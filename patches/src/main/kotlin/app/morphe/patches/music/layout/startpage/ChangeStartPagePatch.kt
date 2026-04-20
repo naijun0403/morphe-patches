@@ -12,6 +12,7 @@ import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
 import app.morphe.patcher.patch.bytecodePatch
+import app.morphe.patcher.patch.resourcePatch
 import app.morphe.patches.music.misc.extension.sharedExtensionPatch
 import app.morphe.patches.music.misc.settings.PreferenceScreen
 import app.morphe.patches.music.misc.settings.settingsPatch
@@ -29,6 +30,22 @@ import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 
 private const val EXTENSION_CLASS = "Lapp/morphe/extension/music/patches/ChangeStartPagePatch;"
 
+private fun disablePredictiveBackManifestPatch() = resourcePatch {
+    execute {
+        val manifestFile = get("AndroidManifest.xml")
+        var manifestContent = manifestFile.readText()
+        val targetAttribute = "android:enableOnBackInvokedCallback=\"false\""
+
+        if (manifestContent.contains("android:enableOnBackInvokedCallback=\"true\"")) {
+            manifestContent = manifestContent.replace("android:enableOnBackInvokedCallback=\"true\"", targetAttribute)
+            manifestFile.writeText(manifestContent)
+        } else if (!manifestContent.contains(targetAttribute)) {
+            manifestContent = manifestContent.replaceFirst("<application", "<application $targetAttribute")
+            manifestFile.writeText(manifestContent)
+        }
+    }
+}
+
 val changeStartPagePatch = bytecodePatch(
     name = "Change start page",
     description = "Adds an option to set which page the app opens in instead of the homepage.",
@@ -36,6 +53,7 @@ val changeStartPagePatch = bytecodePatch(
     dependsOn(
         sharedExtensionPatch,
         settingsPatch,
+        disablePredictiveBackManifestPatch(),
     )
 
     compatibleWith(COMPATIBILITY_YOUTUBE_MUSIC)
