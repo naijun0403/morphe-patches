@@ -35,8 +35,8 @@ public final class ChangeStartPagePatch {
         PLAYLISTS("FEmusic_liked_playlists", TRUE),
         PODCASTS("FEmusic_non_music_audio", TRUE),
         SUBSCRIPTIONS("FEmusic_library_corpus_artists", TRUE),
-        EPISODES_FOR_LATER("VLSE", TRUE),
-        LIKED_MUSIC("VLLM", TRUE),
+        EPISODES_FOR_LATER("SE", false),
+        LIKED_MUSIC("LM", false),
         SEARCH("", false);
 
         @NonNull
@@ -68,10 +68,8 @@ public final class ChangeStartPagePatch {
     private static final String SHORTCUT_ID_SEARCH = "Eh4IBRDTnQEYmgMiEwiZn+H0r5WLAxVV5OcDHcHRBmPqpd25AQA=";
     private static final int SHORTCUT_TYPE_SEARCH = 1;
 
-    private static boolean forceHome = false;
     private static long appLaunchTime = 0;
-    private static long lastBackPressTime = 0;
-    private static boolean isStartPageOverridden = false;
+    private static long lastFinishTime = 0;
 
     public static class ChangeStartPageTypeAvailability implements Setting.Availability {
         @Override
@@ -117,12 +115,6 @@ public final class ChangeStartPagePatch {
             StartPage startPage = Settings.CHANGE_START_PAGE.get();
 
             if (!"FEmusic_home".equals(original)) return original;
-
-            if (forceHome) {
-                forceHome = false;
-                return original;
-            }
-
             if (!startPage.isBrowseId()) return original;
 
             String overrideBrowseId = startPage.id;
@@ -134,8 +126,6 @@ public final class ChangeStartPagePatch {
                     return original;
                 }
             }
-
-            isStartPageOverridden = true;
             return overrideBrowseId;
         } catch (Exception ex) {
             return original;
@@ -151,15 +141,23 @@ public final class ChangeStartPagePatch {
             }
 
             StartPage startPage = Settings.CHANGE_START_PAGE.get();
-            if (startPage != StartPage.SEARCH) return;
+            if (startPage == StartPage.DEFAULT || startPage.isBrowseId()) return;
 
             Intent originalIntent = activity.getIntent();
             if (originalIntent == null) return;
 
             if (ACTION_MAIN.equals(originalIntent.getAction())) {
-                Intent searchIntent = new Intent();
-                setSearchIntent(activity, searchIntent);
-                activity.startActivity(searchIntent);
+                if (startPage == StartPage.SEARCH) {
+                    Intent searchIntent = new Intent();
+                    setSearchIntent(activity, searchIntent);
+                    activity.startActivity(searchIntent);
+                }
+                else if (startPage == StartPage.LIKED_MUSIC || startPage == StartPage.EPISODES_FOR_LATER) {
+                    Intent intent = new Intent(Intent.ACTION_VIEW);
+                    intent.setData(android.net.Uri.parse("https://music.youtube.com/playlist?list=" + startPage.id));
+                    intent.setPackage(activity.getPackageName());
+                    activity.startActivity(intent);
+                }
             }
         } catch (Exception ex ){
             Logger.printException(() -> "overrideIntentActionOnCreate failure", ex);
@@ -170,73 +168,26 @@ public final class ChangeStartPagePatch {
         try {
             if (intent == null) return;
 
-            if (forceHome) {
-                return;
-            }
-
             if (ACTION_MAIN.equals(intent.getAction())) {
                 StartPage startPage = Settings.CHANGE_START_PAGE.get();
                 boolean changeAlways = Settings.CHANGE_START_PAGE_ALWAYS.get();
 
-                if (changeAlways && startPage == StartPage.SEARCH) {
-                    Intent searchIntent = new Intent();
-                    setSearchIntent(activity, searchIntent);
-                    activity.startActivity(searchIntent);
+                if (changeAlways && !startPage.isBrowseId() && startPage != StartPage.DEFAULT) {
+                    if (startPage == StartPage.SEARCH) {
+                        Intent searchIntent = new Intent();
+                        setSearchIntent(activity, searchIntent);
+                        activity.startActivity(searchIntent);
+                    } else if (startPage == StartPage.LIKED_MUSIC || startPage == StartPage.EPISODES_FOR_LATER) {
+                        Intent newIntent = new Intent(Intent.ACTION_VIEW);
+                        newIntent.setData(android.net.Uri.parse("https://music.youtube.com/playlist?list=" + startPage.id));
+                        newIntent.setPackage(activity.getPackageName());
+                        activity.startActivity(newIntent);
+                    }
                 }
             }
         } catch (Exception ex ){
             Logger.printException(() -> "overrideIntentActionOnNewIntent failure", ex);
         }
-    }
-
-    /**
-     * Intercepts onBackPressed before the Fragment Manager can create a blank screen.
-     */
-    public static boolean onBackPressed(Activity activity) {
-        StartPage startPage = Settings.CHANGE_START_PAGE.get();
-        if (startPage == StartPage.DEFAULT) return true;
-
-        String className = activity.getClass().getSimpleName();
-
-        if ("BrowserActivity".equals(className)) {
-            if (isStartPageOverridden) {
-                isStartPageOverridden = false;
-
-                try {
-                    Intent intent = new Intent(Intent.ACTION_VIEW);
-                    intent.setData(android.net.Uri.parse("https://music.youtube.com/"));
-                    intent.setPackage(activity.getPackageName());
-                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                    activity.startActivity(intent);
-                } catch (Exception e) {
-                    Logger.printException(() -> "Failed to launch home intent", e);
-                }
-
-                activity.finish();
-                return false;
-            }
-            return true;
-        }
-
-        final long currentTime = System.currentTimeMillis();
-        if (currentTime - lastBackPressTime < 2000) {
-            return true;
-        }
-        lastBackPressTime = currentTime;
-
-        forceHome = true;
-
-        try {
-            Intent intent = new Intent(Intent.ACTION_VIEW);
-            intent.setData(android.net.Uri.parse("https://music.youtube.com/"));
-            intent.setPackage(activity.getPackageName());
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            activity.startActivity(intent);
-        } catch (Exception e) {
-            Logger.printException(() -> "Failed to launch home intent", e);
-        }
-
-        return false;
     }
 
     /**
@@ -248,26 +199,15 @@ public final class ChangeStartPagePatch {
         if (startPage == StartPage.DEFAULT) return true;
 
         String className = activity.getClass().getSimpleName();
-
         if ("BrowserActivity".equals(className)) {
-            if (isStartPageOverridden) {
-                isStartPageOverridden = false;
-                try {
-                    Intent intent = new Intent(Intent.ACTION_VIEW);
-                    intent.setData(android.net.Uri.parse("https://music.youtube.com/"));
-                    intent.setPackage(activity.getPackageName());
-                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                    activity.startActivity(intent);
-                } catch (Exception e) {
-                    Logger.printException(() -> "Failed to launch home recovery intent", e);
-                }
-            }
             return true;
         }
 
-        if (forceHome) return true;
-
-        forceHome = true;
+        final long currentTime = System.currentTimeMillis();
+        if (currentTime - lastFinishTime < 2000) {
+            return true;
+        }
+        lastFinishTime = currentTime;
 
         try {
             Intent intent = new Intent(Intent.ACTION_VIEW);
