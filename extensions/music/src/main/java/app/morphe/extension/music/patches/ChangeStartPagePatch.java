@@ -113,6 +113,9 @@ public final class ChangeStartPagePatch {
 
     public static String overrideBrowseId(@Nullable String original) {
         try {
+            StartPage startPage = Settings.CHANGE_START_PAGE.get();
+            Logger.printDebug(() -> "Original: " + original + " startPage: " + startPage);
+
             if (!"FEmusic_home".equals(original)) {
                 return original;
             }
@@ -123,7 +126,6 @@ public final class ChangeStartPagePatch {
                 return original;
             }
 
-            StartPage startPage = Settings.CHANGE_START_PAGE.get();
             if (!startPage.isBrowseId()) {
                 return original;
             }
@@ -133,9 +135,10 @@ public final class ChangeStartPagePatch {
                 return original;
             }
 
-            boolean changeAlways = Settings.CHANGE_START_PAGE_ALWAYS.get();
+            final boolean changeAlways = Settings.CHANGE_START_PAGE_ALWAYS.get();
             if (!changeAlways) {
                 if (System.currentTimeMillis() - appLaunchTime > 5000) {
+                    Logger.printDebug(() -> "Ignoring browserId override due to recent app launch");
                     return original;
                 }
             }
@@ -150,6 +153,8 @@ public final class ChangeStartPagePatch {
 
     public static void overrideIntentActionOnCreate(Activity activity, @Nullable Bundle savedInstanceState) {
         try {
+            Logger.printDebug(() -> "overrideIntentActionOnCreate");
+
             if (savedInstanceState == null) {
                 appLaunchTime = System.currentTimeMillis();
             } else {
@@ -202,7 +207,7 @@ public final class ChangeStartPagePatch {
      * @return true to continue with original back behavior (minimizes), false to consume it (routes to home).
      */
     public static boolean onBackPressed(Activity activity) {
-        Logger.printDebug(() -> "onBackPressed intercepted");
+        Logger.printDebug(() -> "onBackPressed");
 
         StartPage startPage = Settings.CHANGE_START_PAGE.get();
         if (startPage == StartPage.DEFAULT) {
@@ -226,8 +231,8 @@ public final class ChangeStartPagePatch {
 
             Logger.printDebug(() -> "Launching back button escape intent (Deep Link)");
             activity.startActivity(intent);
-        } catch (Exception e) {
-            Logger.printException(() -> "Failed to launch home intent", e);
+        } catch (Exception ex) {
+            Logger.printException(() -> "Failed to launch home intent", ex);
         }
 
         return false;
