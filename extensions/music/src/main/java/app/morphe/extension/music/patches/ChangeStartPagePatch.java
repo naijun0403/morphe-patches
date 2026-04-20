@@ -87,18 +87,20 @@ public final class ChangeStartPagePatch {
 
     public static String overrideBrowseId(@Nullable String original) {
         try {
-            if (forceHome && "FEmusic_home".equals(original)) {
+            Logger.printDebug(() -> "Original browseId: " + original);
+
+            final boolean isMusicHome = "FEmusic_home".equals(original);
+            if (forceHome && isMusicHome) {
                 forceHome = false;
                 return original;
             }
 
-            StartPage startPage = Settings.CHANGE_START_PAGE.get();
-
-            if (!startPage.isBrowseId()) {
+            if (!isMusicHome) {
                 return original;
             }
 
-            if (!"FEmusic_home".equals(original)) {
+            StartPage startPage = Settings.CHANGE_START_PAGE.get();
+            if (!startPage.isBrowseId()) {
                 return original;
             }
 
@@ -161,13 +163,17 @@ public final class ChangeStartPagePatch {
      * @return true to continue with original back behavior (minimizes), false to consume it (routes to home).
      */
     public static boolean onBackPressed(Activity activity) {
+        Logger.printDebug(() -> "onBackPressed");
+
         StartPage startPage = Settings.CHANGE_START_PAGE.get();
         if (startPage == StartPage.DEFAULT) {
+            Logger.printDebug(() -> "Ignoring default start page");
             return true;
         }
 
-        long currentTime = System.currentTimeMillis();
+        final long currentTime = System.currentTimeMillis();
         if (currentTime - lastBackPressTime < 2000) {
+            Logger.printDebug(() -> "Ignoring duplicate fast back button press");
             return true;
         }
 
@@ -176,6 +182,7 @@ public final class ChangeStartPagePatch {
 
         Intent intent = activity.getPackageManager().getLaunchIntentForPackage(activity.getPackageName());
         if (intent != null) {
+            Logger.printDebug(() -> "Launching back button intent");
             intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
             activity.startActivity(intent);
         }
