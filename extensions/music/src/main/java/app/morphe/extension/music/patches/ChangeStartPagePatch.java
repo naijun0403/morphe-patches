@@ -70,6 +70,7 @@ public final class ChangeStartPagePatch {
 
     private static boolean forceHome = false;
     private static long appLaunchTime = 0;
+    private static long lastBackPressTime = 0;
     private static boolean isStartPageOverridden = false;
 
     public static class ChangeStartPageTypeAvailability implements Setting.Availability {
@@ -143,8 +144,6 @@ public final class ChangeStartPagePatch {
 
     public static void overrideIntentActionOnCreate(Activity activity, @Nullable Bundle savedInstanceState) {
         try {
-            Logger.printDebug(() -> "overrideIntentActionOnCreate");
-
             if (savedInstanceState == null) {
                 appLaunchTime = System.currentTimeMillis();
             } else {
@@ -158,7 +157,6 @@ public final class ChangeStartPagePatch {
             if (originalIntent == null) return;
 
             if (ACTION_MAIN.equals(originalIntent.getAction())) {
-                Logger.printDebug(() -> "Cold start: Firing search activity directly");
                 Intent searchIntent = new Intent();
                 setSearchIntent(activity, searchIntent);
                 activity.startActivity(searchIntent);
@@ -181,7 +179,6 @@ public final class ChangeStartPagePatch {
                 boolean changeAlways = Settings.CHANGE_START_PAGE_ALWAYS.get();
 
                 if (changeAlways && startPage == StartPage.SEARCH) {
-                    Logger.printDebug(() -> "Warm start: Firing search activity directly");
                     Intent searchIntent = new Intent();
                     setSearchIntent(activity, searchIntent);
                     activity.startActivity(searchIntent);
@@ -190,6 +187,56 @@ public final class ChangeStartPagePatch {
         } catch (Exception ex ){
             Logger.printException(() -> "overrideIntentActionOnNewIntent failure", ex);
         }
+    }
+
+    /**
+     * Intercepts onBackPressed before the Fragment Manager can create a blank screen.
+     */
+    public static boolean onBackPressed(Activity activity) {
+        StartPage startPage = Settings.CHANGE_START_PAGE.get();
+        if (startPage == StartPage.DEFAULT) return true;
+
+        String className = activity.getClass().getSimpleName();
+
+        if ("BrowserActivity".equals(className)) {
+            if (isStartPageOverridden) {
+                isStartPageOverridden = false;
+
+                try {
+                    Intent intent = new Intent(Intent.ACTION_VIEW);
+                    intent.setData(android.net.Uri.parse("https://music.youtube.com/"));
+                    intent.setPackage(activity.getPackageName());
+                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                    activity.startActivity(intent);
+                } catch (Exception e) {
+                    Logger.printException(() -> "Failed to launch home intent", e);
+                }
+
+                activity.finish();
+                return false;
+            }
+            return true;
+        }
+
+        final long currentTime = System.currentTimeMillis();
+        if (currentTime - lastBackPressTime < 2000) {
+            return true;
+        }
+        lastBackPressTime = currentTime;
+
+        forceHome = true;
+
+        try {
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setData(android.net.Uri.parse("https://music.youtube.com/"));
+            intent.setPackage(activity.getPackageName());
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            activity.startActivity(intent);
+        } catch (Exception e) {
+            Logger.printException(() -> "Failed to launch home intent", e);
+        }
+
+        return false;
     }
 
     /**
@@ -207,12 +254,12 @@ public final class ChangeStartPagePatch {
                 isStartPageOverridden = false;
                 try {
                     Intent intent = new Intent(Intent.ACTION_VIEW);
-                    intent.setData(android.net.Uri.parse("https://music.youtube.com/library"));
+                    intent.setData(android.net.Uri.parse("https://music.youtube.com/"));
                     intent.setPackage(activity.getPackageName());
                     intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
                     activity.startActivity(intent);
                 } catch (Exception e) {
-                    Logger.printException(() -> "Failed to launch library recovery intent", e);
+                    Logger.printException(() -> "Failed to launch home recovery intent", e);
                 }
             }
             return true;
