@@ -35,8 +35,8 @@ public final class ChangeStartPagePatch {
         PLAYLISTS("FEmusic_liked_playlists", TRUE),
         PODCASTS("FEmusic_non_music_audio", TRUE),
         SUBSCRIPTIONS("FEmusic_library_corpus_artists", TRUE),
-        EPISODES_FOR_LATER("SE", false),
-        LIKED_MUSIC("LM", false),
+        EPISODES_FOR_LATER("VLSE", false),
+        LIKED_MUSIC("VLLM", false),
         SEARCH("", false);
 
         @NonNull
@@ -115,6 +115,15 @@ public final class ChangeStartPagePatch {
             StartPage startPage = Settings.CHANGE_START_PAGE.get();
 
             if (!"FEmusic_home".equals(original)) return original;
+            if (startPage == StartPage.LIKED_MUSIC || startPage == StartPage.EPISODES_FOR_LATER) {
+                final boolean changeAlways = Settings.CHANGE_START_PAGE_ALWAYS.get();
+                if (!changeAlways && (System.currentTimeMillis() - appLaunchTime > 5000)) {
+                    return original;
+                }
+                Logger.printDebug(() -> "Foundation Test: Swapping Playlist ID for Library ID");
+                return StartPage.LIBRARY.id;
+            }
+
             if (!startPage.isBrowseId()) return original;
 
             String overrideBrowseId = startPage.id;
@@ -126,6 +135,7 @@ public final class ChangeStartPagePatch {
                     return original;
                 }
             }
+
             return overrideBrowseId;
         } catch (Exception ex) {
             return original;
@@ -150,13 +160,8 @@ public final class ChangeStartPagePatch {
                 if (startPage == StartPage.SEARCH) {
                     Intent searchIntent = new Intent();
                     setSearchIntent(activity, searchIntent);
+                    searchIntent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
                     activity.startActivity(searchIntent);
-                }
-                else if (startPage == StartPage.LIKED_MUSIC || startPage == StartPage.EPISODES_FOR_LATER) {
-                    Intent intent = new Intent(Intent.ACTION_VIEW);
-                    intent.setData(android.net.Uri.parse("https://music.youtube.com/playlist?list=" + startPage.id));
-                    intent.setPackage(activity.getPackageName());
-                    activity.startActivity(intent);
                 }
             }
         } catch (Exception ex ){
