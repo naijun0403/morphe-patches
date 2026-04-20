@@ -206,26 +206,7 @@ public final class ChangeStartPagePatch {
      * @return true to continue with original back behavior (minimizes), false to consume it (routes to home).
      */
     public static boolean onBackPressed(Activity activity) {
-        Logger.printDebug(() -> "onBackPressed");
-
-        StartPage startPage = Settings.CHANGE_START_PAGE.get();
-        if (startPage == StartPage.DEFAULT) {
-            return true;
-        }
-
-        forceHome = true;
-
-        try {
-            Intent intent = new Intent(Intent.ACTION_VIEW);
-            intent.setData(android.net.Uri.parse("https://music.youtube.com/"));
-            intent.setPackage(activity.getPackageName());
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-
-            Logger.printDebug(() -> "Launching back button escape intent (Deep Link)");
-            activity.startActivity(intent);
-        } catch (Exception ex) {
-            Logger.printException(() -> "Failed to launch home intent", ex);
-        }
+        Logger.printDebug(() -> "onBackPressed intercepted - testing isolation");
 
         return false;
     }
