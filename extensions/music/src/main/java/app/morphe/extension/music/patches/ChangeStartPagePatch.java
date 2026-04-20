@@ -202,11 +202,34 @@ public final class ChangeStartPagePatch {
     }
 
     /**
-     * Intercepts onBackPressed at the Activity level when the app is about to close.
-     * @return true to continue with original back behavior (minimizes), false to consume it (routes to home).
+     * Intercepts finish() at the Activity level when the app is about to close.
+     * @return true to continue closing the app normally, false to consume it and load home.
      */
-    public static boolean onBackPressed(Activity activity) {
-        Logger.printDebug(() -> "onBackPressed intercepted - testing isolation");
+    public static boolean onFinish(Activity activity) {
+        Logger.printDebug(() -> "Activity finish() intercepted");
+
+        StartPage startPage = Settings.CHANGE_START_PAGE.get();
+        if (startPage == StartPage.DEFAULT) {
+            return true;
+        }
+
+        if (forceHome) {
+            return true;
+        }
+
+        forceHome = true;
+
+        try {
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setData(android.net.Uri.parse("https://music.youtube.com/"));
+            intent.setPackage(activity.getPackageName());
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+
+            Logger.printDebug(() -> "Rescuing app from finish() - Launching Home intent");
+            activity.startActivity(intent);
+        } catch (Exception e) {
+            Logger.printException(() -> "Failed to launch home intent", e);
+        }
 
         return false;
     }

@@ -86,12 +86,12 @@ val changeStartPagePatch = bytecodePatch(
             "invoke-static { p0, p1 }, $EXTENSION_CLASS->overrideIntentActionOnNewIntent(Landroid/app/Activity;Landroid/content/Intent;)V"
         )
 
-        MusicActivityOnBackPressedFingerprint.let {
+        MusicActivityFinishFingerprint.let {
             it.method.apply {
                 addInstructionsWithLabels(
                     0,
                     """
-                        invoke-static { p0 }, $EXTENSION_CLASS->onBackPressed(Landroid/app/Activity;)Z
+                        invoke-static { p0 }, $EXTENSION_CLASS->onFinish(Landroid/app/Activity;)Z
                         move-result v0
                         if-nez v0, :continue
                         return-void
