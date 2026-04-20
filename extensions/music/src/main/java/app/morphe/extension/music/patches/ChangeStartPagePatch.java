@@ -70,6 +70,7 @@ public final class ChangeStartPagePatch {
 
     private static boolean forceHome = false;
     private static long appLaunchTime = 0;
+    private static long lastBackPressTime = 0;
 
     public static class ChangeStartPageTypeAvailability implements Setting.Availability {
         @Override
@@ -199,6 +200,40 @@ public final class ChangeStartPagePatch {
         } catch (Exception ex ){
             Logger.printException(() -> "overrideIntentActionOnNewIntent failure", ex);
         }
+    }
+
+    /**
+     * Intercepts onBackPressed before the Fragment Manager can create a blank screen.
+     */
+    public static boolean onBackPressed(Activity activity) {
+        Logger.printDebug(() -> "onBackPressed intercepted");
+
+        StartPage startPage = Settings.CHANGE_START_PAGE.get();
+        if (startPage == StartPage.DEFAULT) {
+            return true;
+        }
+
+        final long currentTime = System.currentTimeMillis();
+        if (currentTime - lastBackPressTime < 2000) {
+            return true;
+        }
+        lastBackPressTime = currentTime;
+
+        forceHome = true;
+
+        try {
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setData(android.net.Uri.parse("https://music.youtube.com/library"));
+            intent.setPackage(activity.getPackageName());
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+
+            Logger.printDebug(() -> "Rescuing app from blank screen - Launching Library intent");
+            activity.startActivity(intent);
+        } catch (Exception e) {
+            Logger.printException(() -> "Failed to launch recovery intent", e);
+        }
+
+        return false;
     }
 
     /**

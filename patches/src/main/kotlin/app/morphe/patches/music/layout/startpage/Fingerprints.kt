@@ -8,8 +8,10 @@
 package app.morphe.patches.music.layout.startpage
 
 import app.morphe.patcher.Fingerprint
+import app.morphe.patcher.methodCall
 import app.morphe.patcher.string
 import app.morphe.patches.music.shared.MusicActivityOnCreateFingerprint
+import com.android.tools.smali.dexlib2.Opcode
 
 internal object ColdStartUpFingerprint : Fingerprint(
     returnType = "Ljava/lang/String;",
@@ -27,6 +29,13 @@ internal object MusicActivityFinishFingerprint : Fingerprint(
     parameters = listOf()
 )
 
+internal object MusicActivityOnBackPressedFingerprint : Fingerprint(
+    classFingerprint = MusicActivityOnCreateFingerprint,
+    name = "onBackPressed",
+    filters = listOf(
+        methodCall(opcode = Opcode.INVOKE_SUPER, name = "onBackPressed")
+    )
+)
 internal object BrowserActivityOnNewIntentFingerprint : Fingerprint(
     definingClass = "Lcom/google/android/apps/youtube/music/browser/BrowserActivity;",
     name = "onNewIntent",

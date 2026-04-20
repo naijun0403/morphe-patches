@@ -117,5 +117,21 @@ val changeStartPagePatch = bytecodePatch(
                 )
             }
         }
+
+        MusicActivityOnBackPressedFingerprint.let {
+            it.method.apply {
+                addInstructionsWithLabels(
+                    0,
+                    """
+                        invoke-static { p0 }, $EXTENSION_CLASS->onBackPressed(Landroid/app/Activity;)Z
+                        move-result v0
+                        if-nez v0, :continue
+                        return-void
+                        :continue
+                        nop
+                    """
+                )
+            }
+        }
     }
 }
