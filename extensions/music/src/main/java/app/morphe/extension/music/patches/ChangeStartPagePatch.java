@@ -125,20 +125,32 @@ public final class ChangeStartPagePatch {
 
     public static void overrideIntentActionOnCreate(Activity activity, @Nullable Bundle savedInstanceState) {
         try {
-            if (savedInstanceState != null) return;
+            if (savedInstanceState != null) {
+                Logger.printDebug(() -> "savedInstanceState is not null, not changing intent action");
+                return;
+            }
 
             StartPage startPage = Settings.CHANGE_START_PAGE.get();
-            if (startPage != StartPage.SEARCH) return;
+            if (startPage != StartPage.SEARCH) {
+                Logger.printDebug(() -> "Start page is not search, not changing intent action: " + startPage);
+                return;
+            }
 
             Intent originalIntent = activity.getIntent();
-            if (originalIntent == null) return;
+            if (originalIntent == null) {
+                Logger.printDebug(() -> "Original intent is null, not changing intent action");
+                return;
+            }
 
             if (ACTION_MAIN.equals(originalIntent.getAction())) {
                 Logger.printDebug(() -> "Cold start: Firing search activity directly");
                 Intent searchIntent = new Intent();
                 setSearchIntent(activity, searchIntent);
                 activity.startActivity(searchIntent);
+                return;
             }
+
+            Logger.printDebug(() -> "Not overriding intent action");
         } catch (Exception ex ){
             Logger.printException(() -> "overrideIntentActionOnCreate failure", ex);
         }
