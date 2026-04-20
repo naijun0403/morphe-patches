@@ -70,7 +70,6 @@ public final class ChangeStartPagePatch {
 
     private static boolean forceHome = false;
     private static long appLaunchTime = 0;
-    private static long lastBackPressTime = 0;
 
     public static class ChangeStartPageTypeAvailability implements Setting.Availability {
         @Override
@@ -209,20 +208,13 @@ public final class ChangeStartPagePatch {
             return true;
         }
 
-        final long currentTime = System.currentTimeMillis();
-        if (currentTime - lastBackPressTime < 2000) {
-            Logger.printDebug(() -> "Ignoring duplicate fast back press");
-            return true;
-        }
-
-        lastBackPressTime = currentTime;
         forceHome = true;
 
         try {
             Intent intent = new Intent(Intent.ACTION_VIEW);
             intent.setData(android.net.Uri.parse("https://music.youtube.com/"));
             intent.setPackage(activity.getPackageName());
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
 
             Logger.printDebug(() -> "Launching back button escape intent (Deep Link)");
             activity.startActivity(intent);
