@@ -120,7 +120,6 @@ public final class ChangeStartPagePatch {
                 if (!changeAlways && (System.currentTimeMillis() - appLaunchTime > 5000)) {
                     return original;
                 }
-                Logger.printDebug(() -> "Foundation Test: Swapping Playlist ID for Library ID");
                 return StartPage.LIBRARY.id;
             }
 
@@ -163,6 +162,13 @@ public final class ChangeStartPagePatch {
                     searchIntent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
                     activity.startActivity(searchIntent);
                 }
+                else if (startPage == StartPage.LIKED_MUSIC || startPage == StartPage.EPISODES_FOR_LATER) {
+                    Intent intent = new Intent(Intent.ACTION_VIEW);
+                    intent.setData(android.net.Uri.parse("https://music.youtube.com/playlist?list=" + startPage.id));
+                    intent.setPackage(activity.getPackageName());
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
+                    activity.startActivity(intent);
+                }
             }
         } catch (Exception ex ){
             Logger.printException(() -> "overrideIntentActionOnCreate failure", ex);
@@ -181,11 +187,13 @@ public final class ChangeStartPagePatch {
                     if (startPage == StartPage.SEARCH) {
                         Intent searchIntent = new Intent();
                         setSearchIntent(activity, searchIntent);
+                        searchIntent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
                         activity.startActivity(searchIntent);
                     } else if (startPage == StartPage.LIKED_MUSIC || startPage == StartPage.EPISODES_FOR_LATER) {
                         Intent newIntent = new Intent(Intent.ACTION_VIEW);
                         newIntent.setData(android.net.Uri.parse("https://music.youtube.com/playlist?list=" + startPage.id));
                         newIntent.setPackage(activity.getPackageName());
+                        newIntent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
                         activity.startActivity(newIntent);
                     }
                 }
