@@ -115,14 +115,6 @@ public final class ChangeStartPagePatch {
             StartPage startPage = Settings.CHANGE_START_PAGE.get();
 
             if (!"FEmusic_home".equals(original)) return original;
-            if (startPage == StartPage.LIKED_MUSIC || startPage == StartPage.EPISODES_FOR_LATER) {
-                final boolean changeAlways = Settings.CHANGE_START_PAGE_ALWAYS.get();
-                if (!changeAlways && (System.currentTimeMillis() - appLaunchTime > 5000)) {
-                    return original;
-                }
-                return StartPage.LIBRARY.id;
-            }
-
             if (!startPage.isBrowseId()) return original;
 
             String overrideBrowseId = startPage.id;
@@ -163,11 +155,10 @@ public final class ChangeStartPagePatch {
                     activity.startActivity(searchIntent);
                 }
                 else if (startPage == StartPage.LIKED_MUSIC || startPage == StartPage.EPISODES_FOR_LATER) {
-                    Intent intent = new Intent(Intent.ACTION_VIEW);
-                    intent.setData(android.net.Uri.parse("https://music.youtube.com/playlist?list=" + startPage.id));
-                    intent.setPackage(activity.getPackageName());
-                    intent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
-                    activity.startActivity(intent);
+                    originalIntent.setAction(Intent.ACTION_VIEW);
+                    originalIntent.setData(android.net.Uri.parse("https://music.youtube.com/playlist?list=" + startPage.id));
+                    originalIntent.removeCategory(Intent.CATEGORY_LAUNCHER);
+                    activity.setIntent(originalIntent);
                 }
             }
         } catch (Exception ex ){
@@ -190,11 +181,10 @@ public final class ChangeStartPagePatch {
                         searchIntent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
                         activity.startActivity(searchIntent);
                     } else if (startPage == StartPage.LIKED_MUSIC || startPage == StartPage.EPISODES_FOR_LATER) {
-                        Intent newIntent = new Intent(Intent.ACTION_VIEW);
-                        newIntent.setData(android.net.Uri.parse("https://music.youtube.com/playlist?list=" + startPage.id));
-                        newIntent.setPackage(activity.getPackageName());
-                        newIntent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
-                        activity.startActivity(newIntent);
+                        intent.setAction(Intent.ACTION_VIEW);
+                        intent.setData(android.net.Uri.parse("https://music.youtube.com/playlist?list=" + startPage.id));
+                        intent.removeCategory(Intent.CATEGORY_LAUNCHER);
+                        activity.setIntent(intent);
                     }
                 }
             }
