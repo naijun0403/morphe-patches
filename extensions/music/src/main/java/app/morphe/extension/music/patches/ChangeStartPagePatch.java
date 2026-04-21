@@ -70,6 +70,7 @@ public final class ChangeStartPagePatch {
 
     private static long appLaunchTime = 0;
     private static long lastFinishTime = 0;
+    private static boolean isColdStartRouting = false;
 
     public static class ChangeStartPageTypeAvailability implements Setting.Availability {
         @Override
@@ -158,9 +159,12 @@ public final class ChangeStartPagePatch {
                     Intent intent = new Intent(Intent.ACTION_VIEW);
                     intent.setData(android.net.Uri.parse("https://music.youtube.com/playlist?list=" + startPage.id));
                     intent.setPackage(activity.getPackageName());
-                    intent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION | Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+
+                    isColdStartRouting = true;
 
                     activity.startActivity(intent);
+                    activity.finishAndRemoveTask();
                     activity.overridePendingTransition(0, 0);
                 }
             }
@@ -204,6 +208,11 @@ public final class ChangeStartPagePatch {
      * @return true to continue closing the app normally, false to consume it and load home.
      */
     public static boolean onFinish(Activity activity) {
+        if (isColdStartRouting) {
+            isColdStartRouting = false;
+            return true;
+        }
+
         StartPage startPage = Settings.CHANGE_START_PAGE.get();
         if (startPage == StartPage.DEFAULT) return true;
 
