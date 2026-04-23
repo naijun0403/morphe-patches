@@ -5,7 +5,6 @@ import static java.lang.Boolean.TRUE;
 
 import android.content.Intent;
 
-import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import app.morphe.extension.shared.Logger;
@@ -58,13 +57,12 @@ public final class ChangeStartPagePatch {
         SEARCH("com.google.android.youtube.action.open.search", FALSE),
         SHORTS("com.google.android.youtube.action.open.shorts", FALSE);
 
-        @NonNull
         final String id;
 
         @Nullable
         final Boolean isBrowseId;
 
-        StartPage(@NonNull String id, @Nullable Boolean isBrowseId) {
+        StartPage(String id, @Nullable Boolean isBrowseId) {
             this.id = id;
             this.isBrowseId = isBrowseId;
         }
@@ -91,15 +89,13 @@ public final class ChangeStartPagePatch {
 
     private static final StartPage START_PAGE = Settings.CHANGE_START_PAGE.get();
 
-    private static final boolean CHANGE_START_PAGE_ALWAYS = false;
-
     /**
      * There is an issue where the back button on the toolbar doesn't work properly.
      * As a workaround for this issue, instead of overriding the browserId multiple times, just override it once.
      */
     private static boolean appLaunched = false;
 
-    public static String overrideBrowseId(@NonNull String original) {
+    public static String overrideBrowseId(String original) {
         if (!START_PAGE.isBrowseId()) {
             return original;
         }
@@ -108,7 +104,7 @@ public final class ChangeStartPagePatch {
             return original;
         }
 
-        if (!CHANGE_START_PAGE_ALWAYS && appLaunched) {
+        if (appLaunched) {
             Logger.printDebug(() -> "Ignore override browseId as the app already launched");
             return original;
         }
@@ -118,7 +114,7 @@ public final class ChangeStartPagePatch {
         return START_PAGE.id;
     }
 
-    public static void overrideIntentAction(@NonNull Intent intent) {
+    public static void overrideIntentAction(Intent intent) {
         if (!START_PAGE.isIntentAction()) {
             return;
         }
@@ -129,7 +125,7 @@ public final class ChangeStartPagePatch {
             return;
         }
 
-        if (!CHANGE_START_PAGE_ALWAYS && appLaunched) {
+        if (appLaunched) {
             Logger.printDebug(() -> "Ignore override intent action as the app already launched");
             return;
         }
