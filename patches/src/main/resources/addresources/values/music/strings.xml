@@ -120,11 +120,6 @@ Feature implementation by VazerOG"</string>
     <string name="morphe_change_start_page_entry_playlists">Playlists</string>
     <string name="morphe_change_start_page_entry_search">Search</string>
     <string name="morphe_change_start_page_entry_subscriptions">Subscriptions</string>
-    <string name="morphe_change_start_page_always_title">Always change start page</string>
-    <string name="morphe_change_start_page_always_summary_on">"Start page is always changed
-
-Limitation: Using the back button on the toolbar may not work"</string>
-    <string name="morphe_change_start_page_always_summary_off">Start page is changed only on app startup</string>
 
     <!-- layout.compactheader.hideCategoryBar -->
     <string name="morphe_music_hide_category_bar_title">Hide category bar</string>
