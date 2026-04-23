@@ -110,11 +110,17 @@ public final class ChangeStartPagePatch {
 
     public static void overrideIntentActionOnCreate(Activity activity, @Nullable Bundle savedInstanceState) {
         try {
+            if (savedInstanceState != null) return;
+            if (!activity.isTaskRoot()) return;
+
             StartPage startPage = Settings.CHANGE_START_PAGE.get();
             if (startPage == StartPage.DEFAULT || startPage.isBrowseId()) return;
 
             Intent originalIntent = activity.getIntent();
             if (originalIntent == null) return;
+            if ((originalIntent.getFlags() & Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0) {
+                return;
+            }
 
             if (!ACTION_MAIN.equals(originalIntent.getAction())) {
                 return;
@@ -125,15 +131,17 @@ public final class ChangeStartPagePatch {
                 setSearchIntent(activity, searchIntent);
                 searchIntent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
                 activity.startActivity(searchIntent);
+                activity.finish();
                 activity.overridePendingTransition(0, 0);
             } else if (startPage == StartPage.LIKED_MUSIC || startPage == StartPage.EPISODES_FOR_LATER) {
-                Intent intent = new Intent(Intent.ACTION_VIEW);
-                intent.setData(android.net.Uri.parse("https://music.youtube.com/playlist?list=" + startPage.id));
-                intent.setPackage(activity.getPackageName());
-                intent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION | Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-
-                activity.startActivity(intent);
-                activity.finishAndRemoveTask();
+                Intent homeIntent = new Intent(Intent.ACTION_VIEW);
+                homeIntent.setData(android.net.Uri.parse("https://music.youtube.com/"));
+                homeIntent.setPackage(activity.getPackageName());
+                homeIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION);
+                Intent playlistIntent = new Intent(Intent.ACTION_VIEW);
+                playlistIntent.setData(android.net.Uri.parse("https://music.youtube.com/playlist?list=" + startPage.id));
+                playlistIntent.setPackage(activity.getPackageName());
+                activity.startActivities(new Intent[]{homeIntent, playlistIntent});
                 activity.overridePendingTransition(0, 0);
             }
         } catch (Exception ex ){
