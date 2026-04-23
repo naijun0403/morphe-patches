@@ -8,10 +8,7 @@ import android.content.Intent;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import java.util.List;
-
 import app.morphe.extension.shared.Logger;
-import app.morphe.extension.shared.settings.Setting;
 import app.morphe.extension.youtube.settings.Settings;
 
 @SuppressWarnings("unused")
@@ -82,18 +79,6 @@ public final class ChangeStartPagePatch {
         }
     }
 
-    public static class ChangeStartPageTypeAvailability implements Setting.Availability {
-        @Override
-        public boolean isAvailable() {
-            return Settings.CHANGE_START_PAGE.get() != StartPage.DEFAULT;
-        }
-
-        @Override
-        public List<Setting<?>> getParentSettings() {
-            return List.of(Settings.CHANGE_START_PAGE);
-        }
-    }
-
     /**
      * Intent action when YouTube is cold started from the launcher.
      * <p>
@@ -106,7 +91,7 @@ public final class ChangeStartPagePatch {
 
     private static final StartPage START_PAGE = Settings.CHANGE_START_PAGE.get();
 
-    private static final boolean CHANGE_START_PAGE_ALWAYS = Settings.CHANGE_START_PAGE_ALWAYS.get();
+    private static final boolean CHANGE_START_PAGE_ALWAYS = true;
 
     /**
      * There is an issue where the back button on the toolbar doesn't work properly.
