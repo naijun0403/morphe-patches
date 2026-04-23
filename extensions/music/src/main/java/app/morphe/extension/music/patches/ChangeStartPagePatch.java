@@ -131,7 +131,6 @@ public final class ChangeStartPagePatch {
                 setSearchIntent(activity, searchIntent);
                 searchIntent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
                 activity.startActivity(searchIntent);
-                activity.finish();
                 activity.overridePendingTransition(0, 0);
             } else if (startPage == StartPage.LIKED_MUSIC || startPage == StartPage.EPISODES_FOR_LATER) {
                 Intent homeIntent = new Intent(Intent.ACTION_VIEW);
