@@ -14,7 +14,7 @@ import androidx.annotation.NonNull;
 
 import app.morphe.extension.shared.settings.BooleanSetting;
 
-abstract class FilterGroup<T> {
+abstract class SpanFilterGroup<T> {
     final static class FilterGroupResult {
         private BooleanSetting setting;
         private int matchedIndex;
@@ -45,7 +45,7 @@ abstract class FilterGroup<T> {
     protected final T[] filters;
 
     @SafeVarargs
-    public FilterGroup(final BooleanSetting setting, final T... filters) {
+    public SpanFilterGroup(final BooleanSetting setting, final T... filters) {
         this.setting = setting;
         this.filters = filters;
         if (filters.length == 0) {
@@ -71,9 +71,9 @@ abstract class FilterGroup<T> {
     public abstract FilterGroupResult check(final T stack);
 }
 
-class StringFilterGroup extends FilterGroup<String> {
+class StringSpanFilterGroup extends SpanFilterGroup<String> {
 
-    public StringFilterGroup(final BooleanSetting setting, final String... filters) {
+    public StringSpanFilterGroup(final BooleanSetting setting, final String... filters) {
         super(setting, filters);
     }
 

@@ -97,10 +97,11 @@ val textComponentPatch = bytecodePatch(
             ).registerA
 
             addInstructions(
-                insertIndex, """
+                insertIndex,
+                """
                     move-object/from16 v$textComponentContextRegister, p0
                     iget-object v$textComponentContextRegister, v$textComponentContextRegister, $conversionContextFieldReference
-                    """
+                """
             )
             textComponentIndex = insertIndex + 2
         }
@@ -111,10 +112,11 @@ internal fun hookSpannableString(
     classDescriptor: String,
     methodName: String
 ) = spannedMethod.addInstructions(
-    spannedIndex, """
-        invoke-static {v$spannedContextRegister, v$spannedRegister}, $classDescriptor->$methodName(Ljava/lang/Object;Ljava/lang/CharSequence;)Ljava/lang/CharSequence;
+    spannedIndex,
+    """
+        invoke-static { v$spannedContextRegister, v$spannedRegister }, $classDescriptor->$methodName(Ljava/lang/Object;Ljava/lang/CharSequence;)Ljava/lang/CharSequence;
         move-result-object v$spannedRegister
-        """
+    """
 )
 
 internal fun hookTextComponent(
@@ -122,10 +124,11 @@ internal fun hookTextComponent(
     methodName: String = "onLithoTextLoaded"
 ) = textComponentMethod.apply {
     addInstructions(
-        textComponentIndex, """
-            invoke-static {v$textComponentContextRegister, v$textComponentRegister}, $classDescriptor->$methodName(Ljava/lang/Object;Ljava/lang/CharSequence;)Ljava/lang/CharSequence;
+        textComponentIndex,
+        """
+            invoke-static { v$textComponentContextRegister, v$textComponentRegister }, $classDescriptor->$methodName(Ljava/lang/Object;Ljava/lang/CharSequence;)Ljava/lang/CharSequence;
             move-result-object v$textComponentRegister
-            """
+        """
     )
     textComponentIndex += 2
 }

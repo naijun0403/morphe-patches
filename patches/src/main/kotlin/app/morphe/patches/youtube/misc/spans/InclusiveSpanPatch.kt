@@ -21,8 +21,8 @@ import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod.Companion.toMutable
 import app.morphe.patches.youtube.misc.textcomponent.hookSpannableString
 import app.morphe.patches.youtube.misc.textcomponent.textComponentPatch
-import app.morphe.patches.youtube.shared.indexOfSpannableStringInstruction
 import app.morphe.patches.youtube.shared.SpannableStringBuilderFingerprint
+import app.morphe.patches.youtube.shared.indexOfSpannableStringInstruction
 import app.morphe.util.fiveRegisters
 import app.morphe.util.getMutableMethod
 import app.morphe.util.getReference
@@ -40,7 +40,7 @@ import java.lang.ref.WeakReference
 
 internal const val EXTENSION_SPANS_CLASS = "Lapp/morphe/extension/youtube/patches/spans/InclusiveSpanPatch;"
 
-internal const val EXTENSION_FILTER_ARRAY = "[Lapp/morphe/extension/youtube/patches/spans/Filter;"
+internal const val EXTENSION_FILTER_ARRAY = "[Lapp/morphe/extension/youtube/patches/spans/SpanFilter;"
 
 // Registers used in extension helperMethod.
 private const val REGISTER_FILTER_CLASS = 0

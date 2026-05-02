@@ -22,7 +22,7 @@ import java.util.function.Consumer;
 import app.morphe.extension.shared.StringTrieSearch;
 import app.morphe.extension.shared.TrieSearch;
 
-abstract class FilterGroupList<V, T extends FilterGroup<V>> implements Iterable<T> {
+abstract class SpanFilterGroupList<V, T extends SpanFilterGroup<V>> implements Iterable<T> {
 
     private final List<T> filterGroups = new ArrayList<>();
     private final TrieSearch<V> search = createSearchGraph();
@@ -36,9 +36,11 @@ abstract class FilterGroupList<V, T extends FilterGroup<V>> implements Iterable<
                 continue;
             }
             for (V pattern : group.filters) {
-                search.addPattern(pattern, (textSearched, matchedStartIndex, matchedLength, callbackParameter) -> {
+                search.addPattern(pattern, (textSearched, matchedStartIndex,
+                                            matchedLength, callbackParameter) -> {
                     if (group.isEnabled()) {
-                        FilterGroup.FilterGroupResult result = (FilterGroup.FilterGroupResult) callbackParameter;
+                        SpanFilterGroup.FilterGroupResult result =
+                                (SpanFilterGroup.FilterGroupResult) callbackParameter;
                         result.setValues(group.setting, matchedStartIndex);
                         return true;
                     }
@@ -65,8 +67,8 @@ abstract class FilterGroupList<V, T extends FilterGroup<V>> implements Iterable<
         return filterGroups.spliterator();
     }
 
-    protected FilterGroup.FilterGroupResult check(V stack) {
-        FilterGroup.FilterGroupResult result = new FilterGroup.FilterGroupResult();
+    protected SpanFilterGroup.FilterGroupResult check(V stack) {
+        SpanFilterGroup.FilterGroupResult result = new SpanFilterGroup.FilterGroupResult();
         search.matches(stack, result);
         return result;
     }
@@ -74,7 +76,7 @@ abstract class FilterGroupList<V, T extends FilterGroup<V>> implements Iterable<
     protected abstract TrieSearch<V> createSearchGraph();
 }
 
-final class StringFilterGroupList extends FilterGroupList<String, StringFilterGroup> {
+final class StringSpanFilterGroupList extends SpanFilterGroupList<String, StringSpanFilterGroup> {
     @Override
     protected StringTrieSearch createSearchGraph() {
         return new StringTrieSearch();

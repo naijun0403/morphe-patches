@@ -31,11 +31,11 @@ import app.morphe.extension.youtube.settings.Settings;
 /**
  * Placeholder for actual filters.
  */
-final class DummyFilter extends Filter {
+final class DummySpanFilter extends SpanFilter {
 }
 
 @SuppressWarnings("unused")
-public final class InclusiveSpanType {
+public final class InclusiveSpanPatch {
 
     /**
      * Simple wrapper to pass the litho parameters through the prefix search.
@@ -118,20 +118,20 @@ public final class InclusiveSpanType {
                 : spanType.type;
     }
 
-    private static final Filter[] filters = new Filter[]{
-            new DummyFilter() // Replaced by patch.
+    private static final SpanFilter[] filters = new SpanFilter[]{
+            new DummySpanFilter() // Replaced by patch.
     };
 
     private static final StringTrieSearch searchTree = new StringTrieSearch();
 
     /**
-     * Because litho filtering is multi-threaded and the buffer is passed in from a different injection point,
+     * Because litho filtering is multithreaded and the buffer is passed in from a different injection point,
      * the buffer is saved to a ThreadLocal so each calling thread does not interfere with other threads.
      */
     private static final ThreadLocal<String> conversionContextThreadLocal = new ThreadLocal<>();
 
     static {
-        for (Filter filter : filters) {
+        for (SpanFilter filter : filters) {
             filterUsingCallbacks(filter, filter.callbacks);
         }
 
@@ -142,17 +142,17 @@ public final class InclusiveSpanType {
         }
     }
 
-    private static void filterUsingCallbacks(Filter filter, List<StringFilterGroup> groups) {
+    private static void filterUsingCallbacks(SpanFilter filter, List<StringSpanFilterGroup> groups) {
         String filterSimpleName = filter.getClass().getSimpleName();
 
-        for (StringFilterGroup group : groups) {
+        for (StringSpanFilterGroup group : groups) {
             if (!group.includeInSearch()) {
                 continue;
             }
 
             for (String pattern : group.filters) {
-                InclusiveSpanType.searchTree.addPattern(pattern, (textSearched, matchedStartIndex,
-                                                                  matchedLength, callbackParameter) -> {
+                InclusiveSpanPatch.searchTree.addPattern(pattern, (textSearched, matchedStartIndex,
+                                                                   matchedLength, callbackParameter) -> {
                             if (!group.isEnabled()) return false;
 
                             LithoFilterParameters parameters = (LithoFilterParameters) callbackParameter;
@@ -177,21 +177,20 @@ public final class InclusiveSpanType {
      *
      * @param conversionContext ConversionContext is used to identify whether it is a comment thread or not.
      */
-    public static CharSequence setConversionContext(@NonNull Object conversionContext,
-                                                    @NonNull CharSequence original) {
+    public static CharSequence setConversionContext(Object conversionContext, CharSequence original) {
         conversionContextThreadLocal.set(conversionContext.toString());
         return original;
     }
 
     private static boolean returnEarly(SpannableString spannableString, Object span, int start, int end, int flags) {
         try {
-            final String conversionContext = conversionContextThreadLocal.get();
+            String conversionContext = conversionContextThreadLocal.get();
             if (conversionContext == null || conversionContext.isEmpty()) {
                 return false;
             }
 
-            LithoFilterParameters parameter =
-                    new LithoFilterParameters(conversionContext, spannableString, span, start, end, flags);
+            LithoFilterParameters parameter = new LithoFilterParameters(conversionContext,
+                    spannableString, span, start, end, flags);
 
             if (Settings.DEBUG_SPANNABLE.get()) {
                 Logger.printDebug(() -> "Searching...\n\u200B\n" + parameter);

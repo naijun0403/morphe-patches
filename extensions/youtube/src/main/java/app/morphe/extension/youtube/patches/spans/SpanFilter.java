@@ -26,22 +26,22 @@ import java.util.List;
  * <p>
  * All callbacks must be registered before the constructor completes.
  */
-abstract class Filter {
+abstract class SpanFilter {
     private static final RelativeSizeSpan relativeSizeSpanDummy = new RelativeSizeSpan(0f);
     private static final Drawable transparentDrawable = new ColorDrawable(Color.TRANSPARENT);
     private static final ImageSpan imageSpanDummy = new ImageSpan(transparentDrawable);
 
     /**
      * Path callbacks. Do not add to this instance,
-     * and instead use {@link #addCallbacks(StringFilterGroup...)}.
+     * and instead use {@link #addCallbacks(StringSpanFilterGroup...)}.
      */
-    protected final List<StringFilterGroup> callbacks = new ArrayList<>();
+    protected final List<StringSpanFilterGroup> callbacks = new ArrayList<>();
 
     /**
-     * Adds callbacks to {@link #skip(String, SpannableString, Object, int, int, int, boolean, SpanType, StringFilterGroup)}
+     * Adds callbacks to {@link #skip(String, SpannableString, Object, int, int, int, boolean, SpanType, StringSpanFilterGroup)}
      * if any of the groups are found.
      */
-    protected final void addCallbacks(StringFilterGroup... groups) {
+    protected final void addCallbacks(StringSpanFilterGroup... groups) {
         callbacks.addAll(Arrays.asList(groups));
     }
 
@@ -63,7 +63,7 @@ abstract class Filter {
      * @param matchedGroup The actual filter that matched.
      */
     boolean skip(String conversionContext, SpannableString spannableString, Object span, int start, int end,
-                 int flags, boolean isWord, SpanType spanType, StringFilterGroup matchedGroup) {
+                 int flags, boolean isWord, SpanType spanType, StringSpanFilterGroup matchedGroup) {
         return true;
     }
 }
