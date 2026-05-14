@@ -24,12 +24,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Setup Java
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
       - name: Cache Gradle
         uses: burrunan/gradle-cache-action@v3
@@ -67,7 +69,7 @@ jobs:
 
       - name: Trigger website deploy
         if: steps.release.outputs.new_release_published == 'true'
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |
@@ -78,17 +80,17 @@ jobs:
             })
 
       - name: Wait before sending FCM
-        if: steps.release.outputs.new_release_published == 'true' && inputs.send_fcm != false
+        if: steps.release.outputs.new_release_published == 'true' && (github.event_name == 'push' || inputs.send_fcm == true)
         run: sleep 300
 
       - name: Setup Python for FCM
-        if: steps.release.outputs.new_release_published == 'true' && inputs.send_fcm != false
+        if: steps.release.outputs.new_release_published == 'true' && (github.event_name == 'push' || inputs.send_fcm == true)
         uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
       - name: Send FCM push notification
-        if: steps.release.outputs.new_release_published == 'true' && inputs.send_fcm != false
+        if: steps.release.outputs.new_release_published == 'true' && (github.event_name == 'push' || inputs.send_fcm == true)
         env:
           FCM_PROJECT_ID: ${{ secrets.FCM_PROJECT_ID }}
           FCM_SERVICE_ACCOUNT_JSON: ${{ secrets.FCM_SERVICE_ACCOUNT_JSON }}

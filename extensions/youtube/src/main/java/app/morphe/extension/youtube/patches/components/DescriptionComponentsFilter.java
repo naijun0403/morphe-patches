@@ -17,9 +17,12 @@ final class DescriptionComponentsFilter extends Filter {
     private final ByteArrayFilterGroupList macroMarkersCarouselGroupList = new ByteArrayFilterGroupList();
     private final StringFilterGroup playlistSection;
     private final ByteArrayFilterGroupList playlistSectionGroupList = new ByteArrayFilterGroupList();
-    private final StringFilterGroup featuredLinksSection;
-    private final StringFilterGroup featuredVideosSection;
+    private final StringFilterGroup featuredSection;
+    private final ByteArrayFilterGroupList featuredSectionGroupList = new ByteArrayFilterGroupList();
     private final StringFilterGroup subscribeButton;
+    private final StringFilterGroup shortsHowThisWasMadeSection;
+    private final StringFilterGroup videoDetails;
+    private final ByteArrayFilterGroup videoDetailsBuffer;
 
     public DescriptionComponentsFilter() {
         final StringFilterGroup aiGeneratedVideoSummarySection = new StringFilterGroup(
@@ -29,17 +32,24 @@ final class DescriptionComponentsFilter extends Filter {
 
         final StringFilterGroup askSection = new StringFilterGroup(
                 Settings.HIDE_ASK_SECTION,
+                "input_composer_button.e",
                 "youchat_entrypoint.e"
         );
 
-        featuredLinksSection = new StringFilterGroup(
-                Settings.HIDE_FEATURED_LINKS_SECTION,
-                "media_lockup"
+        featuredSection = new StringFilterGroup(
+                null,
+                "compact_infocard.e"
         );
 
-        featuredVideosSection = new StringFilterGroup(
-                Settings.HIDE_FEATURED_VIDEOS_SECTION,
-                "structured_description_video_lockup"
+        featuredSectionGroupList.addAll(
+                new ByteArrayFilterGroup(
+                        Settings.HIDE_FEATURED_LINKS_SECTION,
+                        "media_lockup"
+                ),
+                new ByteArrayFilterGroup(
+                        Settings.HIDE_FEATURED_VIDEOS_SECTION,
+                        "structured_description_video_lockup"
+                )
         );
 
         playlistSection = new StringFilterGroup(
@@ -60,6 +70,11 @@ final class DescriptionComponentsFilter extends Filter {
                         "FEpodcasts_destination",
                         "yt_outline_experimental_podcast"
                 )
+        );
+
+        final StringFilterGroup correctionsSection = new StringFilterGroup(
+                Settings.HIDE_CORRECTIONS_SECTION,
+                "error_corrections_section"
         );
 
         final StringFilterGroup transcriptSection = new StringFilterGroup(
@@ -111,19 +126,37 @@ final class DescriptionComponentsFilter extends Filter {
                 )
         );
 
+        shortsHowThisWasMadeSection = new StringFilterGroup(
+                Settings.HIDE_HOW_THIS_WAS_MADE_SECTION,
+                "shelf_header.e",
+                "cell_video_attribute.e"
+        );
+
+        videoDetails = new StringFilterGroup(
+                null,
+                "linear_layout.e"
+        );
+
+        videoDetailsBuffer = new ByteArrayFilterGroup(
+                Settings.HIDE_VIDEO_DETAILS_SECTION,
+                "section_header"
+        );
+
         addPathCallbacks(
                 aiGeneratedVideoSummarySection,
                 askSection,
+                correctionsSection,
                 courseProgressSection,
-                featuredLinksSection,
-                featuredVideosSection,
+                featuredSection,
                 howThisWasMadeSection,
                 hypePoints,
                 infoCardsSection,
                 macroMarkersCarousel,
                 playlistSection,
+                shortsHowThisWasMadeSection,
                 subscribeButton,
-                transcriptSection
+                transcriptSection,
+                videoDetails
         );
     }
 
@@ -142,8 +175,12 @@ final class DescriptionComponentsFilter extends Filter {
             return false;
         }
 
-        if (matchedGroup == featuredLinksSection || matchedGroup == featuredVideosSection || matchedGroup == subscribeButton) {
+        if (matchedGroup == subscribeButton) {
             return path.startsWith(INFOCARDS_SECTION_PATH);
+        }
+
+        if (matchedGroup == featuredSection) {
+            return featuredSectionGroupList.check(buffer).isFiltered();
         }
 
         if (matchedGroup == playlistSection) {
@@ -153,6 +190,14 @@ final class DescriptionComponentsFilter extends Filter {
 
         if (matchedGroup == macroMarkersCarousel) {
             return contentIndex == 0 && macroMarkersCarouselGroupList.check(buffer).isFiltered();
+        }
+
+        if (matchedGroup == shortsHowThisWasMadeSection) {
+            return ShortsPlayerState.isOpen() && EngagementPanel.isDescription();
+        }
+
+        if (matchedGroup == videoDetails) {
+            return videoDetailsBuffer.check(buffer).isFiltered();
         }
 
         return true;

@@ -8,6 +8,7 @@
 package app.morphe.extension.shared.patches;
 
 import static app.morphe.extension.shared.ByteTrieSearch.convertStringsToBytes;
+import static app.morphe.extension.shared.patches.AppCheckPatch.IS_YOUTUBE;
 
 import android.app.Dialog;
 import android.view.View;
@@ -18,6 +19,7 @@ import androidx.annotation.Nullable;
 
 import app.morphe.extension.shared.ByteTrieSearch;
 import app.morphe.extension.shared.Logger;
+import app.morphe.extension.shared.Utils;
 import app.morphe.extension.shared.settings.SharedYouTubeSettings;
 
 @SuppressWarnings("unused")
@@ -29,7 +31,27 @@ public class HideFullscreenAdsPatch {
 
     /**
      * Injection point.
+     * Invoke only in old clients.
      */
+    public static void hideFullscreenAds(View view) {
+        Utils.hideViewBy0dpUnderCondition(SharedYouTubeSettings.HIDE_FULLSCREEN_ADS, view);
+    }
+
+    /**
+     * Rest of the implementation added by patch.
+     */
+    private static void closeDialog(Object customDialog) {
+        // Casting customDialog to 'android.app.Dialog' and calling [dialog.onBackPressed()] also works with limitations.
+        // If the targetSDKVersion is 36+ and the device is running Android 16+, this method will most likely not work.
+        //
+        // So the patch call the 'onBackPressed()' method of the custom dialog class.
+        // The 'onBackPressed()' method of the customDialog class handles the OnBackInvokedDispatcher.
+    }
+
+    /**
+     * Injection point.
+     */
+    @SuppressWarnings("deprecation")
     public static void closeFullscreenAd(Object customDialog, @Nullable byte[] buffer) {
         try {
             if (!SharedYouTubeSettings.HIDE_FULLSCREEN_ADS.get()) {
@@ -63,12 +85,25 @@ public class HideFullscreenAdsPatch {
                     window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_UNSPECIFIED);
 
                     // Restore decorView visibility
-                    View decorView = window.getDecorView();
-                    decorView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_VISIBLE);
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                        android.view.WindowInsetsController insetsController = window.getInsetsController();
+                        if (insetsController != null) {
+                            insetsController.show(android.view.WindowInsets.Type.systemBars());
+                        }
+                    } else {
+                        View decorView = window.getDecorView();
+                        decorView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_VISIBLE);
+                    }
                 }
 
                 // Dismiss dialog
-                dialog.dismiss();
+                if (IS_YOUTUBE) {
+                    dialog.dismiss();
+                } else {
+                    // In YouTube Music, the home feed doesn't load when the dialog is closed with [Dialog.dismiss()].
+                    // Use [Dialog.onBackPressed()] to close the dialog, even with a 100ms delay.
+                    Utils.runOnMainThreadDelayed(() -> closeDialog(customDialog), 100);
+                }
             }
         } catch (Exception ex) {
             Logger.printException(() -> "closeFullscreenAd failure", ex);

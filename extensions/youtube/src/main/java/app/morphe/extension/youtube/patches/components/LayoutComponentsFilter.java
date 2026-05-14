@@ -20,7 +20,6 @@ import android.text.SpannableStringBuilder;
 import android.text.TextUtils;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.ViewParent;
 import android.view.ViewTreeObserver;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -29,6 +28,7 @@ import android.widget.TextView;
 import androidx.annotation.Nullable;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.StringTrieSearch;
@@ -58,7 +58,7 @@ public final class LayoutComponentsFilter extends Filter {
     private final StringFilterGroup notifyMe;
     private final StringFilterGroup searchFriction;
     private final StringFilterGroup singleItemInformationPanel;
-    private static volatile int singleItemInformationPanelIndex = -1;
+    private static final AtomicInteger singleItemInformationPanelIndex = new AtomicInteger(-1);
     private final StringFilterGroup expandableMetadata;
     private final ByteArrayFilterGroup productCardBuffer;
     private final ByteArrayFilterGroup summaryCardBuffer;
@@ -68,6 +68,8 @@ public final class LayoutComponentsFilter extends Filter {
     private final StringFilterGroup chipBar;
     private final StringFilterGroup channelProfile;
     private final StringFilterGroupList channelProfileGroupList;
+    private final StringFilterGroup videoLabels;
+    private final ByteArrayFilterGroupList videoLabelsGroupList = new ByteArrayFilterGroupList();
 
     public enum ExpandableCardStyle {
         SHOW_ALL,
@@ -251,20 +253,10 @@ public final class LayoutComponentsFilter extends Filter {
                 "compact_channel_bar"
         );
 
-        final var relatedVideos = new StringFilterGroup(
-                Settings.HIDE_QUICK_ACTIONS_RELATED_VIDEOS,
-                "fullscreen_related_videos"
-        );
-
         final var playables = new StringFilterGroup(
                 Settings.HIDE_PLAYABLES,
                 "horizontal_gaming_shelf.e",
                 "mini_game_card.e"
-        );
-
-        final var quickActions = new StringFilterGroup(
-                Settings.HIDE_QUICK_ACTIONS,
-                "quick_actions"
         );
 
         final var imageShelf = new StringFilterGroup(
@@ -285,7 +277,8 @@ public final class LayoutComponentsFilter extends Filter {
 
         compactChannelBarInner = new StringFilterGroup(
                 Settings.HIDE_JOIN_MEMBERSHIP_BUTTON,
-                "compact_channel_bar_inner"
+                "compact_channel_bar_inner",
+                "video_description_header"
         );
 
         compactChannelBarInnerButton = new StringFilterGroup(
@@ -322,6 +315,23 @@ public final class LayoutComponentsFilter extends Filter {
                 Settings.HIDE_WEB_SEARCH_RESULTS,
                 "web_link_panel",
                 "web_result_panel"
+        );
+
+        videoLabels = new StringFilterGroup(
+                null,
+                "|badge.e"
+        );
+        videoLabelsGroupList.addAll(
+                new ByteArrayFilterGroup(
+                        Settings.HIDE_AUTO_DUBBED_LABEL,
+                        "yt_outline_person_radar",
+                        "yt_outline_experimental_person_waves"
+                ),
+                new ByteArrayFilterGroup(
+                        Settings.HIDE_HYPED_LABEL,
+                        "yt_fill_star_shooting",
+                        "yt_fill_experimental_hype"
+                )
         );
 
         channelProfile = new StringFilterGroup(
@@ -371,8 +381,6 @@ public final class LayoutComponentsFilter extends Filter {
                 paidPromotion,
                 playables,
                 postsShelf,
-                quickActions,
-                relatedVideos,
                 searchFriction,
                 singleItemInformationPanel,
                 subscribedChannelsBar,
@@ -380,6 +388,7 @@ public final class LayoutComponentsFilter extends Filter {
                 subscriptionsChipBar,
                 surveys,
                 timedReactions,
+                videoLabels,
                 videoTitle,
                 videoRecommendationLabels,
                 webLinkPanel
@@ -400,15 +409,16 @@ public final class LayoutComponentsFilter extends Filter {
         // From 2025, the medical information panel is no longer shown in the search results.
         // Therefore, this identifier does not filter when the search bar is activated.
         if (matchedGroup == searchFriction) {
-            singleItemInformationPanelIndex = 0;
+            singleItemInformationPanelIndex.set(0);
             return false;
         }
         if (matchedGroup == singleItemInformationPanel) {
-            if (singleItemInformationPanelIndex >= 0) {
-                if (singleItemInformationPanelIndex < 9) {
-                    singleItemInformationPanelIndex++;
+            int currentIndex = singleItemInformationPanelIndex.get();
+            if (currentIndex >= 0) {
+                if (currentIndex < 9) {
+                    singleItemInformationPanelIndex.incrementAndGet();
                 } else {
-                    singleItemInformationPanelIndex = -1;
+                    singleItemInformationPanelIndex.set(-1);
                 }
                 return false;
             } else {
@@ -441,6 +451,10 @@ public final class LayoutComponentsFilter extends Filter {
                     return false;
                 }
             }
+        }
+
+        if (matchedGroup == videoLabels) {
+            return videoLabelsGroupList.check(buffer).isFiltered();
         }
 
         if (matchedGroup == channelProfile) {

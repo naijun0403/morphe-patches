@@ -33,9 +33,9 @@ import app.morphe.patches.youtube.misc.playservice.versionCheckPatch
 import app.morphe.patches.youtube.misc.settings.PreferenceScreen
 import app.morphe.patches.youtube.misc.settings.settingsPatch
 import app.morphe.patches.youtube.shared.Constants.COMPATIBILITY_YOUTUBE
+import app.morphe.util.addInstructionsAtControlFlowLabel
 import app.morphe.util.findElementByAttributeValueOrThrow
 import app.morphe.util.forEachLiteralValueInstruction
-import app.morphe.util.getMutableMethod
 import app.morphe.util.getReference
 import app.morphe.util.indexOfFirstInstructionOrThrow
 import app.morphe.util.removeFromParent
@@ -69,12 +69,13 @@ private val hideShortsComponentsResourcePatch = resourcePatch {
         val hideShortsWidget by hideShortsWidgetOption
 
         PreferenceScreen.SHORTS.addPreferences(
-            SwitchPreference("morphe_hide_shorts_channel"),
-            SwitchPreference("morphe_hide_shorts_home"),
-            SwitchPreference("morphe_hide_shorts_search"),
-            SwitchPreference("morphe_hide_shorts_subscriptions"),
-            SwitchPreference("morphe_hide_shorts_video_description"),
-            SwitchPreference("morphe_hide_shorts_history"),
+            SwitchPreference("morphe_hide_shorts_channel", summaryKey = null),
+            SwitchPreference("morphe_hide_shorts_home", summaryKey = null),
+            SwitchPreference("morphe_hide_shorts_search", summaryKey = null),
+            SwitchPreference("morphe_hide_shorts_subscriptions", summaryKey = null),
+            SwitchPreference("morphe_hide_shorts_video_description", summaryKey = null),
+            SwitchPreference("morphe_hide_shorts_history", summaryKey = null),
+            SwitchPreference("morphe_disable_shorts_double_tap_to_like", summaryKey = null),
 
             PreferenceScreenPreference(
                 key = "morphe_shorts_player_screen",
@@ -85,47 +86,47 @@ private val hideShortsComponentsResourcePatch = resourcePatch {
 
                     // Vertical row of buttons on right side of the screen.
                     // Like fountain may no longer be used by YT anymore.
-                    //SwitchPreference("morphe_hide_shorts_like_fountain"),
-                    SwitchPreference("morphe_hide_shorts_like_button"),
-                    SwitchPreference("morphe_hide_shorts_dislike_button"),
-                    SwitchPreference("morphe_hide_shorts_comments_button"),
-                    SwitchPreference("morphe_hide_shorts_share_button"),
-                    SwitchPreference("morphe_hide_shorts_remix_button"),
-                    SwitchPreference("morphe_hide_shorts_sound_button"),
+                    //SwitchPreference("morphe_hide_shorts_like_fountain", summaryKey = null),
+                    SwitchPreference("morphe_hide_shorts_like_button", summaryKey = null),
+                    SwitchPreference("morphe_hide_shorts_dislike_button", summaryKey = null),
+                    SwitchPreference("morphe_hide_shorts_comments_button", summaryKey = null),
+                    SwitchPreference("morphe_hide_shorts_share_button", summaryKey = null),
+                    SwitchPreference("morphe_hide_shorts_remix_button", summaryKey = null),
+                    SwitchPreference("morphe_hide_shorts_sound_button", summaryKey = null),
 
                     // Upper and middle area of the player.
-                    SwitchPreference("morphe_hide_shorts_join_button"),
-                    SwitchPreference("morphe_hide_shorts_subscribe_button"),
-                    SwitchPreference("morphe_hide_shorts_paused_overlay_buttons"),
+                    SwitchPreference("morphe_hide_shorts_join_button", summaryKey = null),
+                    SwitchPreference("morphe_hide_shorts_subscribe_button", summaryKey = null),
+                    SwitchPreference("morphe_hide_shorts_paused_overlay_buttons", summaryKey = null),
 
                     // Suggested actions.
-                    SwitchPreference("morphe_hide_shorts_preview_comment"),
-                    SwitchPreference("morphe_hide_shorts_save_sound_button"),
-                    SwitchPreference("morphe_hide_shorts_use_sound_button"),
-                    SwitchPreference("morphe_hide_shorts_use_template_button"),
-                    SwitchPreference("morphe_hide_shorts_upcoming_button"),
-                    SwitchPreference("morphe_hide_shorts_effect_button"),
-                    SwitchPreference("morphe_hide_shorts_green_screen_button"),
-                    SwitchPreference("morphe_hide_shorts_hashtag_button"),
-                    SwitchPreference("morphe_hide_shorts_live_preview"),
-                    SwitchPreference("morphe_hide_shorts_new_posts_button"),
-                    SwitchPreference("morphe_hide_shorts_shop_button"),
-                    SwitchPreference("morphe_hide_shorts_tagged_products"),
-                    SwitchPreference("morphe_hide_shorts_search_suggestions"),
-                    SwitchPreference("morphe_hide_shorts_super_thanks_button"),
-                    SwitchPreference("morphe_hide_shorts_stickers"),
+                    SwitchPreference("morphe_hide_shorts_preview_comment", summaryKey = null),
+                    SwitchPreference("morphe_hide_shorts_save_sound_button", summaryKey = null),
+                    SwitchPreference("morphe_hide_shorts_use_sound_button", summaryKey = null),
+                    SwitchPreference("morphe_hide_shorts_use_template_button", summaryKey = null),
+                    SwitchPreference("morphe_hide_shorts_upcoming_button", summaryKey = null),
+                    SwitchPreference("morphe_hide_shorts_effect_button", summaryKey = null),
+                    SwitchPreference("morphe_hide_shorts_green_screen_button", summaryKey = null),
+                    SwitchPreference("morphe_hide_shorts_hashtag_button", summaryKey = null),
+                    SwitchPreference("morphe_hide_shorts_live_preview", summaryKey = null),
+                    SwitchPreference("morphe_hide_shorts_new_posts_button", summaryKey = null),
+                    SwitchPreference("morphe_hide_shorts_shop_button", summaryKey = null),
+                    SwitchPreference("morphe_hide_shorts_tagged_products", summaryKey = null),
+                    SwitchPreference("morphe_hide_shorts_search_suggestions", summaryKey = null),
+                    SwitchPreference("morphe_hide_shorts_super_thanks_button", summaryKey = null),
+                    SwitchPreference("morphe_hide_shorts_stickers", summaryKey = null),
 
                     // Bottom of the screen.
-                    SwitchPreference("morphe_hide_shorts_ai_button"),
-                    SwitchPreference("morphe_hide_shorts_auto_dubbed_label"),
-                    SwitchPreference("morphe_hide_shorts_location_label"),
-                    SwitchPreference("morphe_hide_shorts_channel_bar"),
-                    SwitchPreference("morphe_hide_shorts_info_panel"),
-                    SwitchPreference("morphe_hide_shorts_full_video_link_label"),
-                    SwitchPreference("morphe_hide_shorts_video_title"),
-                    SwitchPreference("morphe_hide_shorts_sound_metadata_label"),
-                    SwitchPreference("morphe_hide_shorts_navigation_bar"),
-                ),
+                    SwitchPreference("morphe_hide_shorts_ai_button", summaryKey = null),
+                    SwitchPreference("morphe_hide_shorts_auto_dubbed_label", summaryKey = null),
+                    SwitchPreference("morphe_hide_shorts_location_label", summaryKey = null),
+                    SwitchPreference("morphe_hide_shorts_channel_bar", summaryKey = null),
+                    SwitchPreference("morphe_hide_shorts_info_panel", summaryKey = null),
+                    SwitchPreference("morphe_hide_shorts_full_video_link_label", summaryKey = null),
+                    SwitchPreference("morphe_hide_shorts_video_title", summaryKey = null),
+                    SwitchPreference("morphe_hide_shorts_sound_metadata_label", summaryKey = null),
+                    SwitchPreference("morphe_hide_shorts_navigation_bar", summaryKey = null),
+                )
             )
         )
 
@@ -227,10 +228,7 @@ val hideShortsComponentsPatch = bytecodePatch(
         }
 
         // Hook to hide the pivotBar when the Shorts player is opened.
-        ReelWatchFragmentInitPlaybackFingerprint.instructionMatches.last()
-            .instruction
-            .getReference<MethodReference>()!!
-            .getMutableMethod()
+        ReelWatchFragmentInitPlaybackFingerprint.instructionMatches.last().getMethodCalled()
             .addInstruction(
                 0,
                 "invoke-static { p1 }, $EXTENSION_FILTER->hidePivotBar(Ljava/lang/String;)V",
@@ -275,5 +273,20 @@ val hideShortsComponentsPatch = bytecodePatch(
         RenderNextUIFeatureFlagFingerprint.method.returnLate(false)
 
         // endregion
+
+        DoubleTapToLikeLogicFingerprint.let {
+            it.method.apply {
+                val index = it.instructionMatches.last().index
+                val register = getInstruction<OneRegisterInstruction>(index).registerA
+
+                addInstructionsAtControlFlowLabel(
+                    index,
+                    """
+                        invoke-static { v$register }, $EXTENSION_FILTER->allowDoubleTapToLike(Z)Z
+                        move-result v$register
+                    """
+                )
+            }
+        }
     }
 }
