@@ -133,14 +133,11 @@ public final class ChangeStartPagePatch {
                 activity.startActivity(searchIntent);
                 activity.overridePendingTransition(0, 0);
             } else if (startPage == StartPage.LIKED_MUSIC || startPage == StartPage.EPISODES_FOR_LATER) {
-                Intent homeIntent = new Intent(Intent.ACTION_VIEW);
-                homeIntent.setData(android.net.Uri.parse("https://music.youtube.com/"));
-                homeIntent.setPackage(activity.getPackageName());
-                homeIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION);
                 Intent playlistIntent = new Intent(Intent.ACTION_VIEW);
                 playlistIntent.setData(android.net.Uri.parse("https://music.youtube.com/playlist?list=" + startPage.id));
                 playlistIntent.setPackage(activity.getPackageName());
-                activity.startActivities(new Intent[]{homeIntent, playlistIntent});
+                playlistIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION);
+                activity.startActivity(playlistIntent);
                 activity.overridePendingTransition(0, 0);
             }
         } catch (Exception ex ){

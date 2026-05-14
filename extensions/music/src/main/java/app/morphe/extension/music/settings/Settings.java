@@ -6,7 +6,6 @@ import static app.morphe.extension.shared.settings.Setting.parent;
 import static app.morphe.extension.shared.settings.Setting.parentNot;
 
 import app.morphe.extension.music.patches.ChangeHeaderPatch.HeaderLogo;
-import app.morphe.extension.music.patches.ChangeStartPagePatch;
 import app.morphe.extension.music.patches.ChangeStartPagePatch.StartPage;
 import app.morphe.extension.music.patches.CrossfadeManager.CrossFadeDuration;
 import app.morphe.extension.music.patches.CrossfadeManager.FadeCurve;

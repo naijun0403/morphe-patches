@@ -1,3 +1,13 @@
+/*
+ * Copyright 2026 Morphe.
+ * https://github.com/MorpheApp/morphe-patches
+ *
+ * Original hard forked code:
+ * https://github.com/ReVanced/revanced-patches/commit/724e6d61b2ecd868c1a9a37d465a688e83a74799
+ *
+ * See the included NOTICE file for GPLv3 §7(b) and §7(c) terms that apply to this code.
+ */
+
 package app.morphe.extension.youtube.patches;
 
 import static java.lang.Boolean.FALSE;
@@ -87,34 +97,53 @@ public final class ChangeStartPagePatch {
      */
     private static final String ACTION_MAIN = "android.intent.action.MAIN";
 
-    private static final StartPage START_PAGE = Settings.CHANGE_START_PAGE.get();
-
     public static String overrideBrowseId(String original) {
-        if (!START_PAGE.isBrowseId()) {
+        try {
+            StartPage startPage = Settings.CHANGE_START_PAGE.get();
+
+            if (!startPage.isBrowseId()) {
+                return original;
+            }
+
+            if (!"FEwhat_to_watch".equals(original)) {
+                return original;
+            }
+
+            Logger.printDebug(() -> "Changing browseId to: " + startPage.id);
+            return startPage.id;
+        } catch (Exception ex) {
+            Logger.printException(() -> "overrideBrowseId failure", ex);
             return original;
         }
-
-        if (!"FEwhat_to_watch".equals(original)) {
-            return original;
-        }
-
-        Logger.printDebug(() -> "Changing browseId to: " + START_PAGE.id);
-        return START_PAGE.id;
     }
 
     public static void overrideIntentAction(Intent intent) {
-        if (!START_PAGE.isIntentAction()) {
-            return;
-        }
+        try {
+            if (intent == null) return;
 
-        if (!ACTION_MAIN.equals(intent.getAction())) {
-            Logger.printDebug(() -> "Ignore override intent action" +
-                    " as the current activity is not the entry point of the application");
-            return;
-        }
+            StartPage startPage = Settings.CHANGE_START_PAGE.get();
 
-        String intentAction = START_PAGE.id;
-        Logger.printDebug(() -> "Changing intent action to: " + intentAction);
-        intent.setAction(intentAction);
+            if (!startPage.isIntentAction()) {
+                return;
+            }
+
+            if ((intent.getFlags() & Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0) {
+                Logger.printDebug(() -> "Ignore override intent action as the app was launched from history");
+                return;
+            }
+
+            if (!ACTION_MAIN.equals(intent.getAction())) {
+                Logger.printDebug(() -> "Ignore override intent action as the current activity is not the entry point");
+                return;
+            }
+
+            String intentAction = startPage.id;
+            Logger.printDebug(() -> "Changing intent action to: " + intentAction);
+            intent.setAction(intentAction);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
+
+        } catch (Exception ex) {
+            Logger.printException(() -> "overrideIntentAction failure", ex);
+        }
     }
 }
