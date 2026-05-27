@@ -39,12 +39,16 @@ import app.morphe.extension.youtube.shared.ConversionContext.ContextInterface;
 
 @SuppressWarnings("unused")
 public final class LayoutComponentsFilter extends Filter {
-    private static final ByteArrayFilterGroup mixPlaylistsBufferExceptions = new ByteArrayFilterGroup(
+    private static final ByteArrayFilterGroup mixPlaylistsBuffersExceptions = new ByteArrayFilterGroup(
             null,
             "cell_description_body",
             "channel_profile"
     );
-    private static final ByteArrayFilterGroup mixPlaylists = new ByteArrayFilterGroup(
+    private static final ByteArrayFilterGroup mix8Buffer = new ByteArrayFilterGroup(
+            null,
+            "Mix8"
+    );
+    private static final ByteArrayFilterGroup playlistListTagBuffer = new ByteArrayFilterGroup(
             null,
             "&list="
     );
@@ -81,9 +85,6 @@ public final class LayoutComponentsFilter extends Filter {
 
     public LayoutComponentsFilter() {
         exceptions.addPatterns(
-                "home_video_with_context",
-                "related_video_with_context",
-                "search_video_with_context",
                 "comment_thread", // Whitelist comments
                 "|comment.", // Whitelist comment replies
                 "library_recent_shelf"
@@ -121,6 +122,7 @@ public final class LayoutComponentsFilter extends Filter {
                 "images_post_root.e",
                 "images_post_root_slim.e",
                 "images_post_slim.e", // may be obsolete and no longer needed.
+                "options_post_root.e",
                 "poll_post_responsive_root.e",
                 "poll_post_root.e",
                 "post_base_wrapper", // may be obsolete and no longer needed.
@@ -180,11 +182,6 @@ public final class LayoutComponentsFilter extends Filter {
         final var medicalPanel = new StringFilterGroup(
                 Settings.HIDE_MEDICAL_PANELS,
                 "medical_panel"
-        );
-
-        final var paidPromotion = new StringFilterGroup(
-                Settings.HIDE_PAID_PROMOTION_LABEL,
-                "paid_content_overlay"
         );
 
         final var infoPanel = new StringFilterGroup(
@@ -340,7 +337,8 @@ public final class LayoutComponentsFilter extends Filter {
                 "page_header.e"
         );
         channelProfileGroupList = new StringFilterGroupList();
-        channelProfileGroupList.addAll(new StringFilterGroup(
+        channelProfileGroupList.addAll(
+                new StringFilterGroup(
                         Settings.HIDE_COMMUNITY_BUTTON,
                         "community_button"
                 ),
@@ -378,7 +376,6 @@ public final class LayoutComponentsFilter extends Filter {
                 infoPanel,
                 medicalPanel,
                 notifyMe,
-                paidPromotion,
                 playables,
                 postsShelf,
                 searchFriction,
@@ -404,6 +401,11 @@ public final class LayoutComponentsFilter extends Filter {
                        StringFilterGroup matchedGroup,
                        FilterContentType contentType,
                        int contentIndex) {
+        // Exceptions are not filtered.
+        if (exceptions.matches(path)) {
+            return false;
+        }
+
         // This identifier is used not only in players but also in search results:
         // Until 2024, medical information panels such as Covid-19 also used this identifier and were shown in the search results.
         // From 2025, the medical information panel is no longer shown in the search results.
@@ -465,8 +467,6 @@ public final class LayoutComponentsFilter extends Filter {
             return contextInterface.isHomeFeedOrRelatedVideo() || contextInterface.isSubscriptionOrLibrary();
         }
 
-        if (exceptions.matches(path)) return false; // Exceptions are not filtered.
-
         if (matchedGroup == compactChannelBarInner) {
             return compactChannelBarInnerButton.check(path).isFiltered()
                     // The filter may be broad, but in the context of a compactChannelBarInnerButton,
@@ -486,8 +486,6 @@ public final class LayoutComponentsFilter extends Filter {
      * Called from a different place then the other filters.
      */
     public static boolean filterMixPlaylists(@Nullable byte[] buffer) {
-        // Edit: This hook may no longer be needed, and mix playlist filtering
-        //       might be possible using the existing litho filters.
         try {
             if (!Settings.HIDE_MIX_PLAYLISTS.get()) {
                 return false;
@@ -498,9 +496,9 @@ public final class LayoutComponentsFilter extends Filter {
                 return false;
             }
 
-            if (mixPlaylists.check(buffer).isFiltered()
-                    // Prevent hiding the description of some videos accidentally.
-                    && !mixPlaylistsBufferExceptions.check(buffer).isFiltered()) {
+            if (!mixPlaylistsBuffersExceptions.check(buffer).isFiltered() &&
+                    mix8Buffer.check(buffer).isFiltered() &&
+                    playlistListTagBuffer.check(buffer).isFiltered()) {
                 Logger.printDebug(() -> "Filtered mix playlist");
                 return true;
             }

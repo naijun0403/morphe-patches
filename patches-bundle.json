@@ -1,7 +1,7 @@
 {
-  "created_at": "2026-05-14T09:26:36",
-  "description": "# [1.28.0-dev.2](https://github.com/MorpheApp/morphe-patches/compare/v1.28.0-dev.1...v1.28.0-dev.2) (2026-05-14)\n\n\n### Bug Fixes\n\n* Update Crowdin translations ([b652e67](https://github.com/MorpheApp/morphe-patches/commit/b652e6731eebe67f1c20cb0e0d83ace9a94167cb))",
-  "download_url": "https://github.com/MorpheApp/morphe-patches/releases/download/v1.28.0-dev.2/patches-1.28.0-dev.2.mpp",
+  "created_at": "2026-05-27T08:55:23",
+  "description": "## [1.30.0-dev.5](https://github.com/MorpheApp/morphe-patches/compare/v1.30.0-dev.4...v1.30.0-dev.5) (2026-05-27)\n\n### 🐛 Bug Fixes\n\n* **YouTube - DRC audio patch:** Add support for 21.19 and higher ([#1561](https://github.com/MorpheApp/morphe-patches/issues/1561)) ([8608270](https://github.com/MorpheApp/morphe-patches/commit/8608270c1b7a517b1f863ee5f3471153b2ad3574))\n\n### ✨ New Features\n\n* **YouTube - Hide layout components:** Add \"Hide Featured channels section\" setting ([#1567](https://github.com/MorpheApp/morphe-patches/issues/1567)) ([47cd714](https://github.com/MorpheApp/morphe-patches/commit/47cd7148685966e602e91687ea5297603d13d431))",
+  "download_url": "https://github.com/MorpheApp/morphe-patches/releases/download/v1.30.0-dev.5/patches-1.30.0-dev.5.mpp",
   "signature_download_url": "",
-  "version": "1.28.0-dev.2"
+  "version": "1.30.0-dev.5"
 }
