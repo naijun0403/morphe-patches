@@ -14,6 +14,8 @@ import android.app.Activity;
 
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.Utils;
+import app.morphe.extension.youtube.settings.Settings;
+import app.morphe.extension.youtube.shared.NavigationBar;
 import app.morphe.extension.youtube.shared.PlayerType;
 
 @SuppressWarnings("unused")
@@ -34,34 +36,76 @@ public class FixBackToExitGesturePatch {
     private static volatile boolean isTopView = false;
 
     /**
+     * Maps the user's custom StartPage setting to the active NavigationBar tab.
+     */
+    private static boolean isViewingCustomStartPage() {
+        ChangeStartPagePatch.StartPage startPage = Settings.CHANGE_START_PAGE.get();
+        NavigationBar.NavigationButton currentTab = NavigationBar.NavigationButton.getSelectedNavigationButton();
+
+        if (startPage == ChangeStartPagePatch.StartPage.DEFAULT || currentTab == null) {
+            return false;
+        }
+
+        switch (startPage) {
+            case SUBSCRIPTIONS, ALL_SUBSCRIPTIONS -> {
+                return currentTab == NavigationBar.NavigationButton.SUBSCRIPTIONS;
+            }
+            case LIBRARY -> {
+                return currentTab == NavigationBar.NavigationButton.LIBRARY;
+            }
+            case NOTIFICATIONS -> {
+                return currentTab == NavigationBar.NavigationButton.NOTIFICATIONS;
+            }
+            case SHORTS -> {
+                return currentTab == NavigationBar.NavigationButton.SHORTS;
+            }
+            default -> {
+                // For highly specific browseIds (like specific channel IDs),
+                // we default to false to prevent accidental exits.
+                return false;
+            }
+        }
+    }
+
+    /**
      * Handle the event after clicking the back button.
      *
      * @param activity The activity, the app is launched with to finish.
      */
     public static void onBackPressed(Activity activity) {
         if (isTopView) {
-            long now = System.currentTimeMillis();
 
-            // If the time between two back button presses does not reach PRESSED_TIMEOUT_MILLISECONDS,
-            // set lastTimeBackPressed to the current time.
-            if (now - lastTimeBackPressed < PRESSED_TIMEOUT_MILLISECONDS) {
-                // In the latest YouTube, there is an issue where the video pauses if 'onDestroy()' is called while the video is minimized,
-                // and then 'onCreate()' is called again (Unpatched YouTube issue).
-                // See: https://github.com/MorpheApp/morphe-patches/issues/279
-                // As a workaround for this issue, use 'moveTaskToBack()' instead of 'finish()'
-                // when the video is minimized to avoid the call to 'onDestroy()'.
-                if (PlayerType.getCurrent() == PlayerType.WATCH_WHILE_MINIMIZED && activity.moveTaskToBack(true)) {
-                    Logger.printDebug(() -> "Moving task to back");
+            // Check if they are on the custom start page OR the default Home page
+            boolean onCustomPage = isViewingCustomStartPage();
+            boolean onHomePage = NavigationBar.NavigationButton.getSelectedNavigationButton() == NavigationBar.NavigationButton.HOME;
+
+            if (onCustomPage || onHomePage) {
+                long now = System.currentTimeMillis();
+
+                // If the time between two back button presses does not reach PRESSED_TIMEOUT_MILLISECONDS,
+                // set lastTimeBackPressed to the current time.
+                if (now - lastTimeBackPressed < PRESSED_TIMEOUT_MILLISECONDS) {
+                    // In the latest YouTube, there is an issue where the video pauses if 'onDestroy()' is called while the video is minimized,
+                    // and then 'onCreate()' is called again (Unpatched YouTube issue).
+                    // See: https://github.com/MorpheApp/morphe-patches/issues/279
+                    // As a workaround for this issue, use 'moveTaskToBack()' instead of 'finish()'
+                    // when the video is minimized to avoid the call to 'onDestroy()'.
+                    if (PlayerType.getCurrent() == PlayerType.WATCH_WHILE_MINIMIZED && activity.moveTaskToBack(true)) {
+                        Logger.printDebug(() -> "Moving task to back (Miniplayer)");
+                    } else {
+                        Logger.printDebug(() -> "Moving task to back (Exiting from Start Page)");
+                        // Force backgrounding the app instead of finishing it.
+                        // This preserves the memory state so it reopens to the custom page.
+                        activity.moveTaskToBack(true);
+                    }
+
                 } else {
-                    Logger.printDebug(() -> "Closing activity");
-                    activity.finish();
+                    lastTimeBackPressed = now;
+                    Utils.runOnMainThreadDelayed(() -> {
+                        // After the timeout, the user should double-click the back button again.
+                        isTopView = false;
+                    }, PRESSED_TIMEOUT_MILLISECONDS);
                 }
-            } else {
-                lastTimeBackPressed = now;
-                Utils.runOnMainThreadDelayed(() -> {
-                    // After the timeout, the user should double-click the back button again.
-                    isTopView = false;
-                }, PRESSED_TIMEOUT_MILLISECONDS);
             }
         }
     }

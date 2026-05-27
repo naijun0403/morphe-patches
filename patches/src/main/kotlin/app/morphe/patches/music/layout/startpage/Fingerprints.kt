@@ -9,7 +9,6 @@ package app.morphe.patches.music.layout.startpage
 
 import app.morphe.patcher.Fingerprint
 import app.morphe.patcher.string
-import app.morphe.patches.music.shared.MusicActivityOnCreateFingerprint
 
 internal object ColdStartUpFingerprint : Fingerprint(
     returnType = "Ljava/lang/String;",

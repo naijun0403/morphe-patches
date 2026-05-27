@@ -96,6 +96,7 @@ public final class ChangeStartPagePatch {
      * In this case, instead of opening Shorts, the start page specified by the user is opened.
      */
     private static final String ACTION_MAIN = "android.intent.action.MAIN";
+    private static boolean appLaunched = false;
 
     public static String overrideBrowseId(String original) {
         try {
@@ -109,6 +110,12 @@ public final class ChangeStartPagePatch {
                 return original;
             }
 
+            if (appLaunched) {
+                Logger.printDebug(() -> "Ignore override browseId to prevent back-button loop");
+                return original;
+            }
+
+            appLaunched = true;
             Logger.printDebug(() -> "Changing browseId to: " + startPage.id);
             return startPage.id;
         } catch (Exception ex) {
@@ -120,6 +127,9 @@ public final class ChangeStartPagePatch {
     public static void overrideIntentAction(Intent intent) {
         try {
             if (intent == null) return;
+            if (ACTION_MAIN.equals(intent.getAction())) {
+                appLaunched = false;
+            }
 
             StartPage startPage = Settings.CHANGE_START_PAGE.get();
 
