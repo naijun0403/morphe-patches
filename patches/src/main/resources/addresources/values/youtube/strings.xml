@@ -64,6 +64,9 @@ Changes include:
     <string name="morphe_hide_feed_flyout_menu_title">Enable feed flyout menu filter</string>
     <string name="morphe_hide_feed_flyout_menu_filter_strings_title">Feed flyout menu filter</string>
     <string name="morphe_hide_feed_flyout_menu_filter_strings_summary">Enter the flyout menu names to filter by, separated by new lines</string>
+    <string name="morphe_hide_account_menu_title">Enable Library / You bottom menu filter</string>
+    <string name="morphe_hide_account_menu_filter_strings_title">Library / You bottom menu filter</string>
+    <string name="morphe_hide_account_menu_filter_strings_summary">Enter the Library / You bottom menu names to filter by, separated by new lines</string>
     <string name="morphe_hide_album_cards_title">Hide album cards</string>
     <string name="morphe_hide_album_cards_summary">Hides the album cards under the artist description</string>
     <string name="morphe_hide_artist_cards_title">Hide artist cards</string>
@@ -129,7 +132,6 @@ Showing YouTube Doodles may prevent custom headers from displaying."</string>
     <!-- 'Join' should be translated using the same localized wording YouTube displays for the button.
           This button usually appears in the video player for certain videos. -->
     <string name="morphe_hide_join_membership_button_title">Hide Join button</string>
-    <string name="morphe_hide_live_chat_donators_bar_title">Hide live chat donators bar</string>
     <!-- 'Live chat replay' should be translated using the same localized wording YouTube displays for the button.
           This button usually appears when in fullscreen for live streamed videos after opening live chat. -->
     <string name="morphe_hide_live_chat_replay_button_title">Hide \'Live chat replay\' button</string>
@@ -215,6 +217,7 @@ Showing YouTube Doodles may prevent custom headers from displaying."</string>
     <string name="morphe_hide_comments_create_a_short_button_title">Hide \'Create a Short\' button</string>
     <string name="morphe_hide_comments_emoji_and_timestamp_buttons_title">Hide Emoji and Timestamp buttons</string>
     <string name="morphe_hide_comments_info_button_title">Hide Info button</string>
+    <string name="morphe_hide_comments_live_chat_donators_bar_title">Hide live chat donators bar</string>
     <string name="morphe_hide_comments_preview_comment_title">Hide preview comment</string>
     <string name="morphe_hide_comments_preview_comment_summary">Hides the comment preview under video before opening the full comments section</string>
     <string name="morphe_hide_comments_thanks_button_title">Hide Thanks button</string>
@@ -334,11 +337,22 @@ Verify the package name is correct and the app is installed"</string>
 
     <!-- interaction.loop.loopVideoPatch -->
     <string name="morphe_loop_video_title">Enable loop video</string>
+    <string name="morphe_do_not_remember_loop_video_title">Don\'t remember loop video</string>
+    <string name="morphe_do_not_remember_loop_video_summary">Prevent loop video current state from being saved for subsequent videos</string>
 
     <!-- interaction.loop.loopVideoButtonPatch -->
     <string name="morphe_loop_video_button_title">Show Loop video button</string>
     <string name="morphe_loop_video_button_toast_on">Loop video is on</string>
     <string name="morphe_loop_video_button_toast_off">Loop video is off</string>
+    <string name="morphe_loop_video_range_dialog_title">Loop range</string>
+    <string name="morphe_loop_video_range_label_start">Start</string>
+    <string name="morphe_loop_video_range_label_end">End</string>
+    <string name="morphe_loop_video_range_hint_start">[hh:]mm:ss</string>
+    <string name="morphe_loop_video_range_hint_end">[hh:]mm:ss (empty = video end)</string>
+    <string name="morphe_loop_video_range_set">Set</string>
+    <string name="morphe_loop_video_range_clear">Clear</string>
+    <string name="morphe_loop_video_range_toast_on">Looping %1$s - %2$s</string>
+    <string name="morphe_loop_video_range_invalid_time">Invalid time range</string>
 
     <!-- interaction.playall.playAllButtonPatch -->
     <string name="morphe_play_all_button_title">Show Play all button</string>
@@ -502,6 +516,8 @@ Info: May not work on live streams"</string>
     <string name="morphe_hide_quick_actions_playlist_button_title">Hide Playlist button</string>
     <string name="morphe_hide_quick_actions_save_button_title">Hide Save button</string>
     <string name="morphe_hide_quick_actions_share_button_title">Hide Share button</string>
+    <string name="morphe_quick_actions_top_margin_title">Quick actions top margin</string>
+    <string name="morphe_quick_actions_top_margin_summary">Set the top margin of the quick actions bar (0-32 dp)</string>
 
     <!-- layout.captions.captionsPatch -->
     <string name="morphe_captions_screen_title">Captions</string>

@@ -59,6 +59,9 @@ Nogle server-side layouts kan ikke vende tilbage.
   <string name="morphe_hide_feed_flyout_menu_title">Aktiver feedrullemenufilter</string>
   <string name="morphe_hide_feed_flyout_menu_filter_strings_title">Feedrullemenufilter</string>
   <string name="morphe_hide_feed_flyout_menu_filter_strings_summary">Indtast flyout-menunavnene for at filtrere efter, adskilt af nye linjer</string>
+  <string name="morphe_hide_account_menu_title">Aktiver Bibliotek / Dit nederste menufilter</string>
+  <string name="morphe_hide_account_menu_filter_strings_title">Bibliotek / Dit nederste menufilter</string>
+  <string name="morphe_hide_account_menu_filter_strings_summary">Indtast Bibliotek / Dine bundmenu navne, der skal filtreres efter, adskilt af nye linjer</string>
   <string name="morphe_hide_album_cards_title">Skjul albumkort</string>
   <string name="morphe_hide_album_cards_summary">Skjuler albumkortene under kunstnerbeskrivelsen</string>
   <string name="morphe_hide_artist_cards_title">Skjul kunstnerkort</string>
@@ -123,7 +126,6 @@ Visning af YouTube Doodles kan forhindre brugerdefinerede overskrifter i at bliv
   <!-- 'Join' should be translated using the same localized wording YouTube displays for the button.
           This button usually appears in the video player for certain videos. -->
   <string name="morphe_hide_join_membership_button_title">Skjul knappen \"Tilmeld\"</string>
-  <string name="morphe_hide_live_chat_donators_bar_title">Skjul live chat donatorbjælken</string>
   <!-- 'Live chat replay' should be translated using the same localized wording YouTube displays for the button.
           This button usually appears when in fullscreen for live streamed videos after opening live chat. -->
   <string name="morphe_hide_live_chat_replay_button_title">Skjul \'Live chat genafspilning\' knappen</string>
@@ -147,6 +149,7 @@ Visning af YouTube Doodles kan forhindre brugerdefinerede overskrifter i at bliv
   <string name="morphe_hide_explore_section_summary">Skjuler sektionerne Udforsk dette kursus og Udforsk podcasten</string>
   <string name="morphe_hide_explore_course_section_title">Skjul sektionen \'Udforsk dette kursus\'</string>
   <string name="morphe_hide_explore_podcast_section_title">Skjul sektionen \'Udforsk podcasten\'</string>
+  <string name="morphe_hide_featured_channels_section_title">Skjul fremhævede kanaler</string>
   <string name="morphe_hide_featured_links_section_title">Skjul Fremhævede links sektionen</string>
   <string name="morphe_hide_featured_places_section_title">Skjul sektionen \'Fremhævede steder\'</string>
   <string name="morphe_hide_featured_videos_section_title">Skjul Fremhævede videoer sektionen</string>
@@ -204,6 +207,7 @@ Visning af YouTube Doodles kan forhindre brugerdefinerede overskrifter i at bliv
   <string name="morphe_hide_comments_create_a_short_button_title">Skjul knappen \"Opret en Short\"</string>
   <string name="morphe_hide_comments_emoji_and_timestamp_buttons_title">Skjul Emoji- og Tidsstempelknapper</string>
   <string name="morphe_hide_comments_info_button_title">Skjul Info-knap</string>
+  <string name="morphe_hide_comments_live_chat_donators_bar_title">Skjul live chat donatorbjælken</string>
   <string name="morphe_hide_comments_preview_comment_title">Skjul forhåndsvisning kommentar</string>
   <string name="morphe_hide_comments_preview_comment_summary">Skjuler kommentar preview under videoen inden åbning af hele kommentarsektionen</string>
   <string name="morphe_hide_comments_thanks_button_title">Skjul \"Tak\"-knap</string>
@@ -304,10 +308,21 @@ Kontrollér at pakkenavnet er korrekt og at appen er installeret"</string>
   <string name="morphe_external_downloader_empty_warning">Pakkenavnet må ikke være tomt</string>
   <!-- interaction.loop.loopVideoPatch -->
   <string name="morphe_loop_video_title">Aktiver loop-video</string>
+  <string name="morphe_do_not_remember_loop_video_title">Husk ikke loop-video</string>
+  <string name="morphe_do_not_remember_loop_video_summary">Forhindr at den aktuelle loop-video-tilstand gemmes for efterfølgende videoer</string>
   <!-- interaction.loop.loopVideoButtonPatch -->
   <string name="morphe_loop_video_button_title">Stryg lodret på højre side af fuldskærmstilstand for at justere lydstyrken</string>
   <string name="morphe_loop_video_button_toast_on">Loop video er slået til</string>
   <string name="morphe_loop_video_button_toast_off">Loop video er slået fra</string>
+  <string name="morphe_loop_video_range_dialog_title">Sløjfeinterval</string>
+  <string name="morphe_loop_video_range_label_start">Start</string>
+  <string name="morphe_loop_video_range_label_end">Slut</string>
+  <string name="morphe_loop_video_range_hint_start">[tt:]mm:ss</string>
+  <string name="morphe_loop_video_range_hint_end">[tt:]mm:ss (tom = video slut)</string>
+  <string name="morphe_loop_video_range_set">Angiv</string>
+  <string name="morphe_loop_video_range_clear">Ryd</string>
+  <string name="morphe_loop_video_range_toast_on">Looping %1$s - %2$s</string>
+  <string name="morphe_loop_video_range_invalid_time">Ugyldigt tidsinterval</string>
   <!-- interaction.playall.playAllButtonPatch -->
   <string name="morphe_play_all_button_title">Kræver tryk og hold, før en strygebevægelse genkendes</string>
   <string name="morphe_play_all_button_summary">"Tryk for at generere en playliste over alle videoer fra kanalen, tryk og hold for at fortryde
@@ -459,6 +474,8 @@ Info: Virker muligvis ikke på live streams"</string>
   <string name="morphe_hide_quick_actions_playlist_button_title">Indstillinger knap position</string>
   <string name="morphe_hide_quick_actions_save_button_title">Når den er aktiveret, åbner tryk Morphe-indstillinger og langt tryk åbner YouTube-indstillinger, deaktiver for at bytte</string>
   <string name="morphe_hide_quick_actions_share_button_title">Skjul knappen Del</string>
+  <string name="morphe_quick_actions_top_margin_title">Hurtig handlingers øverste margen</string>
+  <string name="morphe_quick_actions_top_margin_summary">Indstil den øverste margen for værktøjslinjen med hurtige handlinger (0-32 dp)</string>
   <!-- layout.captions.captionsPatch -->
   <string name="morphe_captions_screen_title">Undertekster</string>
   <string name="morphe_captions_screen_summary">Animer overgange, når du skifter mellem faner</string>

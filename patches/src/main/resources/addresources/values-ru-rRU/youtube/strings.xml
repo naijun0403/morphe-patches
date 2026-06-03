@@ -59,6 +59,9 @@ Second \"item\" text"</string>
   <string name="morphe_hide_feed_flyout_menu_title">Включить фильтр всплывающего меню ленты</string>
   <string name="morphe_hide_feed_flyout_menu_filter_strings_title">Фильтр всплывающего меню ленты</string>
   <string name="morphe_hide_feed_flyout_menu_filter_strings_summary">Введите имена всплывающих меню, по которым нужно фильтровать, разделенные новыми строками</string>
+  <string name="morphe_hide_account_menu_title">Включить библиотеку / Фильтр нижнего меню</string>
+  <string name="morphe_hide_account_menu_filter_strings_title">Библиотека / Фильтр нижнего меню</string>
+  <string name="morphe_hide_account_menu_filter_strings_summary">Введите названия меню библиотеки / Фильтр нижнего меню, разделенные новыми строками</string>
   <string name="morphe_hide_album_cards_title">Скрыть карточки альбомов</string>
   <string name="morphe_hide_album_cards_summary">Скрывает карточки альбомов под описанием исполнителя</string>
   <string name="morphe_hide_artist_cards_title">Скрыть карточки исполнителей</string>
@@ -123,7 +126,6 @@ Second \"item\" text"</string>
   <!-- 'Join' should be translated using the same localized wording YouTube displays for the button.
           This button usually appears in the video player for certain videos. -->
   <string name="morphe_hide_join_membership_button_title">Скрыть кнопку \"Подписаться\"</string>
-  <string name="morphe_hide_live_chat_donators_bar_title">Скрыть строку доноров чата</string>
   <!-- 'Live chat replay' should be translated using the same localized wording YouTube displays for the button.
           This button usually appears when in fullscreen for live streamed videos after opening live chat. -->
   <string name="morphe_hide_live_chat_replay_button_title">Скрыть кнопку \"Повтор живого чата\"</string>
@@ -147,6 +149,7 @@ Second \"item\" text"</string>
   <string name="morphe_hide_explore_section_summary">Скрывает разделы «Обзор этого курса» и «Обзор подкаста»</string>
   <string name="morphe_hide_explore_course_section_title">Скрыть секцию «Обзор этого курса»</string>
   <string name="morphe_hide_explore_podcast_section_title">Скрыть секцию «Обзор подкаста»</string>
+  <string name="morphe_hide_featured_channels_section_title">Скрыть выделенные каналы</string>
   <string name="morphe_hide_featured_links_section_title">Скрыть секцию \"Рекомендуемые ссылки\"</string>
   <string name="morphe_hide_featured_places_section_title">Скрыть секцию \"Упомянутые места\"</string>
   <string name="morphe_hide_featured_videos_section_title">Скрыть секцию \"Рекомендуемые видео\"</string>
@@ -205,6 +208,7 @@ Second \"item\" text"</string>
   <string name="morphe_hide_comments_create_a_short_button_title">Скрыть кнопку \"Создать Short\"</string>
   <string name="morphe_hide_comments_emoji_and_timestamp_buttons_title">Скрыть кнопки эмодзи и метки времени</string>
   <string name="morphe_hide_comments_info_button_title">Скрыть кнопку \"Инфо\"</string>
+  <string name="morphe_hide_comments_live_chat_donators_bar_title">Скрыть панель донатеров в прямом чате</string>
   <string name="morphe_hide_comments_preview_comment_title">Скрыть предпросмотр комментария</string>
   <string name="morphe_hide_comments_preview_comment_summary">Скрывает предварительный просмотр комментария под видео перед открытием полного раздела комментариев</string>
   <string name="morphe_hide_comments_thanks_button_title">Скрыть кнопку \"Спасибо\"</string>
@@ -305,10 +309,21 @@ Second \"item\" text"</string>
   <string name="morphe_external_downloader_empty_warning">Имя пакета не может быть пустым</string>
   <!-- interaction.loop.loopVideoPatch -->
   <string name="morphe_loop_video_title">Включить повтор воспроизведения</string>
+  <string name="morphe_do_not_remember_loop_video_title">Не запоминать зацикливание видео</string>
+  <string name="morphe_do_not_remember_loop_video_summary">Запретить сохранение текущего состояния зацикливания видео для последующих видео</string>
   <!-- interaction.loop.loopVideoButtonPatch -->
   <string name="morphe_loop_video_button_title">Показать кнопку цикла видео</string>
   <string name="morphe_loop_video_button_toast_on">Повтор видео включен</string>
   <string name="morphe_loop_video_button_toast_off">Повтор видео выключен</string>
+  <string name="morphe_loop_video_range_dialog_title">Диапазон повторений</string>
+  <string name="morphe_loop_video_range_label_start">Начало</string>
+  <string name="morphe_loop_video_range_label_end">Конец</string>
+  <string name="morphe_loop_video_range_hint_start">[чч:]мм:сс</string>
+  <string name="morphe_loop_video_range_hint_end">[чч:]мм:сс (пусто = конец видео)</string>
+  <string name="morphe_loop_video_range_set">Задать</string>
+  <string name="morphe_loop_video_range_clear">Очистить</string>
+  <string name="morphe_loop_video_range_toast_on">Цикл %1$s - %2$s</string>
+  <string name="morphe_loop_video_range_invalid_time">Указано неверное время</string>
   <!-- interaction.playall.playAllButtonPatch -->
   <string name="morphe_play_all_button_title">Показать кнопку \"Воспроизвести все\"</string>
   <string name="morphe_play_all_button_summary">"Кнопка «Воспроизвести все» показана
@@ -462,6 +477,8 @@ Second \"item\" text"</string>
   <string name="morphe_hide_quick_actions_playlist_button_title">Скрыть кнопку \"Плейлист\"</string>
   <string name="morphe_hide_quick_actions_save_button_title">Скрыть кнопку \"Сохранить\"</string>
   <string name="morphe_hide_quick_actions_share_button_title">Скрыть кнопку \"Поделиться\"</string>
+  <string name="morphe_quick_actions_top_margin_title">Верхний отступ быстрых действий</string>
+  <string name="morphe_quick_actions_top_margin_summary">Установите верхний отступ панели быстрых действий (0-32 dp)</string>
   <!-- layout.captions.captionsPatch -->
   <string name="morphe_captions_screen_title">Субтитры</string>
   <string name="morphe_captions_screen_summary">Управление автоматическими субтитрами и cookie-файлами субтитров</string>

@@ -42,6 +42,8 @@ Second \"item\" text"</string>
   <string name="morphe_music_crossfade_curve_entry_ease_out_quad">Yumuşak geçiş</string>
   <string name="morphe_music_crossfade_curve_entry_smoothstep">Pürüzsüz S-eğrisi</string>
   <!-- Empty string because custom preference handles the title itself -->
+  <string name="morphe_music_crossfade_curve_preview_outgoing">Giden</string>
+  <string name="morphe_music_crossfade_curve_preview_incoming">Gelen</string>
   <string name="morphe_music_crossfade_duration_title">Geçiş süresi</string>
   <string name="morphe_crossfade_duration_250ms">250 milisaniye</string>
   <string name="morphe_crossfade_duration_500ms">500 milisaniye</string>
@@ -56,6 +58,8 @@ Second \"item\" text"</string>
   <string name="morphe_crossfade_duration_8000ms">8 saniye</string>
   <string name="morphe_crossfade_duration_9000ms">9 saniye</string>
   <string name="morphe_crossfade_duration_10000ms">10 saniye</string>
+  <string name="morphe_crossfade_duration_11000ms">11 saniye</string>
+  <string name="morphe_crossfade_duration_12000ms">12 saniye</string>
   <string name="morphe_music_crossfade_on_skip_title">Manuel atlamada geçiş</string>
   <string name="morphe_music_crossfade_on_skip_summary">Sonraki parçaya manuel olarak atladığınızda geçiş efekti uygular</string>
   <string name="morphe_music_crossfade_on_auto_advance_title">Otomatik ilerlemede geçiş</string>
@@ -66,11 +70,9 @@ Second \"item\" text"</string>
   <string name="morphe_music_crossfade_resumed_toast">Geçiş devam ettirildi</string>
   <string name="morphe_music_crossfade_video_mode_disabled_toast">Geçiş etkinken video modu kullanılamaz</string>
   <string name="morphe_music_crossfade_about_title">Hakkında</string>
-  <string name="morphe_music_crossfade_about_summary">"Geçiş YouTube Music 8.x ile kullanılabilir
+  <string name="morphe_music_crossfade_about_summary">"Karıştırma düğmesine uzun basarak devre dışı bırak/etkinleştir
 
-Karıştırma düğmesine uzun basarak devre dışı bırak/etkinleştir
-
-VazerOG'den özellik uyarlaması"</string>
+Özellik VazerOG tarafından uygulanmıştır"</string>
   <!-- interaction.permanentrepeat.permanentRepeatPatch -->
   <string name="morphe_music_play_permanent_repeat_title">Kalıcı tekrarı etkinleştir</string>
   <!-- layout.buttons.hideButtons -->

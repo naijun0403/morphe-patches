@@ -42,6 +42,8 @@ Second \"item\" text"</string>
   <string name="morphe_music_crossfade_curve_entry_ease_out_quad">Ketenangan yang lembut</string>
   <string name="morphe_music_crossfade_curve_entry_smoothstep">Kurva-S yang halus</string>
   <!-- Empty string because custom preference handles the title itself -->
+  <string name="morphe_music_crossfade_curve_preview_outgoing">Keluar</string>
+  <string name="morphe_music_crossfade_curve_preview_incoming">Masuk</string>
   <string name="morphe_music_crossfade_duration_title">Durasi pudar silang</string>
   <string name="morphe_crossfade_duration_250ms">250 milidetik</string>
   <string name="morphe_crossfade_duration_500ms">500 milidetik</string>
@@ -56,6 +58,8 @@ Second \"item\" text"</string>
   <string name="morphe_crossfade_duration_8000ms">8 detik</string>
   <string name="morphe_crossfade_duration_9000ms">9 detik</string>
   <string name="morphe_crossfade_duration_10000ms">10 detik</string>
+  <string name="morphe_crossfade_duration_11000ms">11 detik</string>
+  <string name="morphe_crossfade_duration_12000ms">12 detik</string>
   <string name="morphe_music_crossfade_on_skip_title">Pudar silang saat melewatkan manual</string>
   <string name="morphe_music_crossfade_on_skip_summary">Menerapkan efek pudar silang saat Anda melewati trek berikutnya secara manual</string>
   <string name="morphe_music_crossfade_on_auto_advance_title">Fade silang saat otomatis maju</string>
@@ -66,9 +70,7 @@ Second \"item\" text"</string>
   <string name="morphe_music_crossfade_resumed_toast">Pudar silang dilanjutkan</string>
   <string name="morphe_music_crossfade_video_mode_disabled_toast">Mode video tidak tersedia saat pudar silang diaktifkan</string>
   <string name="morphe_music_crossfade_about_title">Tentang</string>
-  <string name="morphe_music_crossfade_about_summary">"Pudar silang tersedia di YouTube Music 8.x
-
-Tekan lama tombol acak untuk menonaktifkan/mengaktifkan
+  <string name="morphe_music_crossfade_about_summary">"Tekan lama tombol acak untuk menonaktifkan/mengaktifkan
 
 Implementasi fitur oleh VazerOG"</string>
   <!-- interaction.permanentrepeat.permanentRepeatPatch -->

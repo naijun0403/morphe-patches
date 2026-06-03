@@ -42,6 +42,8 @@ Second \"item\" text"</string>
   <string name="morphe_music_crossfade_curve_entry_ease_out_quad">Jemné zeslabení</string>
   <string name="morphe_music_crossfade_curve_entry_smoothstep">Hladká S-křivka</string>
   <!-- Empty string because custom preference handles the title itself -->
+  <string name="morphe_music_crossfade_curve_preview_outgoing">Odchozí</string>
+  <string name="morphe_music_crossfade_curve_preview_incoming">Příchozí</string>
   <string name="morphe_music_crossfade_duration_title">Délka vyhlazování</string>
   <string name="morphe_crossfade_duration_250ms">250 milisekund</string>
   <string name="morphe_crossfade_duration_500ms">500 milisekund</string>
@@ -56,6 +58,8 @@ Second \"item\" text"</string>
   <string name="morphe_crossfade_duration_8000ms">8 sekund</string>
   <string name="morphe_crossfade_duration_9000ms">9 sekund</string>
   <string name="morphe_crossfade_duration_10000ms">10 sekund</string>
+  <string name="morphe_crossfade_duration_11000ms">11 sekundy</string>
+  <string name="morphe_crossfade_duration_12000ms">12 sekundy</string>
   <string name="morphe_music_crossfade_on_skip_title">Vyhlazování při ručním přeskoku</string>
   <string name="morphe_music_crossfade_on_skip_summary">Aplikuje efekt crossfade, když ručně přeskočíte na další skladbu</string>
   <string name="morphe_music_crossfade_on_auto_advance_title">Vyhlazování při automatickém přechodu</string>
@@ -66,9 +70,7 @@ Second \"item\" text"</string>
   <string name="morphe_music_crossfade_resumed_toast">Přechod mezi skladbami obnoven</string>
   <string name="morphe_music_crossfade_video_mode_disabled_toast">Režim videa není dostupný při zapnutém přechodu mezi skladbami</string>
   <string name="morphe_music_crossfade_about_title">O aplikaci</string>
-  <string name="morphe_music_crossfade_about_summary">"Vyhlazování je k dispozici s YouTube Music 8.x
-
-Dlouze podržte tlačítko pro náhodné přehrávání, abyste jej vypnuli/zapnuli
+  <string name="morphe_music_crossfade_about_summary">"Dlouhé stisknutí tlačítka přehrávání náhodně zapne/vypne
 
 Implementace funkce VazerOG"</string>
   <!-- interaction.permanentrepeat.permanentRepeatPatch -->

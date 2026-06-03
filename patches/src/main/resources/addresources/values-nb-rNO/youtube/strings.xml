@@ -59,6 +59,9 @@ Endringer inkluderer:
   <string name="morphe_hide_feed_flyout_menu_title">Aktiver feed flyout-menufilter</string>
   <string name="morphe_hide_feed_flyout_menu_filter_strings_title">Feed flyout-menufilter</string>
   <string name="morphe_hide_feed_flyout_menu_filter_strings_summary">Skriv inn navnene på flyut-menyen du vil filtrere etter, atskilt med nye linjer</string>
+  <string name="morphe_hide_account_menu_title">Aktiver bibliotek / Du bunnmenyfilter</string>
+  <string name="morphe_hide_account_menu_filter_strings_title">Aktiver bibliotek / Du bunnmenyfilter</string>
+  <string name="morphe_hide_account_menu_filter_strings_summary">Skriv inn bibliotek / Du bunnmenynavnene du vil filtrere etter, atskilt med nye linjer</string>
   <string name="morphe_hide_album_cards_title">Skjul albumkort</string>
   <string name="morphe_hide_album_cards_summary">Skjuler albumkortene under artistbeskrivelsen</string>
   <string name="morphe_hide_artist_cards_title">Skjul artistkort</string>
@@ -123,7 +126,6 @@ Visning av YouTube-doodles kan hindre egendefinerte headere fra å vises."</stri
   <!-- 'Join' should be translated using the same localized wording YouTube displays for the button.
           This button usually appears in the video player for certain videos. -->
   <string name="morphe_hide_join_membership_button_title">Skjul \'Bli med\'-knapp</string>
-  <string name="morphe_hide_live_chat_donators_bar_title">Skjul live chat donator bar</string>
   <!-- 'Live chat replay' should be translated using the same localized wording YouTube displays for the button.
           This button usually appears when in fullscreen for live streamed videos after opening live chat. -->
   <string name="morphe_hide_live_chat_replay_button_title">Skjul \'Direktestrøm-chat-gjennomgang\'-knappen</string>
@@ -147,6 +149,7 @@ Visning av YouTube-doodles kan hindre egendefinerte headere fra å vises."</stri
   <string name="morphe_hide_explore_section_summary">Skjuler «Utforsk dette kurset»- og «Utforsk podkasten»-seksjonene</string>
   <string name="morphe_hide_explore_course_section_title">Skjul «Utforsk dette kurset»-seksjon</string>
   <string name="morphe_hide_explore_podcast_section_title">Skjul «Utforsk podkasten»-seksjon</string>
+  <string name="morphe_hide_featured_channels_section_title">Skjul seksjonen med utvalgte kanaler</string>
   <string name="morphe_hide_featured_links_section_title">Skjul Utvalgte lenker-seksjon</string>
   <string name="morphe_hide_featured_places_section_title">Skjul «Utvalgte steder»-seksjon</string>
   <string name="morphe_hide_featured_videos_section_title">Skjul Utvalgte videoer-seksjon</string>
@@ -204,6 +207,7 @@ Visning av YouTube-doodles kan hindre egendefinerte headere fra å vises."</stri
   <string name="morphe_hide_comments_create_a_short_button_title">Skjul \'Opprett en Short\'-knapp</string>
   <string name="morphe_hide_comments_emoji_and_timestamp_buttons_title">Skjul emoji- og tidsstempelknapper</string>
   <string name="morphe_hide_comments_info_button_title">Skjul info-knapp</string>
+  <string name="morphe_hide_comments_live_chat_donators_bar_title">Skjul donatorfeltet for livechat</string>
   <string name="morphe_hide_comments_preview_comment_title">Skjul forhåndsvisningskommentar</string>
   <string name="morphe_hide_comments_preview_comment_summary">Skjuler kommentarforslag under videoen før du åpner hele kommentarfeltet</string>
   <string name="morphe_hide_comments_thanks_button_title">Skjul takkeknapp</string>
@@ -304,10 +308,21 @@ Vennligst sjekk at pakkenavnet er riktig og at appen er installert"</string>
   <string name="morphe_external_downloader_empty_warning">Pakkenavnet kan ikke være tomt</string>
   <!-- interaction.loop.loopVideoPatch -->
   <string name="morphe_loop_video_title">Aktiver video i sløyfe</string>
+  <string name="morphe_do_not_remember_loop_video_title">Husk ikke løkkevideo</string>
+  <string name="morphe_do_not_remember_loop_video_summary">Forhindre at gjeldende status for løkkevideoen lagres for påfølgende videoer</string>
   <!-- interaction.loop.loopVideoButtonPatch -->
   <string name="morphe_loop_video_button_title">Vis gjenta video-knapp</string>
   <string name="morphe_loop_video_button_toast_on">Video i sløyfe er aktivert</string>
   <string name="morphe_loop_video_button_toast_off">Video i sløyfe er deaktivert</string>
+  <string name="morphe_loop_video_range_dialog_title">Repetisjonsområde</string>
+  <string name="morphe_loop_video_range_label_start">Start</string>
+  <string name="morphe_loop_video_range_label_end">Slutt</string>
+  <string name="morphe_loop_video_range_hint_start">[tt:]mm:ss</string>
+  <string name="morphe_loop_video_range_hint_end">[tt:]mm:ss (tom = videoslutt)</string>
+  <string name="morphe_loop_video_range_set">Sett</string>
+  <string name="morphe_loop_video_range_clear">Tøm</string>
+  <string name="morphe_loop_video_range_toast_on">Looper %1$s – %2$s</string>
+  <string name="morphe_loop_video_range_invalid_time">Ugyldig tidsperiode</string>
   <!-- interaction.playall.playAllButtonPatch -->
   <string name="morphe_play_all_button_title">Vis Spill alle-knapp</string>
   <string name="morphe_play_all_button_summary">"Trykk for å generere en spilleliste over alle videoer fra kanalen, trykk og hold for å angre
@@ -459,6 +474,8 @@ Info: Fungerer kanskje ikke på direktesendinger"</string>
   <string name="morphe_hide_quick_actions_playlist_button_title">Skjul Spillelisteknapp</string>
   <string name="morphe_hide_quick_actions_save_button_title">Skjul Lagre-knapp</string>
   <string name="morphe_hide_quick_actions_share_button_title">Skjul Del-knappen</string>
+  <string name="morphe_quick_actions_top_margin_title">Rask handling-toppmargin</string>
+  <string name="morphe_quick_actions_top_margin_summary">Angi toppmargen for hurtighandlingslinjen (0-32 dp)</string>
   <!-- layout.captions.captionsPatch -->
   <string name="morphe_captions_screen_title">Teksting</string>
   <string name="morphe_captions_screen_summary">Administrer automatisk teksting og informasjonskapsler for teksting</string>

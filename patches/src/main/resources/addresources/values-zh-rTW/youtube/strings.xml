@@ -59,6 +59,9 @@ Second \"item\" text"</string>
   <string name="morphe_hide_feed_flyout_menu_title">啟用推薦內容彈出式選單篩選器</string>
   <string name="morphe_hide_feed_flyout_menu_filter_strings_title">推薦內容彈出式選單篩選器</string>
   <string name="morphe_hide_feed_flyout_menu_filter_strings_summary">輸入彈出式選單名稱以進行篩選，每行一個</string>
+  <string name="morphe_hide_account_menu_title">啟用資料庫 / 您在底部選單中的篩選選項</string>
+  <string name="morphe_hide_account_menu_filter_strings_title">啟用資料庫 / 您在底部選單中的篩選選項</string>
+  <string name="morphe_hide_account_menu_filter_strings_summary">輸入資料庫 / 您要在底部選單中篩選的名稱，以新行分隔</string>
   <string name="morphe_hide_album_cards_title">隱藏專輯資訊卡</string>
   <string name="morphe_hide_album_cards_summary">隱藏藝術家描述下方的專輯卡片</string>
   <string name="morphe_hide_artist_cards_title">隱藏藝人資訊卡</string>
@@ -123,7 +126,6 @@ Second \"item\" text"</string>
   <!-- 'Join' should be translated using the same localized wording YouTube displays for the button.
           This button usually appears in the video player for certain videos. -->
   <string name="morphe_hide_join_membership_button_title">隱藏「加入」按鈕</string>
-  <string name="morphe_hide_live_chat_donators_bar_title">隱藏直播捐助者欄</string>
   <!-- 'Live chat replay' should be translated using the same localized wording YouTube displays for the button.
           This button usually appears when in fullscreen for live streamed videos after opening live chat. -->
   <string name="morphe_hide_live_chat_replay_button_title">隱藏「直播聊天重播」按鈕</string>
@@ -147,6 +149,7 @@ Second \"item\" text"</string>
   <string name="morphe_hide_explore_section_summary">隱藏「探索本課程」和「探索 Podcast」區段</string>
   <string name="morphe_hide_explore_course_section_title">隱藏「探索本課程」區段</string>
   <string name="morphe_hide_explore_podcast_section_title">隱藏「探索 Podcast」區段</string>
+  <string name="morphe_hide_featured_channels_section_title">隱藏精選頻道區段</string>
   <string name="morphe_hide_featured_links_section_title">隱藏精選連結區段</string>
   <string name="morphe_hide_featured_places_section_title">隱藏「精選地點」區段</string>
   <string name="morphe_hide_featured_videos_section_title">隱藏精選影片區段</string>
@@ -204,6 +207,7 @@ Second \"item\" text"</string>
   <string name="morphe_hide_comments_create_a_short_button_title">隱藏「建立 Short」按鈕</string>
   <string name="morphe_hide_comments_emoji_and_timestamp_buttons_title">隱藏表情符號和時間戳記按鈕</string>
   <string name="morphe_hide_comments_info_button_title">隱藏資訊按鈕</string>
+  <string name="morphe_hide_comments_live_chat_donators_bar_title">隱藏直播聊天捐款者欄</string>
   <string name="morphe_hide_comments_preview_comment_title">隱藏留言預覽</string>
   <string name="morphe_hide_comments_preview_comment_summary">隱藏在開啟完整的評論區之前，影片下方的評論預覽</string>
   <string name="morphe_hide_comments_thanks_button_title">隱藏「感謝」按鈕</string>
@@ -304,10 +308,21 @@ Second \"item\" text"</string>
   <string name="morphe_external_downloader_empty_warning">套件名稱不能為空</string>
   <!-- interaction.loop.loopVideoPatch -->
   <string name="morphe_loop_video_title">啟用循環播放影片</string>
+  <string name="morphe_do_not_remember_loop_video_title">記住循環播放影片</string>
+  <string name="morphe_do_not_remember_loop_video_summary">防止儲存循環播放影片的目前狀態，以供後續影片使用</string>
   <!-- interaction.loop.loopVideoButtonPatch -->
   <string name="morphe_loop_video_button_title">顯示循環播放影片按鈕</string>
   <string name="morphe_loop_video_button_toast_on">已開啟循環播放影片</string>
   <string name="morphe_loop_video_button_toast_off">已關閉循環播放影片</string>
+  <string name="morphe_loop_video_range_dialog_title">循環範圍</string>
+  <string name="morphe_loop_video_range_label_start">開始</string>
+  <string name="morphe_loop_video_range_label_end">結束</string>
+  <string name="morphe_loop_video_range_hint_start">[hh:]mm:ss</string>
+  <string name="morphe_loop_video_range_hint_end">[hh:]mm:ss (空白 = 影片結束)</string>
+  <string name="morphe_loop_video_range_set">設定</string>
+  <string name="morphe_loop_video_range_clear">清除</string>
+  <string name="morphe_loop_video_range_toast_on">循環播放 %1$s - %2$s</string>
+  <string name="morphe_loop_video_range_invalid_time">所選擇的時間無效</string>
   <!-- interaction.playall.playAllButtonPatch -->
   <string name="morphe_play_all_button_title">顯示播放全部按鈕</string>
   <string name="morphe_play_all_button_summary">"點擊播放頻道中的所有影片，長按取消
@@ -459,6 +474,8 @@ Second \"item\" text"</string>
   <string name="morphe_hide_quick_actions_playlist_button_title">隱藏「播放清單」按鈕</string>
   <string name="morphe_hide_quick_actions_save_button_title">隱藏「儲存」按鈕</string>
   <string name="morphe_hide_quick_actions_share_button_title">隱藏「分享」按鈕</string>
+  <string name="morphe_quick_actions_top_margin_title">快速操作頂端邊距</string>
+  <string name="morphe_quick_actions_top_margin_summary">設定快速操作欄的頂端邊距 (0-32 dp)</string>
   <!-- layout.captions.captionsPatch -->
   <string name="morphe_captions_screen_title">字幕</string>
   <string name="morphe_captions_screen_summary">管理自動字幕和字幕 Cookie</string>

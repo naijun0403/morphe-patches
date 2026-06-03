@@ -42,6 +42,8 @@ Second \"item\" text"</string>
   <string name="morphe_music_crossfade_curve_entry_ease_out_quad">Nežen lahek ton</string>
   <string name="morphe_music_crossfade_curve_entry_smoothstep">Gladka S-krivulja</string>
   <!-- Empty string because custom preference handles the title itself -->
+  <string name="morphe_music_crossfade_curve_preview_outgoing">Izhodna</string>
+  <string name="morphe_music_crossfade_curve_preview_incoming">Vhodna</string>
   <string name="morphe_music_crossfade_duration_title">Trajanje prehoda</string>
   <string name="morphe_crossfade_duration_250ms">250 milisekund</string>
   <string name="morphe_crossfade_duration_500ms">500 milisekund</string>
@@ -56,6 +58,8 @@ Second \"item\" text"</string>
   <string name="morphe_crossfade_duration_8000ms">8 sekund</string>
   <string name="morphe_crossfade_duration_9000ms">9 sekund</string>
   <string name="morphe_crossfade_duration_10000ms">10 sekund</string>
+  <string name="morphe_crossfade_duration_11000ms">11 sekund</string>
+  <string name="morphe_crossfade_duration_12000ms">12 sekund</string>
   <string name="morphe_music_crossfade_on_skip_title">Vklop križnega prehoda ob ročnem preskoku</string>
   <string name="morphe_music_crossfade_on_skip_summary">Uporabi prehod, ko ročno preskočite na naslednjo skladbo</string>
   <string name="morphe_music_crossfade_on_auto_advance_title">Vklop križnega prehoda ob samodejnem preskoku</string>
@@ -66,11 +70,9 @@ Second \"item\" text"</string>
   <string name="morphe_music_crossfade_resumed_toast">Prehod se nadaljuje</string>
   <string name="morphe_music_crossfade_video_mode_disabled_toast">Video način ni na voljo, ko je prehod omogočen</string>
   <string name="morphe_music_crossfade_about_title">O nas</string>
-  <string name="morphe_music_crossfade_about_summary">"Križni prehod je na voljo z YouTube Music 8.x
+  <string name="morphe_music_crossfade_about_summary">"Dolgo pritisnite gumb za naključni vrstni red za onemogočenje/omogočenje
 
-Dolgo držite gumb za pomikanje, da omogočite/onemogočite
-
-Implementacija funkcije s strani VazerOG"</string>
+Izvedba funkcije s strani VazerOG"</string>
   <!-- interaction.permanentrepeat.permanentRepeatPatch -->
   <string name="morphe_music_play_permanent_repeat_title">Omogoči trajno ponavljanje</string>
   <!-- layout.buttons.hideButtons -->

@@ -59,6 +59,9 @@ Muutoksia ovat muun muassa:
   <string name="morphe_hide_feed_flyout_menu_title">Ota käyttöön syötevalikon suodatin</string>
   <string name="morphe_hide_feed_flyout_menu_filter_strings_title">Syötevalikon suodatin</string>
   <string name="morphe_hide_feed_flyout_menu_filter_strings_summary">Kirjoita suodatettavat valikkokohtien nimet, yksi per rivi</string>
+  <string name="morphe_hide_account_menu_title">Kirjaston valikko / Suodatin alavalikussa</string>
+  <string name="morphe_hide_account_menu_filter_strings_title">Kirjaston valikko / Suodatin alavalikussa</string>
+  <string name="morphe_hide_account_menu_filter_strings_summary">Kirjoita suodatettavat valikkokohtien nimet, yksi per rivi</string>
   <string name="morphe_hide_album_cards_title">Piilota albumikortit</string>
   <string name="morphe_hide_album_cards_summary">Piilottaa albumikortit artistin kuvauksen alapuolelta</string>
   <string name="morphe_hide_artist_cards_title">Piilota artistikortit</string>
@@ -123,7 +126,6 @@ YouTube Doodlen näyttäminen saattaa estää mukautettujen otsikoiden näyttäm
   <!-- 'Join' should be translated using the same localized wording YouTube displays for the button.
           This button usually appears in the video player for certain videos. -->
   <string name="morphe_hide_join_membership_button_title">Piilota Liity-painike</string>
-  <string name="morphe_hide_live_chat_donators_bar_title">Piilota live-chat -lahjoittajien palkki</string>
   <!-- 'Live chat replay' should be translated using the same localized wording YouTube displays for the button.
           This button usually appears when in fullscreen for live streamed videos after opening live chat. -->
   <string name="morphe_hide_live_chat_replay_button_title">Piilota \'Livechatin uudelleentoisto\'\' -painike</string>
@@ -147,6 +149,7 @@ YouTube Doodlen näyttäminen saattaa estää mukautettujen otsikoiden näyttäm
   <string name="morphe_hide_explore_section_summary">Piilottaa tutustu tähän kurssiin- ja tutustu podcastiin -osiot</string>
   <string name="morphe_hide_explore_course_section_title">Piilota \"Tutustu tähän kurssiin\" -osio</string>
   <string name="morphe_hide_explore_podcast_section_title">Piilota \"Tutustu podcastiin\" -osio</string>
+  <string name="morphe_hide_featured_channels_section_title">Piilota esiteltyjen kanavien osio</string>
   <string name="morphe_hide_featured_links_section_title">Piilota Tietoja-linkit -osio</string>
   <string name="morphe_hide_featured_places_section_title">Piilota \"Esitellyt paikat\" -osio</string>
   <string name="morphe_hide_featured_videos_section_title">Piilota Esitellyt videot -osio</string>
@@ -205,6 +208,7 @@ YouTube Doodlen näyttäminen saattaa estää mukautettujen otsikoiden näyttäm
   <string name="morphe_hide_comments_create_a_short_button_title">Piilota \"Luo Shorts-video\" -painike</string>
   <string name="morphe_hide_comments_emoji_and_timestamp_buttons_title">Piilota emoji- ja aikaleima-painikkeet</string>
   <string name="morphe_hide_comments_info_button_title">Piilota Tietoja-painike</string>
+  <string name="morphe_hide_comments_live_chat_donators_bar_title">Piilota lahjoittajien palkki suorassa chatissa</string>
   <string name="morphe_hide_comments_preview_comment_title">Piilota kommentin esikatselu</string>
   <string name="morphe_hide_comments_preview_comment_summary">Piilottaa kommenttien esikatselun videon alapuolella ennen koko kommenttiosion avaamista</string>
   <string name="morphe_hide_comments_thanks_button_title">Piilota Kiitos-painike</string>
@@ -305,10 +309,21 @@ Tarkista, että paketin nimi on oikein ja sovellus on asennettu"</string>
   <string name="morphe_external_downloader_empty_warning">Paketin nimi ei voi olla tyhjä</string>
   <!-- interaction.loop.loopVideoPatch -->
   <string name="morphe_loop_video_title">Ota jatkuva toisto käyttöön</string>
+  <string name="morphe_do_not_remember_loop_video_title">Älä muista silmukoitua videota</string>
+  <string name="morphe_do_not_remember_loop_video_summary">Estä silmukoivan videon nykyisen tilan tallentaminen myöhempiä videoita varten</string>
   <!-- interaction.loop.loopVideoButtonPatch -->
   <string name="morphe_loop_video_button_title">Näytä Toista kaikki -painike</string>
   <string name="morphe_loop_video_button_toast_on">Jatkuva toisto on käytössä</string>
   <string name="morphe_loop_video_button_toast_off">Jatkuva toisto ei ole käytössä</string>
+  <string name="morphe_loop_video_range_dialog_title">Toistosilmukan alue</string>
+  <string name="morphe_loop_video_range_label_start">Alku</string>
+  <string name="morphe_loop_video_range_label_end">Loppu</string>
+  <string name="morphe_loop_video_range_hint_start">[hh:]mm:ss</string>
+  <string name="morphe_loop_video_range_hint_end">[hh:]mm:ss (tyhjä = videon loppu)</string>
+  <string name="morphe_loop_video_range_set">Aseta</string>
+  <string name="morphe_loop_video_range_clear">Tyhjennä</string>
+  <string name="morphe_loop_video_range_toast_on">Toisto %1$s - %2$s</string>
+  <string name="morphe_loop_video_range_invalid_time">Annettu aika on virheellinen</string>
   <!-- interaction.playall.playAllButtonPatch -->
   <string name="morphe_play_all_button_title">Näytä Soita kaikki -painike</string>
   <string name="morphe_play_all_button_summary">"Napauta toistaaksesi kaikki kanavan videot, napauta ja pidä painettuna peruuttaaksesi
@@ -460,6 +475,8 @@ Tieto: Ei välttämättä toimi suoratoistoissa"</string>
   <string name="morphe_hide_quick_actions_playlist_button_title">Piilota Soittolista-painike</string>
   <string name="morphe_hide_quick_actions_save_button_title">Piilota Tallenna -painike</string>
   <string name="morphe_hide_quick_actions_share_button_title">Piilota Jaa-painike</string>
+  <string name="morphe_quick_actions_top_margin_title">Pikatoimintojen ylämarginaali</string>
+  <string name="morphe_quick_actions_top_margin_summary">Aseta pikatoimintopalkin ylämarginaali (0-32 dp)</string>
   <!-- layout.captions.captionsPatch -->
   <string name="morphe_captions_screen_title">Tekstitykset</string>
   <string name="morphe_captions_screen_summary">Näytä aina</string>

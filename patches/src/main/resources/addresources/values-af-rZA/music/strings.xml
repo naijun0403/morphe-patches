@@ -42,6 +42,8 @@ Second \"item\" text"</string>
   <string name="morphe_music_crossfade_curve_entry_ease_out_quad">Sagt gemak</string>
   <string name="morphe_music_crossfade_curve_entry_smoothstep">Glad S-kurwe</string>
   <!-- Empty string because custom preference handles the title itself -->
+  <string name="morphe_music_crossfade_curve_preview_outgoing">Uitgaande</string>
+  <string name="morphe_music_crossfade_curve_preview_incoming">Inkomende</string>
   <string name="morphe_music_crossfade_duration_title">Kruisverdof duur</string>
   <string name="morphe_crossfade_duration_250ms">250 millisekondes</string>
   <string name="morphe_crossfade_duration_500ms">500 millisekondes</string>
@@ -56,6 +58,8 @@ Second \"item\" text"</string>
   <string name="morphe_crossfade_duration_8000ms">8 sekondes</string>
   <string name="morphe_crossfade_duration_9000ms">9 sekondes</string>
   <string name="morphe_crossfade_duration_10000ms">10 sekondes</string>
+  <string name="morphe_crossfade_duration_11000ms">11 sekondes</string>
+  <string name="morphe_crossfade_duration_12000ms">12 sekondes</string>
   <string name="morphe_music_crossfade_on_skip_title">Kruisverdof tydens handspring</string>
   <string name="morphe_music_crossfade_on_skip_summary">Wendt die oorgangs effek toe wanneer jy handmatig na die volgende liedjie spring</string>
   <string name="morphe_music_crossfade_on_auto_advance_title">Kruisverdof op outo-vooruitgang</string>
@@ -66,9 +70,7 @@ Second \"item\" text"</string>
   <string name="morphe_music_crossfade_resumed_toast">Die oorgangsvervaging hervat</string>
   <string name="morphe_music_crossfade_video_mode_disabled_toast">Videoweergave is nie beskikbaar terwyl oorgangsvervaging geaktiveer is nie</string>
   <string name="morphe_music_crossfade_about_title">Inligting</string>
-  <string name="morphe_music_crossfade_about_summary">"Kruisverdof is beskikbaar met YouTube Music 8.x
-
-Druk lank op die skuifknoppie om te deaktiveer/aktiveer
+  <string name="morphe_music_crossfade_about_summary">"Druk lank op die shuffle-knoppie om te deaktiveer/aktiveer
 
 Funksie implementering deur VazerOG"</string>
   <!-- interaction.permanentrepeat.permanentRepeatPatch -->

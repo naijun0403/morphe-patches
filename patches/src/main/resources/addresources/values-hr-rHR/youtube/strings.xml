@@ -120,7 +120,6 @@ Prikaz YouTube Doodlesa može spriječiti prikazivanje prilagođenih zaglavlja."
   <!-- 'Join' should be translated using the same localized wording YouTube displays for the button.
           This button usually appears in the video player for certain videos. -->
   <string name="morphe_hide_join_membership_button_title">Sakrij tipku za pridruživanje</string>
-  <string name="morphe_hide_live_chat_donators_bar_title">Skriva traku donatora izravnog chata</string>
   <!-- 'Live chat replay' should be translated using the same localized wording YouTube displays for the button.
           This button usually appears when in fullscreen for live streamed videos after opening live chat. -->
   <string name="morphe_hide_live_chat_replay_button_title">Sakrij tipku \'Live chat replay\'</string>
@@ -201,6 +200,7 @@ Prikaz YouTube Doodlesa može spriječiti prikazivanje prilagođenih zaglavlja."
   <string name="morphe_hide_comments_create_a_short_button_title">Sakrij \'Prikaži\' odjel</string>
   <string name="morphe_hide_comments_emoji_and_timestamp_buttons_title">Sakrij \'Prikaži\' odjel</string>
   <string name="morphe_hide_comments_info_button_title">Sakrij tipku Info</string>
+  <string name="morphe_hide_comments_live_chat_donators_bar_title">Skriva traku donatora izravnog chata</string>
   <string name="morphe_hide_comments_preview_comment_title">Emoji i Vremenska oznaka tipke su skrivene</string>
   <string name="morphe_hide_comments_preview_comment_summary">Sakriva pregled komentara ispod videa prije otvaranja cijelog odjeljka s komentarima</string>
   <string name="morphe_hide_comments_thanks_button_title">Sakrij dugme za pretraživanje</string>
@@ -292,6 +292,7 @@ Potvrdite da naziv paketa je tačan i da je aplikacija instalirana."</string>
   <string name="morphe_loop_video_button_title">Prikaži tipku za prikaz video petlje</string>
   <string name="morphe_loop_video_button_toast_on">Petljati video je uključen</string>
   <string name="morphe_loop_video_button_toast_off">Petljati video je isključen</string>
+  <string name="morphe_loop_video_range_clear">Izbriši</string>
   <!-- interaction.playall.playAllButtonPatch -->
   <string name="morphe_play_all_button_title">Prikaži tipku Reproduciraj sve</string>
   <string name="morphe_play_all_button_type_title">Generiranje načina reprodukcije</string>
@@ -395,6 +396,7 @@ Potvrdite da naziv paketa je tačan i da je aplikacija instalirana."</string>
   <!-- layout.buttons.navigation.navigationButtonsPatch -->
   <string name="morphe_navigation_buttons_screen_title">Traka navigacije</string>
   <!-- 'Home' should be translated using the same localized wording YouTube displays for the tab. -->
+  <string name="morphe_hide_home_button_title">Sakrij tipku Početna</string>
   <!-- 'Shorts' should be translated using the same localized wording YouTube displays for the tab. -->
   <!-- 'Create' has no display name. Translate normally. -->
   <string name="morphe_hide_create_button_title">Sakrij tipku Izradi</string>
@@ -744,6 +746,7 @@ Ako se kasnije isključi, preporuke za UI mogu se izbjeći čišćenjem podataka
   <string name="morphe_open_system_share_sheet_title">Otvori tablicu dijeljenja sustava</string>
   <!-- layout.music.overrideYouTubeMusicButtonsPatch -->
   <!-- layout.startpage.changeStartPagePatch -->
+  <string name="morphe_change_start_page_title">Početna stranica</string>
   <string name="morphe_change_start_page_entry_default">Zadano</string>
   <string name="morphe_change_start_page_entry_all_subscriptions">Sve pretplate</string>
   <string name="morphe_change_start_page_entry_browse">Pretraživanje kanala</string>
@@ -803,6 +806,7 @@ Ako se kasnije isključi, preporuke za UI mogu se izbjeći čišćenjem podataka
   <string name="morphe_splash_screen_animation_style_title">Omogu gradientno zaslonsko pozadina</string>
   <string name="morphe_splash_screen_animation_style_entry_1">Onemogućeno</string>
   <string name="morphe_splash_screen_animation_style_entry_2">Pozadina će imati gradientni zadnji</string>
+  <string name="morphe_splash_screen_animation_style_entry_3">Monokromatski</string>
   <string name="morphe_seekbar_custom_color_title">Omogu oboj za obični seekbar</string>
   <string name="morphe_seekbar_custom_color_invalid">Nevažeća vrijednost obojskog seekbara</string>
   <!-- layout.branding.customBrandingPatch -->

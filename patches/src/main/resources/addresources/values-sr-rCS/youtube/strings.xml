@@ -59,6 +59,9 @@ Promene uključuju:
   <string name="morphe_hide_feed_flyout_menu_title">Omogući filter izvučnog menija za ispis</string>
   <string name="morphe_hide_feed_flyout_menu_filter_strings_title">Filter izvučnog menija za ispis</string>
   <string name="morphe_hide_feed_flyout_menu_filter_strings_summary">Unesite nazive flyout menija po kojima želite da filtrirate, odvojene novim redovima</string>
+  <string name="morphe_hide_account_menu_title">Prikaži biblioteku / Filter menija na dnu</string>
+  <string name="morphe_hide_account_menu_filter_strings_title">Prikaži biblioteku / Filter menija na dnu</string>
+  <string name="morphe_hide_account_menu_filter_strings_summary">Unesite nazive biblioteke / Filter menija na dnu, odvojene novim redovima</string>
   <string name="morphe_hide_album_cards_title">Sakrij kartice albuma</string>
   <string name="morphe_hide_album_cards_summary">Sakriva kartice albuma ispod opisa umetnika</string>
   <string name="morphe_hide_artist_cards_title">Sakrij kartice izvođača</string>
@@ -123,7 +126,6 @@ Prikazivanje YouTube Doodles može sprečiti prikazivanje korisničkih zaglavlja
   <!-- 'Join' should be translated using the same localized wording YouTube displays for the button.
           This button usually appears in the video player for certain videos. -->
   <string name="morphe_hide_join_membership_button_title">Sakrij dugme „Učlani me”</string>
-  <string name="morphe_hide_live_chat_donators_bar_title">Sakrij traku donatora uživo</string>
   <!-- 'Live chat replay' should be translated using the same localized wording YouTube displays for the button.
           This button usually appears when in fullscreen for live streamed videos after opening live chat. -->
   <string name="morphe_hide_live_chat_replay_button_title">Sakrij dugme \"Prikaži ponovni prenos chat-a\"</string>
@@ -147,6 +149,7 @@ Prikazivanje YouTube Doodles može sprečiti prikazivanje korisničkih zaglavlja
   <string name="morphe_hide_explore_section_summary">Sakriva odeljke „Istraži ovaj kurs” i „Istraži podcast”</string>
   <string name="morphe_hide_explore_course_section_title">Sakrij odeljak „Istraži ovaj kurs”</string>
   <string name="morphe_hide_explore_podcast_section_title">Sakrij odeljak „Istraži podcast”</string>
+  <string name="morphe_hide_featured_channels_section_title">Sakrij odeljke sa istaknutim kanalima</string>
   <string name="morphe_hide_featured_links_section_title">Sakrij odeljak „Istaknuti linkovi”</string>
   <string name="morphe_hide_featured_places_section_title">Sakrij odeljak „Istaknuta mesta”</string>
   <string name="morphe_hide_featured_videos_section_title">Sakrij odeljak „Istaknuti video zapisi”</string>
@@ -204,6 +207,7 @@ Prikazivanje YouTube Doodles može sprečiti prikazivanje korisničkih zaglavlja
   <string name="morphe_hide_comments_create_a_short_button_title">Sakrij dugme „Napravi Short”</string>
   <string name="morphe_hide_comments_emoji_and_timestamp_buttons_title">Sakrij dugmad emodžija i vremenske oznake</string>
   <string name="morphe_hide_comments_info_button_title">Sakrij dugme Инфо</string>
+  <string name="morphe_hide_comments_live_chat_donators_bar_title">Sakrij traku donatora uživo</string>
   <string name="morphe_hide_comments_preview_comment_title">Sakrij komentar za pregled</string>
   <string name="morphe_hide_comments_preview_comment_summary">Sakriva pregled komentara ispod videa pre otvaranja celog odeljka za komentare</string>
   <string name="morphe_hide_comments_thanks_button_title">Sakrij dugme „Hvala”</string>
@@ -304,10 +308,21 @@ Proverite da li je naziv paketa ispravan i da li je aplikacija instalirana"</str
   <string name="morphe_external_downloader_empty_warning">Naziv paketa ne može biti prazan</string>
   <!-- interaction.loop.loopVideoPatch -->
   <string name="morphe_loop_video_title">Omogući ponavljanje videa</string>
+  <string name="morphe_do_not_remember_loop_video_title">Ne pamti petlju videa</string>
+  <string name="morphe_do_not_remember_loop_video_summary">Spreči čuvanje trenutnog stanja petlje videa za naredne video zapise</string>
   <!-- interaction.loop.loopVideoButtonPatch -->
   <string name="morphe_loop_video_button_title">Prikaži dugme za ponavljanje videa</string>
   <string name="morphe_loop_video_button_toast_on">Ponavljanje videa je uključeno</string>
   <string name="morphe_loop_video_button_toast_off">Ponavljanje videa je isključeno</string>
+  <string name="morphe_loop_video_range_dialog_title">Opseg petlje</string>
+  <string name="morphe_loop_video_range_label_start">Početak</string>
+  <string name="morphe_loop_video_range_label_end">Kraj</string>
+  <string name="morphe_loop_video_range_hint_start">[hh:]mm:ss</string>
+  <string name="morphe_loop_video_range_hint_end">[hh:]mm:ss (prazno = kraj videa)</string>
+  <string name="morphe_loop_video_range_set">Podešavanje</string>
+  <string name="morphe_loop_video_range_clear">Obriši</string>
+  <string name="morphe_loop_video_range_toast_on">Petlja %1$s - %2$s</string>
+  <string name="morphe_loop_video_range_invalid_time">Nevažeći vremenski opseg</string>
   <!-- interaction.playall.playAllButtonPatch -->
   <string name="morphe_play_all_button_title">Prikaži dugme za reprodukciju svih</string>
   <string name="morphe_play_all_button_summary">"Dodirni da bi kreirao listu reprodukcije svih video snimaka sa kanala, dodirni i zadrži da poništiš
@@ -459,6 +474,8 @@ Napomena: Možda neće raditi na direktnim prenosima"</string>
   <string name="morphe_hide_quick_actions_playlist_button_title">Sakrij dugme „Plejlista”</string>
   <string name="morphe_hide_quick_actions_save_button_title">Sakrij dugme „Čuvaj”</string>
   <string name="morphe_hide_quick_actions_share_button_title">Sakrij dugme „Deli”</string>
+  <string name="morphe_quick_actions_top_margin_title">Gornja margina brzih akcija</string>
+  <string name="morphe_quick_actions_top_margin_summary">Podesite gornju marginu trake brzih akcija (0-32 dp)</string>
   <!-- layout.captions.captionsPatch -->
   <string name="morphe_captions_screen_title">Titlovi</string>
   <string name="morphe_captions_screen_summary">Upravljajte automatskim titlovima i kolačićima za titlove</string>
