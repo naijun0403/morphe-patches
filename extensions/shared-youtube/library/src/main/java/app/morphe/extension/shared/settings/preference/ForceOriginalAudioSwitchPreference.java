@@ -16,7 +16,7 @@ public class ForceOriginalAudioSwitchPreference extends SwitchPreference {
     // Spoof stream patch is not included, or is spoofing to a client with multiple audio streams.
     private static final boolean available = !SpoofVideoStreamsPatch.isPatchIncluded()
             || !SharedYouTubeSettings.SPOOF_VIDEO_STREAMS.get()
-            || SpoofVideoStreamsPatch.getPreferredClient() == ClientType.ANDROID_REEL
+            || SpoofVideoStreamsPatch.getPreferredClient() == ClientType.ANDROID_REEL_AUTH
             || SpoofVideoStreamsPatch.getPreferredClient() == ClientType.TV;
 
     {
@@ -24,8 +24,6 @@ public class ForceOriginalAudioSwitchPreference extends SwitchPreference {
             // Show why force audio is not available.
             String summary = str("morphe_force_original_audio_not_available");
             super.setSummary(summary);
-            super.setSummaryOn(summary);
-            super.setSummaryOff(summary);
             super.setEnabled(false);
         }
     }

@@ -7,6 +7,7 @@ import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
+import app.morphe.patcher.methodCall
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod
 import app.morphe.patches.all.misc.resources.ResourceType
@@ -14,6 +15,7 @@ import app.morphe.patches.all.misc.resources.getResourceId
 import app.morphe.patches.shared.misc.settings.preference.BasePreference
 import app.morphe.patches.shared.misc.settings.preference.InputType
 import app.morphe.patches.shared.misc.settings.preference.ListPreference
+import app.morphe.patches.shared.misc.settings.preference.NonInteractivePreference
 import app.morphe.patches.shared.misc.settings.preference.PreferenceScreenPreference
 import app.morphe.patches.shared.misc.settings.preference.SwitchPreference
 import app.morphe.patches.shared.misc.settings.preference.TextPreference
@@ -26,7 +28,6 @@ import app.morphe.patches.youtube.misc.settings.settingsPatch
 import app.morphe.patches.youtube.shared.Constants.COMPATIBILITY_YOUTUBE
 import app.morphe.util.addInstructionsAtControlFlowLabel
 import app.morphe.util.findInstructionIndicesReversedOrThrow
-import app.morphe.util.getMutableMethod
 import app.morphe.util.getReference
 import app.morphe.util.indexOfFirstInstructionOrThrow
 import app.morphe.util.indexOfFirstLiteralInstructionOrThrow
@@ -35,10 +36,8 @@ import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.Method
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
-import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.reference.FieldReference
-import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 
 internal const val EXTENSION_CLASS = "Lapp/morphe/extension/youtube/patches/MiniplayerPatch;"
 
@@ -73,15 +72,18 @@ val miniplayerPatch = bytecodePatch(
                 )
             }
 
-
-        preferences += SwitchPreference("morphe_miniplayer_disable_drag_and_drop")
-        preferences += SwitchPreference("morphe_miniplayer_disable_horizontal_drag")
+        preferences += SwitchPreference("morphe_miniplayer_disable_resuming", summary = true)
+        preferences += SwitchPreference("morphe_miniplayer_disable_drag_and_drop", summary = true)
+        preferences += SwitchPreference("morphe_miniplayer_disable_horizontal_drag", summary = true)
         preferences += SwitchPreference("morphe_miniplayer_disable_rounded_corners")
         preferences += SwitchPreference("morphe_miniplayer_hide_subtext")
         preferences += SwitchPreference("morphe_miniplayer_hide_overlay_buttons")
         preferences += SwitchPreference("morphe_miniplayer_hide_rewind_forward")
         preferences += TextPreference("morphe_miniplayer_width_dip", inputType = InputType.NUMBER)
-        preferences += TextPreference("morphe_miniplayer_opacity", inputType = InputType.NUMBER)
+        preferences += NonInteractivePreference(
+            key = "morphe_miniplayer_opacity",
+            tag = "app.morphe.extension.shared.settings.preference.SeekBarPreference",
+        )
 
         PreferenceScreen.PLAYER.addPreferences(
             PreferenceScreenPreference(
@@ -160,6 +162,25 @@ val miniplayerPatch = bytecodePatch(
             )
         }
 
+        // region Disable resuming miniplayer (Continue watching)
+
+        ShowMiniplayerCommandFingerprint.let {
+            it.method.apply {
+                val index = it.instructionMatches[1].index
+                val register = getInstruction<OneRegisterInstruction>(index).registerA
+
+                addInstructions(
+                    index,
+                    """
+                        invoke-static { v$register }, $EXTENSION_CLASS->disableResumingStartupMiniPlayer(Z)Z
+                        move-result v$register
+                    """
+                )
+            }
+        }
+
+        // endregion
+
         // region Enable tablet miniplayer.
         // Parts of the YT code is removed in 20.37+ and the legacy player no longer works.
 
@@ -175,18 +196,10 @@ val miniplayerPatch = bytecodePatch(
             // endregion
 
             // region Legacy tablet miniplayer hooks.
-            MiniplayerOverrideFingerprint.let {
-                it.instructionMatches.last()
-                    .getInstruction<ReferenceInstruction>()
-                    .getReference<MethodReference>()!!
-                    .getMutableMethod()
-                    .apply {
-                        findReturnIndicesReversed().forEach { index ->
-                            insertLegacyTabletMiniplayerOverride(
-                                index
-                            )
-                        }
-                    }
+            MiniplayerOverrideFingerprint.instructionMatches.last().getMethodCalled().apply {
+                findReturnIndicesReversed().forEach { index ->
+                    insertLegacyTabletMiniplayerOverride(index)
+                }
             }
 
             MiniplayerResponseModelSizeCheckFingerprint.let {
@@ -290,11 +303,13 @@ val miniplayerPatch = bytecodePatch(
             // 21.17+ removed the code to set the non-bold miniplayer pause/play icon,
             // and removed the non bold yt_fill_pause_white_36 icons.
             MiniplayerSetIconsFingerprint.method.apply {
-                findInstructionIndicesReversedOrThrow {
-                    val reference = getReference<MethodReference>()
-                    opcode == Opcode.INVOKE_INTERFACE
-                        && reference?.returnType == "Z" && reference.parameterTypes.isEmpty()
-                }.forEach { index ->
+                findInstructionIndicesReversedOrThrow(
+                    methodCall(
+                        opcode = Opcode.INVOKE_INTERFACE,
+                        returnType = "Z",
+                        parameters = listOf()
+                    )
+                ).forEach { index ->
                     val register = getInstruction<OneRegisterInstruction>(index + 1).registerA
 
                     addInstructions(

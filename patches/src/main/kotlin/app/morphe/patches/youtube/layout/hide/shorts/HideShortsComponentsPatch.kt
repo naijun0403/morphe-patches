@@ -19,6 +19,7 @@ import app.morphe.patcher.patch.resourcePatch
 import app.morphe.patches.all.misc.resources.ResourceType
 import app.morphe.patches.all.misc.resources.getResourceId
 import app.morphe.patches.all.misc.resources.resourceMappingPatch
+import app.morphe.patches.shared.misc.settings.preference.PreferenceCategory
 import app.morphe.patches.shared.misc.settings.preference.PreferenceScreenPreference
 import app.morphe.patches.shared.misc.settings.preference.SwitchPreference
 import app.morphe.patches.youtube.misc.engagement.engagementPanelHookPatch
@@ -36,7 +37,6 @@ import app.morphe.patches.youtube.shared.Constants.COMPATIBILITY_YOUTUBE
 import app.morphe.util.addInstructionsAtControlFlowLabel
 import app.morphe.util.findElementByAttributeValueOrThrow
 import app.morphe.util.forEachLiteralValueInstruction
-import app.morphe.util.getMutableMethod
 import app.morphe.util.getReference
 import app.morphe.util.indexOfFirstInstructionOrThrow
 import app.morphe.util.removeFromParent
@@ -70,14 +70,18 @@ private val hideShortsComponentsResourcePatch = resourcePatch {
         val hideShortsWidget by hideShortsWidgetOption
 
         PreferenceScreen.SHORTS.addPreferences(
-            SwitchPreference("morphe_hide_shorts_channel"),
-            SwitchPreference("morphe_hide_shorts_home"),
-            SwitchPreference("morphe_hide_shorts_search"),
-            SwitchPreference("morphe_hide_shorts_subscriptions"),
-            SwitchPreference("morphe_hide_shorts_video_description"),
-            SwitchPreference("morphe_hide_shorts_history"),
+            PreferenceCategory(
+                titleKey = "morphe_hide_shorts_category_title",
+                preferences = setOf(
+                    SwitchPreference("morphe_hide_shorts_channel"),
+                    SwitchPreference("morphe_hide_shorts_home"),
+                    SwitchPreference("morphe_hide_shorts_search"),
+                    SwitchPreference("morphe_hide_shorts_subscriptions"),
+                    SwitchPreference("morphe_hide_shorts_video_description"),
+                    SwitchPreference("morphe_hide_shorts_history"),
+                )
+            ),
             SwitchPreference("morphe_disable_shorts_double_tap_to_like"),
-
             PreferenceScreenPreference(
                 key = "morphe_shorts_player_screen",
                 sorting = PreferenceScreenPreference.Sorting.UNSORTED,
@@ -115,7 +119,6 @@ private val hideShortsComponentsResourcePatch = resourcePatch {
                     SwitchPreference("morphe_hide_shorts_tagged_products"),
                     SwitchPreference("morphe_hide_shorts_search_suggestions"),
                     SwitchPreference("morphe_hide_shorts_super_thanks_button"),
-                    SwitchPreference("morphe_hide_shorts_stickers"),
 
                     // Bottom of the screen.
                     SwitchPreference("morphe_hide_shorts_ai_button"),
@@ -229,10 +232,7 @@ val hideShortsComponentsPatch = bytecodePatch(
         }
 
         // Hook to hide the pivotBar when the Shorts player is opened.
-        ReelWatchFragmentInitPlaybackFingerprint.instructionMatches.last()
-            .instruction
-            .getReference<MethodReference>()!!
-            .getMutableMethod()
+        ReelWatchFragmentInitPlaybackFingerprint.instructionMatches.last().getMethodCalled()
             .addInstruction(
                 0,
                 "invoke-static { p1 }, $EXTENSION_FILTER->hidePivotBar(Ljava/lang/String;)V",

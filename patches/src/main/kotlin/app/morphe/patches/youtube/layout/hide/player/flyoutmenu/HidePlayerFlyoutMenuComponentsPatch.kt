@@ -64,12 +64,10 @@ val hidePlayerFlyoutMenuComponentsPatch = bytecodePatch(
                     SwitchPreference("morphe_hide_player_flyout_lock_screen"),
                     SwitchPreference(
                         key = "morphe_hide_player_flyout_audio_track",
-                        tag = "app.morphe.extension.youtube.settings.preference.HideAudioFlyoutMenuPreference"
-                    ),
+                        tag = "app.morphe.extension.youtube.settings.preference.HideAudioFlyoutMenuPreference"),
                     SwitchPreference(
                         key = "morphe_hide_player_flyout_audio_track_footer",
-                        tag = "app.morphe.extension.youtube.settings.preference.HideAudioFlyoutMenuPreference"
-                    ),
+                        tag = "app.morphe.extension.youtube.settings.preference.HideAudioFlyoutMenuPreference"),
                     SwitchPreference("morphe_hide_player_flyout_quality"),
                     SwitchPreference("morphe_hide_player_flyout_quality_footer"),
                     SwitchPreference("morphe_hide_player_flyout_quality_header"),
@@ -92,7 +90,7 @@ val hidePlayerFlyoutMenuComponentsPatch = bytecodePatch(
 
         // region Patch for the Shorts flyout
 
-        CaptionsOldBottomSheetLayoutInflaterFingerprint.matchAll().forEach { match ->
+        CaptionsOldBottomSheetLayoutInflaterFingerprint.matchAll(1 .. 2).forEach { match ->
             match.let {
                 it.method.apply {
                     val footerViewIndex = it.instructionMatches.last().index
@@ -116,7 +114,7 @@ val hidePlayerFlyoutMenuComponentsPatch = bytecodePatch(
             }
         }
 
-        QualityOldBottomSheetLayoutInflaterFingerprint.matchAll().forEach { match ->
+        QualityOldBottomSheetLayoutInflaterFingerprint.matchAll(2 .. 3).forEach { match ->
             match.let {
                 it.method.apply {
                     val footerViewIndex = it.instructionMatches.last().index
