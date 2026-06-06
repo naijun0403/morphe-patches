@@ -528,4 +528,36 @@
         <item>360</item>
         <item>240</item>
     </string-array>
+
+    <!-- video.voiceovertranslation.voiceOverTranslationPatch -->
+    <string-array name="morphe_vot_caption_language_entries">
+        <item>English</item>
+        <item>Українська</item>
+        <item>Русский</item>
+        <item>Deutsch</item>
+        <item>Français</item>
+        <item>Español</item>
+        <item>Polski</item>
+        <item>Português</item>
+        <item>Italiano</item>
+        <item>Türkçe</item>
+        <item>日本語</item>
+        <item>한국어</item>
+        <item>中文</item>
+    </string-array>
+    <string-array name="morphe_vot_caption_language_entry_values">
+        <item>en</item>
+        <item>uk</item>
+        <item>ru</item>
+        <item>de</item>
+        <item>fr</item>
+        <item>es</item>
+        <item>pl</item>
+        <item>pt</item>
+        <item>it</item>
+        <item>tr</item>
+        <item>ja</item>
+        <item>ko</item>
+        <item>zh</item>
+    </string-array>
 </resources>

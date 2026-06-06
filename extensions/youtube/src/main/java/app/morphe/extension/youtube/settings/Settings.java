@@ -514,6 +514,11 @@ public class Settings extends SharedYouTubeSettings {
     public static final IntegerSetting SWIPE_ZONE_WIDTH = new IntegerSetting("morphe_swipe_zone_width", 37, true,
             parentsAny(SWIPE_BRIGHTNESS, SWIPE_VOLUME));
 
+    // VoiceOverTranslation
+    public static final BooleanSetting VOT_ENABLED = new BooleanSetting("morphe_vot_enabled", TRUE);
+    public static final IntegerSetting VOT_ORIGINAL_AUDIO_VOLUME = new IntegerSetting("morphe_vot_original_audio_volume", 100, parent(VOT_ENABLED));
+    public static final StringSetting VOT_CAPTION_LANGUAGE = new StringSetting("morphe_vot_caption_language", "en", parent(VOT_ENABLED));
+
     // ReturnYoutubeDislike
     public static final BooleanSetting RYD_ENABLED = new BooleanSetting("morphe_ryd_enabled", TRUE);
     public static final StringSetting RYD_USER_ID = new StringSetting("morphe_ryd_user_id", "", false, false);

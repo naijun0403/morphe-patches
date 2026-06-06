@@ -334,6 +334,14 @@ Limitations:
 Verify the package name is correct and the app is installed"</string>
     <string name="morphe_external_downloader_empty_warning">The package name cannot be empty</string>
 
+    <!-- video.voiceovertranslation.voiceOverTranslationPatch -->
+    <string name="morphe_vot_enabled_title">Voice over translation</string>
+    <string name="morphe_vot_enabled_summary">Read video captions aloud using on-device text-to-speech, synchronized with playback</string>
+    <string name="morphe_vot_caption_language_title">Caption language</string>
+    <string name="morphe_vot_original_audio_label">Voice volume</string>
+    <string name="morphe_vot_toast_on">Voice over translation on</string>
+    <string name="morphe_vot_toast_off">Voice over translation off</string>
+
     <!-- interaction.loop.loopVideoPatch -->
     <string name="morphe_loop_video_title">Enable loop video</string>
     <string name="morphe_do_not_remember_loop_video_title">Don\'t remember loop video</string>
