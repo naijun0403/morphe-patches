@@ -35,7 +35,7 @@ final class TranscriptFetcher {
     private static final String INNERTUBE_PLAYER_URL =
             "https://www.youtube.com/youtubei/v1/player?prettyPrint=false";
 
-    static List<TranscriptSegment> fetch(String videoId) throws Exception {
+    static List<TranscriptSegment> fetch(String videoId) {
         String targetLang = Settings.VOT_CAPTION_LANGUAGE.get();
         String captionUrl = null;
         String poToken    = null;
@@ -61,21 +61,20 @@ final class TranscriptFetcher {
                 String json3Url = needsTranslation ? baseUrl + "&tlang=" + targetLangCode : baseUrl;
 
                 String json = fetchUrl(json3Url);
+                List<TranscriptSegment> segments = parseJson3(json);
                 boolean clientTranslate = false;
-                // &tlang= is only supported for ASR tracks; fall back to original + client translation.
-                if (json.isEmpty() && needsTranslation) {
+                // &tlang= can return valid JSON with 0 events on manual tracks; fall back to original.
+                if (segments.isEmpty() && needsTranslation) {
                     json = fetchUrl(baseUrl);
+                    segments = parseJson3(json);
                     clientTranslate = true;
                 }
-                if (!json.isEmpty()) {
-                    List<TranscriptSegment> segments = parseJson3(json);
-                    if (!segments.isEmpty()) {
-                        lastSourceLang = sourceLangCode;
-                        if (clientTranslate) {
-                            segments = TranscriptTranslator.translate(segments, targetLangCode);
-                        }
-                        return segments;
+                if (!segments.isEmpty()) {
+                    lastSourceLang = sourceLangCode;
+                    if (clientTranslate) {
+                        segments = TranscriptTranslator.translate(segments, targetLangCode);
                     }
+                    return segments;
                 }
             } catch (Exception ex) {
                 Logger.printDebug(() -> "VoiceOverTranslation: innertube caption fetch failed, trying direct: "
