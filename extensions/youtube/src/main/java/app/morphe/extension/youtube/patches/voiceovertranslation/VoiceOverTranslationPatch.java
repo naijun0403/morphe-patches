@@ -22,6 +22,7 @@ import java.util.Locale;
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.Utils;
 import app.morphe.extension.youtube.settings.Settings;
+import app.morphe.extension.youtube.shared.PlayerType;
 
 @SuppressWarnings("unused")
 public final class VoiceOverTranslationPatch {
@@ -48,6 +49,11 @@ public final class VoiceOverTranslationPatch {
     private static volatile AudioFocusRequest focusRequest;
     private static volatile boolean isDucking = false;
 
+    private static final TtsEngine edgeTtsEngine = new TtsEngine();
+
+    /** Language code of the video's own caption track, detected on each transcript fetch. */
+    static volatile String detectedSourceLang = "en";
+
     /**
      * Injection point.
      */
@@ -61,6 +67,7 @@ public final class VoiceOverTranslationPatch {
         lastSpokenIndex = -1;
 
         if (!Settings.VOT_ENABLED.get()) return;
+        if (PlayerType.getCurrent() == PlayerType.INLINE_MINIMAL) return;
         loadTranscript(videoId);
     }
 
@@ -69,6 +76,7 @@ public final class VoiceOverTranslationPatch {
      */
     public static void videoTimeChanged(long timeMs) {
         if (!Settings.VOT_ENABLED.get() || !sessionEnabled) return;
+        if (PlayerType.getCurrent() == PlayerType.INLINE_MINIMAL) return;
 
         List<TranscriptSegment> current = segments;
         if (current.isEmpty()) return;
@@ -84,8 +92,8 @@ public final class VoiceOverTranslationPatch {
             TranscriptSegment seg = current.get(i);
             if (effectiveTimeMs >= seg.startMs() && timeMs < seg.endMs()) {
                 if (i != lastSpokenIndex) {
-                    TextToSpeech localTts = tts;
-                    if (localTts == null || !localTts.isSpeaking()) {
+                    boolean busy = edgeTtsEngine.isSpeaking() || (tts != null && tts.isSpeaking());
+                    if (!busy) {
                         lastSpokenIndex = i;
                         speak(seg.text());
                     }
@@ -141,6 +149,7 @@ public final class VoiceOverTranslationPatch {
                 List<TranscriptSegment> fetched = TranscriptFetcher.fetch(videoId);
                 if (videoId.equals(currentVideoId)) {
                     segments = fetched;
+                    detectedSourceLang = TranscriptFetcher.lastSourceLang;
                     Logger.printInfo(() -> "VoiceOverTranslation: loaded " + fetched.size()
                             + " segments for " + videoId);
                     notifyStateChanged();
@@ -178,16 +187,29 @@ public final class VoiceOverTranslationPatch {
     }
 
     private static void speak(String text) {
+        String rawLang = Settings.VOT_CAPTION_LANGUAGE.get();
+        String lang = "auto".equals(rawLang) ? detectedSourceLang : rawLang;
+        float volume = Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f;
+
+        if (!Settings.VOT_USE_NATIVE_TTS.get()) {
+            String voice = VoiceCatalog.resolve(lang, !Settings.VOT_PREFER_FEMALE_VOICE.get());
+            if (voice != null) {
+                requestDuck();
+                edgeTtsEngine.speak(text, voice, volume, VoiceOverTranslationPatch::abandonDuck);
+                return;
+            }
+        }
+
         ensureTts();
         if (!ttsReady) return;
         requestDuck();
         Bundle params = new Bundle();
-        params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME,
-                Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f);
+        params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume);
         tts.speak(text, TextToSpeech.QUEUE_FLUSH, params, "vot");
     }
 
     private static void stopTts() {
+        edgeTtsEngine.stop();
         TextToSpeech localTts = tts;
         if (localTts != null) localTts.stop();
         abandonDuck();

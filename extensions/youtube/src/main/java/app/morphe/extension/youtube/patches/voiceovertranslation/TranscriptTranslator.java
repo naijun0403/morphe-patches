@@ -21,82 +21,82 @@ import java.util.List;
 
 import app.morphe.extension.shared.Logger;
 
+/**
+ * Translates transcript segments via the Google Translate public endpoint.
+ * Used as a fallback when YouTube's &tlang= parameter is not supported by the caption track.
+ */
 final class TranscriptTranslator {
 
-    private static final int CONNECT_TIMEOUT_MS = 15_000;
-    private static final int READ_TIMEOUT_MS    = 30_000;
+    private static final String TRANSLATE_URL =
+            "https://translate.googleapis.com/translate_a/t?client=te_lib&sl=auto&format=text&tl=";
 
-    static List<TranscriptSegment> translateAll(List<TranscriptSegment> segments,
-                                                String sourceLang,
-                                                String targetLang) throws Exception {
-        if (sourceLang.split("-")[0].equals(targetLang.split("-")[0])) return segments;
+    // Max segments per POST body to stay within reasonable request size.
+    private static final int BATCH_SIZE = 50;
 
-        StringBuilder joined = new StringBuilder();
-        for (int i = 0; i < segments.size(); i++) {
-            if (i > 0) joined.append('\n');
-            joined.append(segments.get(i).text());
-        }
-
-        String translatedJoined = requestTranslation(joined.toString(), sourceLang, targetLang);
-
-        String[] parts = translatedJoined.split("\n", -1);
+    static List<TranscriptSegment> translate(List<TranscriptSegment> segments, String targetLang) {
+        if (segments.isEmpty()) return segments;
         List<TranscriptSegment> result = new ArrayList<>(segments.size());
-        for (int i = 0; i < segments.size(); i++) {
-            String text = (i < parts.length) ? parts[i].trim() : "";
-            if (text.isEmpty()) text = segments.get(i).text();
-            result.add(new TranscriptSegment(segments.get(i).startMs(), segments.get(i).endMs(), text));
+        for (int i = 0; i < segments.size(); i += BATCH_SIZE) {
+            List<TranscriptSegment> batch = segments.subList(i, Math.min(i + BATCH_SIZE, segments.size()));
+            try {
+                List<String> translated = translateBatch(batch, targetLang);
+                for (int j = 0; j < batch.size(); j++) {
+                    TranscriptSegment orig = batch.get(j);
+                    String text = j < translated.size() ? translated.get(j) : orig.text();
+                    result.add(new TranscriptSegment(orig.startMs(), orig.endMs(), text));
+                }
+            } catch (Exception ex) {
+                // Keep original text for this batch on failure rather than losing segments.
+                result.addAll(batch);
+                Logger.printDebug(() -> "TranscriptTranslator: batch failed: " + ex.getMessage());
+            }
         }
-        Logger.printInfo(() -> "VoiceOverTranslation: translated " + result.size()
-                + " segments (" + sourceLang + "→" + targetLang + ")");
         return result;
     }
 
-    private static String requestTranslation(String text, String sourceLang, String targetLang) throws Exception {
-        String urlStr = "https://translate.googleapis.com/translate_a/single"
-                + "?client=gtx&sl=" + sourceLang + "&tl=" + targetLang + "&dt=t";
-        //noinspection CharsetObjectCanBeUsed — Charset overload requires API 33; .name() works from API 1
-        byte[] body = ("q=" + URLEncoder.encode(text, StandardCharsets.UTF_8.name()))
-                .getBytes(StandardCharsets.UTF_8);
+    private static List<String> translateBatch(List<TranscriptSegment> segments, String targetLang) throws Exception {
+        StringBuilder body = new StringBuilder();
+        for (TranscriptSegment seg : segments) {
+            if (body.length() > 0) body.append('&');
+            //noinspection CharsetObjectCanBeUsed
+            body.append("q=").append(URLEncoder.encode(seg.text(), StandardCharsets.UTF_8.name()));
+        }
 
-        HttpURLConnection conn = (HttpURLConnection) new URL(urlStr).openConnection();
+        HttpURLConnection conn = (HttpURLConnection) new URL(TRANSLATE_URL + targetLang).openConnection();
         try {
             conn.setRequestMethod("POST");
-            conn.setDoOutput(true);
-            conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
-            conn.setReadTimeout(READ_TIMEOUT_MS);
+            conn.setConnectTimeout(10_000);
+            conn.setReadTimeout(15_000);
             conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
             conn.setRequestProperty("User-Agent", "Mozilla/5.0");
+            conn.setDoOutput(true);
 
+            byte[] bodyBytes = body.toString().getBytes(StandardCharsets.UTF_8);
             try (OutputStream os = conn.getOutputStream()) {
-                os.write(body);
+                os.write(bodyBytes);
             }
 
             int code = conn.getResponseCode();
-            if (code != 200) throw new Exception("Translate HTTP " + code + " for " + urlStr);
+            if (code != 200) throw new Exception("HTTP " + code);
 
-            BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8));
-            StringBuilder sb = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) sb.append(line);
-
-            return parseSentences(sb.toString());
+            return parseResponse(conn);
         } finally {
             conn.disconnect();
         }
     }
 
-    // Response: [[["translated1","orig1",...],["translated2","orig2",...],...],...]
-    private static String parseSentences(String json) throws Exception {
-        JSONArray root = new JSONArray(json);
-        JSONArray sentences = root.getJSONArray(0);
-        StringBuilder translated = new StringBuilder();
-        for (int i = 0; i < sentences.length(); i++) {
-            Object item = sentences.get(i);
-            if (item instanceof JSONArray sentence && !sentence.isNull(0)) {
-                translated.append(sentence.getString(0));
-            }
+    private static List<String> parseResponse(HttpURLConnection conn) throws Exception {
+        BufferedReader reader = new BufferedReader(
+                new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8));
+        StringBuilder sb = new StringBuilder();
+        String line;
+        while ((line = reader.readLine()) != null) sb.append(line);
+
+        JSONArray arr = new JSONArray(sb.toString());
+        List<String> result = new ArrayList<>(arr.length());
+        for (int i = 0; i < arr.length(); i++) {
+            result.add(arr.getString(i));
         }
-        return translated.toString();
+        return result;
     }
 }

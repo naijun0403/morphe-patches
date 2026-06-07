@@ -27,54 +27,63 @@ import app.morphe.extension.youtube.settings.Settings;
 
 final class TranscriptFetcher {
 
+    /** Language code detected from the video's own caption track. Updated on every successful fetch. */
+    static volatile String lastSourceLang = "en";
+
     private static final int CONNECT_TIMEOUT_MS = 10_000;
     private static final int READ_TIMEOUT_MS = 15_000;
     private static final String INNERTUBE_PLAYER_URL =
             "https://www.youtube.com/youtubei/v1/player?prettyPrint=false";
 
     static List<TranscriptSegment> fetch(String videoId) throws Exception {
-        String[] innertubeResult = fetchFromInnertube(videoId);
-        String captionUrl = innertubeResult[0];
-        String poToken    = innertubeResult[1];
         String targetLang = Settings.VOT_CAPTION_LANGUAGE.get();
-
-        Logger.printInfo(() -> "VoiceOverTranslation: captionUrl=" + (captionUrl != null ? "found" : "null")
-                + " pot=" + (poToken != null ? "found" : "null") + " for " + videoId);
+        String captionUrl = null;
+        String poToken    = null;
+        try {
+            String[] innertubeResult = fetchFromInnertube(videoId);
+            captionUrl = innertubeResult[0];
+            poToken    = innertubeResult[1];
+        } catch (Exception ex) {
+            Logger.printDebug(() -> "VoiceOverTranslation: innertube player failed: " + ex.getMessage());
+        }
 
         if (captionUrl != null) {
             try {
-                String sourceLang = extractLangFromUrl(captionUrl);
-                String json3Url = captionUrl.replaceAll("&fmt=[^&]*", "") + "&fmt=json3";
-                if (poToken != null) json3Url += "&pot=" + poToken;
+                String sourceLang     = extractLangFromUrl(captionUrl);
+                String sourceLangCode = sourceLang.split("-")[0];
+                String targetLangCode = targetLang.split("-")[0];
+
+                String baseUrl = captionUrl.replaceAll("&fmt=[^&]*", "") + "&fmt=json3";
+                if (poToken != null) baseUrl += "&pot=" + poToken;
+
+                boolean needsTranslation = !"auto".equals(targetLang)
+                        && !sourceLangCode.equals(targetLangCode);
+                String json3Url = needsTranslation ? baseUrl + "&tlang=" + targetLangCode : baseUrl;
 
                 String json = fetchUrl(json3Url);
-                Logger.printInfo(() -> "VoiceOverTranslation: json3 len=" + json.length() + " for " + videoId);
+                boolean clientTranslate = false;
+                // &tlang= is only supported for ASR tracks; fall back to original + client translation.
+                if (json.isEmpty() && needsTranslation) {
+                    json = fetchUrl(baseUrl);
+                    clientTranslate = true;
+                }
                 if (!json.isEmpty()) {
                     List<TranscriptSegment> segments = parseJson3(json);
                     if (!segments.isEmpty()) {
-                        Logger.printInfo(() -> "VoiceOverTranslation: parsed " + segments.size()
-                                + " segments (" + sourceLang + ") for " + videoId);
-                        return translate(segments, sourceLang, targetLang);
+                        lastSourceLang = sourceLangCode;
+                        if (clientTranslate) {
+                            segments = TranscriptTranslator.translate(segments, targetLangCode);
+                        }
+                        return segments;
                     }
                 }
             } catch (Exception ex) {
-                Logger.printInfo(() -> "VoiceOverTranslation: innertube caption fetch failed, trying direct: "
+                Logger.printDebug(() -> "VoiceOverTranslation: innertube caption fetch failed, trying direct: "
                         + ex.getMessage());
             }
         }
 
-        Logger.printInfo(() -> "VoiceOverTranslation: trying direct fetch for " + videoId);
         return fetchDirect(videoId, targetLang);
-    }
-
-    private static List<TranscriptSegment> translate(List<TranscriptSegment> segments,
-                                                      String sourceLang, String targetLang) {
-        try {
-            return TranscriptTranslator.translateAll(segments, sourceLang, targetLang);
-        } catch (Exception ex) {
-            Logger.printException(() -> "VoiceOverTranslation: translation failed, using original", ex);
-            return segments;
-        }
     }
 
     private static String[] fetchFromInnertube(String videoId) throws Exception {
@@ -102,10 +111,8 @@ final class TranscriptFetcher {
             if (code != 200) throw new Exception("Innertube HTTP " + code);
 
             String response = readResponseBody(conn);
-            Logger.printInfo(() -> "VoiceOverTranslation: innertube len=" + response.length()
-                    + " hasTracks=" + response.contains("\"captionTracks\":[") + " for " + videoId);
-
-            return new String[]{extractFirstCaptionUrl(response), extractPoToken(response)};
+            String targetLangCode = Settings.VOT_CAPTION_LANGUAGE.get().split("-")[0];
+            return new String[]{findBestCaptionUrl(response, targetLangCode), extractPoToken(response)};
         } finally {
             conn.disconnect();
         }
@@ -119,12 +126,18 @@ final class TranscriptFetcher {
         return end < 0 ? null : json.substring(idx, end);
     }
 
-    private static String extractFirstCaptionUrl(String json) {
+    /**
+     * Returns the caption URL that best matches {@code preferredLang} (ISO code, e.g. "uk").
+     * Prefers a native track in the target language over translation; falls back to the first
+     * non-gemini track if no match is found. "auto" (or any unmatched lang) uses the default.
+     */
+    private static String findBestCaptionUrl(String json, String preferredLang) {
         int tracksIdx = json.indexOf("\"captionTracks\":[");
         if (tracksIdx < 0) return null;
 
         String firstUrl = null;
         String firstNonGemini = null;
+        String preferredUrl = null;
         int searchFrom = tracksIdx;
 
         while (true) {
@@ -142,38 +155,55 @@ final class TranscriptFetcher {
                              .replace("\\u003c", "<");
 
             if (firstUrl == null) firstUrl = url;
-            if (firstNonGemini == null && !url.contains("variant=gemini")) firstNonGemini = url;
+            boolean nonGemini = !url.contains("variant=gemini");
+            if (firstNonGemini == null && nonGemini) firstNonGemini = url;
+            if (preferredUrl == null && nonGemini && !"auto".equals(preferredLang)) {
+                String urlLang = extractLangFromUrl(url).split("-")[0];
+                if (urlLang.equals(preferredLang)) preferredUrl = url;
+            }
 
             searchFrom = endIdx + 1;
         }
 
+        if (preferredUrl != null) return preferredUrl;
         return firstNonGemini != null ? firstNonGemini : firstUrl;
     }
 
     private static List<TranscriptSegment> fetchDirect(String videoId, String targetLang) {
-        for (String srcLang : new String[]{"en", "en-US", "en-GB"}) {
+        String targetLangCode = "auto".equals(targetLang) ? "" : targetLang.split("-")[0];
+
+        // Try the target language first (catches non-English videos), then English ASR fallbacks.
+        List<String> candidates = new ArrayList<>();
+        if (!targetLangCode.isEmpty() && !"en".equals(targetLangCode)) {
+            candidates.add(targetLangCode);
+        }
+        candidates.add("en");
+        candidates.add("en-US");
+        candidates.add("en-GB");
+
+        for (String srcLang : candidates) {
             try {
                 String urlStr = "https://www.youtube.com/api/timedtext?v=" + videoId
                         + "&lang=" + srcLang + "&kind=asr&fmt=json3";
+                String srcLangCode = srcLang.split("-")[0];
+                if (!targetLangCode.isEmpty() && !srcLangCode.equals(targetLangCode)) {
+                    urlStr += "&tlang=" + targetLangCode;
+                }
                 String json = fetchUrl(urlStr);
-                final String langFinal = srcLang;
-                Logger.printInfo(() -> "VoiceOverTranslation: direct lang=" + langFinal
-                        + " len=" + json.length() + " for " + videoId);
                 if (!json.isEmpty()) {
                     List<TranscriptSegment> segments = parseJson3(json);
                     if (!segments.isEmpty()) {
-                        Logger.printInfo(() -> "VoiceOverTranslation: direct fetch got " + segments.size()
-                                + " segments (" + langFinal + ") for " + videoId);
-                        return translate(segments, "en", targetLang);
+                        lastSourceLang = srcLangCode;
+                        return segments;
                     }
                 }
             } catch (Exception ex) {
                 final String langFinal = srcLang;
-                Logger.printInfo(() -> "VoiceOverTranslation: direct exception lang=" + langFinal
+                Logger.printDebug(() -> "VoiceOverTranslation: direct caption fetch failed lang=" + langFinal
                         + " " + ex.getMessage());
             }
         }
-        Logger.printInfo(() -> "VoiceOverTranslation: no captions available for " + videoId);
+        Logger.printDebug(() -> "VoiceOverTranslation: no captions available for " + videoId);
         return new ArrayList<>();
     }
 
