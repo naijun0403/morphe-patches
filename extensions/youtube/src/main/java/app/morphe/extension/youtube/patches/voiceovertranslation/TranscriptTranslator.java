@@ -9,26 +9,25 @@ package app.morphe.extension.youtube.patches.voiceovertranslation;
 
 import org.json.JSONArray;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import app.morphe.extension.shared.Logger;
+import app.morphe.extension.shared.requests.Requester;
 
 /**
  * Translates transcript segments via the Google Translate public endpoint.
- * Used as a fallback when YouTube's &tlang= parameter is not supported by the caption track.
  */
 final class TranscriptTranslator {
 
     private static final String TRANSLATE_URL =
-            "https://translate.googleapis.com/translate_a/t?client=te_lib&sl=auto&format=text&tl=";
+            "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&dt=t&tl=";
 
     // Max segments per POST body to stay within reasonable request size.
     private static final int BATCH_SIZE = 50;
@@ -56,11 +55,10 @@ final class TranscriptTranslator {
     }
 
     private static List<String> translateBatch(List<TranscriptSegment> segments, String targetLang) throws Exception {
-        StringBuilder body = new StringBuilder();
+        StringBuilder joined = new StringBuilder();
         for (TranscriptSegment seg : segments) {
-            if (body.length() > 0) body.append('&');
-            //noinspection CharsetObjectCanBeUsed
-            body.append("q=").append(URLEncoder.encode(seg.text(), StandardCharsets.UTF_8.name()));
+            if (joined.length() > 0) joined.append('\n');
+            joined.append(seg.text());
         }
 
         HttpURLConnection conn = (HttpURLConnection) new URL(TRANSLATE_URL + targetLang).openConnection();
@@ -71,7 +69,9 @@ final class TranscriptTranslator {
         conn.setRequestProperty("User-Agent", "Mozilla/5.0");
         conn.setDoOutput(true);
 
-        byte[] bodyBytes = body.toString().getBytes(StandardCharsets.UTF_8);
+        //noinspection CharsetObjectCanBeUsed
+        byte[] bodyBytes = ("q=" + URLEncoder.encode(joined.toString(), StandardCharsets.UTF_8.name()))
+                .getBytes(StandardCharsets.UTF_8);
         conn.setFixedLengthStreamingMode(bodyBytes.length);
         try (OutputStream os = conn.getOutputStream()) {
             os.write(bodyBytes);
@@ -80,21 +80,14 @@ final class TranscriptTranslator {
         final int code = conn.getResponseCode();
         if (code != 200) throw new Exception("HTTP " + code);
 
-        return parseResponse(conn);
-    }
-
-    private static List<String> parseResponse(HttpURLConnection conn) throws Exception {
-        BufferedReader reader = new BufferedReader(
-                new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8));
-        StringBuilder sb = new StringBuilder();
-        String line;
-        while ((line = reader.readLine()) != null) sb.append(line);
-
-        JSONArray arr = new JSONArray(sb.toString());
-        List<String> result = new ArrayList<>(arr.length());
-        for (int i = 0; i < arr.length(); i++) {
-            result.add(arr.getString(i));
+        // Response: [[["translated","original",...],...],null,"src_lang",...]
+        // Concatenate sentence translations; newline separators from joined input are preserved.
+        JSONArray sentences = new JSONArray(Requester.parseString(conn)).getJSONArray(0);
+        StringBuilder translatedJoined = new StringBuilder();
+        for (int i = 0; i < sentences.length(); i++) {
+            translatedJoined.append(sentences.getJSONArray(i).getString(0));
         }
-        return result;
+
+        return Arrays.asList(translatedJoined.toString().split("\n", -1));
     }
 }

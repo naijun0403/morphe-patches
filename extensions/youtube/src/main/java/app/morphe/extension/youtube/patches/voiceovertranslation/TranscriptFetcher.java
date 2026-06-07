@@ -35,7 +35,20 @@ final class TranscriptFetcher {
             "https://www.youtube.com/youtubei/v1/player?prettyPrint=false";
 
     static List<TranscriptSegment> fetch(String videoId) {
-        String targetLang = Settings.VOT_CAPTION_LANGUAGE.get();
+        List<TranscriptSegment> segments = fetchEnglishSegments(videoId);
+
+        if (!segments.isEmpty()) {
+            String targetLang = Settings.VOT_CAPTION_LANGUAGE.get();
+            String targetLangCode = "auto".equals(targetLang) ? "" : targetLang.split("-")[0];
+            if (!targetLangCode.isEmpty() && !"en".equals(targetLangCode)) {
+                segments = TranscriptTranslator.translate(segments, targetLangCode);
+            }
+        }
+
+        return segments;
+    }
+
+    private static List<TranscriptSegment> fetchEnglishSegments(String videoId) {
         String captionUrl = null;
         String poToken    = null;
         try {
@@ -48,31 +61,13 @@ final class TranscriptFetcher {
 
         if (captionUrl != null) {
             try {
-                String sourceLang     = extractLangFromUrl(captionUrl);
-                String sourceLangCode = sourceLang.split("-")[0];
-                String targetLangCode = targetLang.split("-")[0];
-
                 String baseUrl = captionUrl.replaceAll("&fmt=[^&]*", "") + "&fmt=json3";
                 if (poToken != null) baseUrl += "&pot=" + poToken;
 
-                boolean needsTranslation = !"auto".equals(targetLang)
-                        && !sourceLangCode.equals(targetLangCode);
-                String json3Url = needsTranslation ? baseUrl + "&tlang=" + targetLangCode : baseUrl;
-
-                String json = fetchUrl(json3Url);
+                String json = fetchUrl(baseUrl);
                 List<TranscriptSegment> segments = parseJson3(json);
-                boolean clientTranslate = false;
-                // &tlang= can return valid JSON with 0 events on manual tracks; fall back to original.
-                if (segments.isEmpty() && needsTranslation) {
-                    json = fetchUrl(baseUrl);
-                    segments = parseJson3(json);
-                    clientTranslate = true;
-                }
                 if (!segments.isEmpty()) {
-                    lastSourceLang = sourceLangCode;
-                    if (clientTranslate) {
-                        segments = TranscriptTranslator.translate(segments, targetLangCode);
-                    }
+                    lastSourceLang = extractLangFromUrl(captionUrl).split("-")[0];
                     return segments;
                 }
             } catch (Exception ex) {
@@ -80,7 +75,7 @@ final class TranscriptFetcher {
             }
         }
 
-        return fetchDirect(videoId, targetLang);
+        return fetchDirect(videoId);
     }
 
     private static String[] fetchFromInnertube(String videoId) throws Exception {
@@ -108,8 +103,7 @@ final class TranscriptFetcher {
         if (code != 200) throw new Exception("Innertube HTTP response: " + code);
 
         String response = Requester.parseString(conn);
-        String targetLangCode = Settings.VOT_CAPTION_LANGUAGE.get().split("-")[0];
-        return new String[]{findBestCaptionUrl(response, targetLangCode), extractPoToken(response)};
+        return new String[]{findBestCaptionUrl(response), extractPoToken(response)};
     }
 
     private static String extractPoToken(String json) {
@@ -121,17 +115,17 @@ final class TranscriptFetcher {
     }
 
     /**
-     * Returns the caption URL that best matches {@code preferredLang} (ISO code, e.g. "uk").
-     * Prefers a native track in the target language over translation; falls back to the first
-     * non-gemini track if no match is found. "auto" (or any unmatched lang) uses the default.
+     * Returns an English caption URL from the captionTracks list.
+     * Prefers a non-gemini English track; falls back to the first non-gemini track,
+     * then the first available.
      */
-    private static String findBestCaptionUrl(String json, String preferredLang) {
+    private static String findBestCaptionUrl(String json) {
         final int tracksIdx = json.indexOf("\"captionTracks\":[");
         if (tracksIdx < 0) return null;
 
         String firstUrl = null;
         String firstNonGemini = null;
-        String preferredUrl = null;
+        String englishUrl = null;
         int searchFrom = tracksIdx;
 
         while (true) {
@@ -151,43 +145,28 @@ final class TranscriptFetcher {
             if (firstUrl == null) firstUrl = url;
             final boolean nonGemini = !url.contains("variant=gemini");
             if (firstNonGemini == null && nonGemini) firstNonGemini = url;
-            if (preferredUrl == null && nonGemini && !"auto".equals(preferredLang)) {
+            if (englishUrl == null && nonGemini) {
                 String urlLang = extractLangFromUrl(url).split("-")[0];
-                if (urlLang.equals(preferredLang)) preferredUrl = url;
+                if ("en".equals(urlLang)) englishUrl = url;
             }
 
             searchFrom = endIdx + 1;
         }
 
-        if (preferredUrl != null) return preferredUrl;
+        if (englishUrl != null) return englishUrl;
         return firstNonGemini != null ? firstNonGemini : firstUrl;
     }
 
-    private static List<TranscriptSegment> fetchDirect(String videoId, String targetLang) {
-        String targetLangCode = "auto".equals(targetLang) ? "" : targetLang.split("-")[0];
-
-        // Try the target language first (catches non-English videos), then English ASR fallbacks.
-        List<String> candidates = new ArrayList<>();
-        if (!targetLangCode.isEmpty() && !"en".equals(targetLangCode)) {
-            candidates.add(targetLangCode);
-        }
-        candidates.add("en");
-        candidates.add("en-US");
-        candidates.add("en-GB");
-
-        for (String srcLang : candidates) {
+    private static List<TranscriptSegment> fetchDirect(String videoId) {
+        for (String srcLang : new String[]{"en", "en-US", "en-GB"}) {
             try {
                 String urlStr = "https://www.youtube.com/api/timedtext?v=" + videoId
                         + "&lang=" + srcLang + "&kind=asr&fmt=json3";
-                String srcLangCode = srcLang.split("-")[0];
-                if (!targetLangCode.isEmpty() && !srcLangCode.equals(targetLangCode)) {
-                    urlStr += "&tlang=" + targetLangCode;
-                }
                 String json = fetchUrl(urlStr);
                 if (!json.isEmpty()) {
                     List<TranscriptSegment> segments = parseJson3(json);
                     if (!segments.isEmpty()) {
-                        lastSourceLang = srcLangCode;
+                        lastSourceLang = "en";
                         return segments;
                     }
                 }
