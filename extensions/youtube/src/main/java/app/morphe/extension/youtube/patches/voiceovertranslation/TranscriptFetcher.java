@@ -19,8 +19,8 @@ import java.util.List;
 import java.util.Map;
 
 import app.morphe.extension.shared.Logger;
+import app.morphe.extension.shared.innertube.utils.AuthUtils;
 import app.morphe.extension.shared.requests.Requester;
-import app.morphe.extension.youtube.innertube.utils.AuthUtils;
 import app.morphe.extension.youtube.patches.CaptionCookiesPatch;
 import app.morphe.extension.youtube.settings.Settings;
 
