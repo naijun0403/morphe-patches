@@ -19,8 +19,8 @@ import java.lang.ref.WeakReference;
 
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.Utils;
-import app.morphe.extension.youtube.patches.voiceovertranslation.VotBottomSheet;
 import app.morphe.extension.youtube.patches.voiceovertranslation.VoiceOverTranslationPatch;
+import app.morphe.extension.youtube.patches.voiceovertranslation.VotBottomSheet;
 import app.morphe.extension.youtube.settings.Settings;
 
 @SuppressWarnings("unused")
@@ -54,7 +54,7 @@ public final class VoiceOverTranslationButton {
                     });
             overlayButtonRef = button != null ? new WeakReference<>(button) : null;
         } catch (Exception ex) {
-            Logger.printException(() -> "VoiceOverTranslationButton initializeButton failure", ex);
+            Logger.printException(() -> "initializeButton failure", ex);
         }
     }
 
@@ -82,7 +82,7 @@ public final class VoiceOverTranslationButton {
                         return true;
                     });
         } catch (Exception ex) {
-            Logger.printException(() -> "VoiceOverTranslationButton initializeLegacyButton failure", ex);
+            Logger.printException(() -> "initializeLegacyButton failure", ex);
         }
     }
 
@@ -105,7 +105,7 @@ public final class VoiceOverTranslationButton {
                 leg.setImageAlpha(alpha);
             }
         } catch (Exception ex) {
-            Logger.printException(() -> "VoiceOverTranslationButton refreshActivatedState failure", ex);
+            Logger.printException(() -> "refreshActivatedState failure", ex);
         }
     }
 

@@ -36,13 +36,14 @@ final class TranscriptTranslator {
     static List<TranscriptSegment> translate(List<TranscriptSegment> segments, String targetLang) {
         if (segments.isEmpty()) return segments;
         List<TranscriptSegment> result = new ArrayList<>(segments.size());
-        for (int i = 0; i < segments.size(); i += BATCH_SIZE) {
+        for (int i = 0, segmentsSize = segments.size(); i < segmentsSize; i += BATCH_SIZE) {
             List<TranscriptSegment> batch = segments.subList(i, Math.min(i + BATCH_SIZE, segments.size()));
             try {
                 List<String> translated = translateBatch(batch, targetLang);
-                for (int j = 0; j < batch.size(); j++) {
+                final int translatedSize = translated.size();
+                for (int j = 0, batchSize = batch.size(); j < batchSize; j++) {
                     TranscriptSegment orig = batch.get(j);
-                    String text = j < translated.size() ? translated.get(j) : orig.text();
+                    String text = j < translatedSize ? translated.get(j) : orig.text();
                     result.add(new TranscriptSegment(orig.startMs(), orig.endMs(), text));
                 }
             } catch (Exception ex) {
@@ -63,26 +64,23 @@ final class TranscriptTranslator {
         }
 
         HttpURLConnection conn = (HttpURLConnection) new URL(TRANSLATE_URL + targetLang).openConnection();
-        try {
-            conn.setRequestMethod("POST");
-            conn.setConnectTimeout(10_000);
-            conn.setReadTimeout(15_000);
-            conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-            conn.setRequestProperty("User-Agent", "Mozilla/5.0");
-            conn.setDoOutput(true);
+        conn.setRequestMethod("POST");
+        conn.setConnectTimeout(10_000);
+        conn.setReadTimeout(15_000);
+        conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+        conn.setRequestProperty("User-Agent", "Mozilla/5.0");
+        conn.setDoOutput(true);
 
-            byte[] bodyBytes = body.toString().getBytes(StandardCharsets.UTF_8);
-            try (OutputStream os = conn.getOutputStream()) {
-                os.write(bodyBytes);
-            }
-
-            int code = conn.getResponseCode();
-            if (code != 200) throw new Exception("HTTP " + code);
-
-            return parseResponse(conn);
-        } finally {
-            conn.disconnect();
+        byte[] bodyBytes = body.toString().getBytes(StandardCharsets.UTF_8);
+        conn.setFixedLengthStreamingMode(bodyBytes.length);
+        try (OutputStream os = conn.getOutputStream()) {
+            os.write(bodyBytes);
         }
+
+        final int code = conn.getResponseCode();
+        if (code != 200) throw new Exception("HTTP " + code);
+
+        return parseResponse(conn);
     }
 
     private static List<String> parseResponse(HttpURLConnection conn) throws Exception {

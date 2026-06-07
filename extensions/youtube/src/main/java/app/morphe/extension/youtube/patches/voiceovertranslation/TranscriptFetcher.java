@@ -10,8 +10,6 @@ package app.morphe.extension.youtube.patches.voiceovertranslation;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -21,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 
 import app.morphe.extension.shared.Logger;
+import app.morphe.extension.shared.requests.Requester;
 import app.morphe.extension.youtube.innertube.utils.AuthUtils;
 import app.morphe.extension.youtube.patches.CaptionCookiesPatch;
 import app.morphe.extension.youtube.settings.Settings;
@@ -77,8 +76,7 @@ final class TranscriptFetcher {
                     return segments;
                 }
             } catch (Exception ex) {
-                Logger.printDebug(() -> "VoiceOverTranslation: innertube caption fetch failed, trying direct: "
-                        + ex.getMessage());
+                Logger.printDebug(() -> "Innertube caption fetch failed, trying direct", ex);
             }
         }
 
@@ -90,31 +88,28 @@ final class TranscriptFetcher {
                 + "\"clientVersion\":\"20.10.38\"}},"
                 + "\"videoId\":\"" + videoId + "\"}";
 
+        //noinspection ExtractMethodRecommender
         HttpURLConnection conn = (HttpURLConnection) new URL(INNERTUBE_PLAYER_URL).openConnection();
-        try {
-            conn.setRequestMethod("POST");
-            conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
-            conn.setReadTimeout(READ_TIMEOUT_MS);
-            conn.setRequestProperty("Content-Type", "application/json");
-            conn.setRequestProperty("User-Agent",
-                    "com.google.android.youtube/20.10.38 (Linux; U; Android 11) gzip");
-            conn.setRequestProperty("X-YouTube-Client-Name", "3");
-            conn.setRequestProperty("X-YouTube-Client-Version", "20.10.38");
-            conn.setDoOutput(true);
+        conn.setRequestMethod("POST");
+        conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
+        conn.setReadTimeout(READ_TIMEOUT_MS);
+        conn.setRequestProperty("Content-Type", "application/json");
+        conn.setRequestProperty("User-Agent",
+                "com.google.android.youtube/20.10.38 (Linux; U; Android 11) gzip");
+        conn.setRequestProperty("X-YouTube-Client-Name", "3");
+        conn.setRequestProperty("X-YouTube-Client-Version", "20.10.38");
+        conn.setDoOutput(true);
 
-            try (OutputStream os = conn.getOutputStream()) {
-                os.write(body.getBytes(StandardCharsets.UTF_8));
-            }
-
-            int code = conn.getResponseCode();
-            if (code != 200) throw new Exception("Innertube HTTP " + code);
-
-            String response = readResponseBody(conn);
-            String targetLangCode = Settings.VOT_CAPTION_LANGUAGE.get().split("-")[0];
-            return new String[]{findBestCaptionUrl(response, targetLangCode), extractPoToken(response)};
-        } finally {
-            conn.disconnect();
+        try (OutputStream os = conn.getOutputStream()) {
+            os.write(body.getBytes(StandardCharsets.UTF_8));
         }
+
+        final int code = conn.getResponseCode();
+        if (code != 200) throw new Exception("Innertube HTTP response: " + code);
+
+        String response = Requester.parseString(conn);
+        String targetLangCode = Settings.VOT_CAPTION_LANGUAGE.get().split("-")[0];
+        return new String[]{findBestCaptionUrl(response, targetLangCode), extractPoToken(response)};
     }
 
     private static String extractPoToken(String json) {
@@ -131,7 +126,7 @@ final class TranscriptFetcher {
      * non-gemini track if no match is found. "auto" (or any unmatched lang) uses the default.
      */
     private static String findBestCaptionUrl(String json, String preferredLang) {
-        int tracksIdx = json.indexOf("\"captionTracks\":[");
+        final int tracksIdx = json.indexOf("\"captionTracks\":[");
         if (tracksIdx < 0) return null;
 
         String firstUrl = null;
@@ -144,7 +139,7 @@ final class TranscriptFetcher {
             if (baseUrlIdx < 0 || baseUrlIdx > tracksIdx + 50_000) break;
             baseUrlIdx += "\"baseUrl\":\"".length();
 
-            int endIdx = json.indexOf('"', baseUrlIdx);
+            final int endIdx = json.indexOf('"', baseUrlIdx);
             if (endIdx < 0) break;
 
             String url = json.substring(baseUrlIdx, endIdx)
@@ -154,7 +149,7 @@ final class TranscriptFetcher {
                              .replace("\\u003c", "<");
 
             if (firstUrl == null) firstUrl = url;
-            boolean nonGemini = !url.contains("variant=gemini");
+            final boolean nonGemini = !url.contains("variant=gemini");
             if (firstNonGemini == null && nonGemini) firstNonGemini = url;
             if (preferredUrl == null && nonGemini && !"auto".equals(preferredLang)) {
                 String urlLang = extractLangFromUrl(url).split("-")[0];
@@ -198,11 +193,10 @@ final class TranscriptFetcher {
                 }
             } catch (Exception ex) {
                 final String langFinal = srcLang;
-                Logger.printDebug(() -> "VoiceOverTranslation: direct caption fetch failed lang=" + langFinal
-                        + " " + ex.getMessage());
+                Logger.printDebug(() -> "Direct caption fetch failed lang: " + langFinal, ex);
             }
         }
-        Logger.printDebug(() -> "VoiceOverTranslation: no captions available for " + videoId);
+        Logger.printDebug(() -> "No captions available for video: " + videoId);
         return new ArrayList<>();
     }
 
@@ -211,7 +205,7 @@ final class TranscriptFetcher {
             int idx = url.indexOf(prefix);
             if (idx >= 0) {
                 idx += prefix.length();
-                int end = url.indexOf('&', idx);
+                final int end = url.indexOf('&', idx);
                 return end < 0 ? url.substring(idx) : url.substring(idx, end);
             }
         }
@@ -224,65 +218,50 @@ final class TranscriptFetcher {
         JSONArray events = root.optJSONArray("events");
         if (events == null) return segments;
 
-        for (int i = 0; i < events.length(); i++) {
+        for (int i = 0, eventsLength = events.length(); i < eventsLength; i++) {
             JSONObject event = events.getJSONObject(i);
             JSONArray segs = event.optJSONArray("segs");
             if (segs == null) continue;
 
-            long startMs = event.optLong("tStartMs", -1);
+            final long startMs = event.optLong("tStartMs", -1);
             if (startMs < 0) continue;
-            long durationMs = event.optLong("dDurationMs", 2000);
+            final long durationMs = event.optLong("dDurationMs", 2000);
 
             StringBuilder text = new StringBuilder();
-            for (int j = 0; j < segs.length(); j++) {
+            for (int j = 0, segsLength = segs.length(); j < segsLength; j++) {
                 text.append(segs.getJSONObject(j).optString("utf8", ""));
             }
 
             String textStr = text.toString().replace('\n', ' ').trim();
             if (!textStr.isEmpty()) {
-                segments.add(new TranscriptSegment(startMs, startMs + Math.max(durationMs, 500), textStr));
+                segments.add(new TranscriptSegment(startMs,
+                        startMs + Math.max(durationMs, 500), textStr));
             }
         }
         return segments;
     }
 
     private static String fetchUrl(String urlStr) throws Exception {
-        HttpURLConnection conn = null;
-        try {
-            URL url = new URL(urlStr);
-            conn = (HttpURLConnection) url.openConnection();
-            conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
-            conn.setReadTimeout(READ_TIMEOUT_MS);
-            conn.setRequestProperty("User-Agent", CaptionCookiesPatch.getUserAgent());
-            String cookies = CaptionCookiesPatch.getCookies();
-            if (!cookies.isEmpty()) {
-                conn.setRequestProperty("Cookie", cookies);
-            }
-            Map<String, String> authHeaders = AuthUtils.getRequestHeader();
-            for (Map.Entry<String, String> entry : authHeaders.entrySet()) {
-                if (!entry.getValue().isEmpty()) {
-                    conn.setRequestProperty(entry.getKey(), entry.getValue());
-                }
-            }
-
-            int responseCode = conn.getResponseCode();
-            if (responseCode != 200) {
-                throw new Exception("HTTP " + responseCode + " for " + urlStr);
-            }
-            return readResponseBody(conn);
-        } finally {
-            if (conn != null) conn.disconnect();
+        URL url = new URL(urlStr);
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
+        conn.setReadTimeout(READ_TIMEOUT_MS);
+        conn.setRequestProperty("User-Agent", CaptionCookiesPatch.getUserAgent());
+        String cookies = CaptionCookiesPatch.getCookies();
+        if (!cookies.isEmpty()) {
+            conn.setRequestProperty("Cookie", cookies);
         }
-    }
-
-    private static String readResponseBody(HttpURLConnection conn) throws Exception {
-        BufferedReader reader = new BufferedReader(
-                new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8));
-        StringBuilder sb = new StringBuilder();
-        String line;
-        while ((line = reader.readLine()) != null) {
-            sb.append(line);
+        Map<String, String> authHeaders = AuthUtils.getRequestHeader();
+        for (Map.Entry<String, String> entry : authHeaders.entrySet()) {
+            if (!entry.getValue().isEmpty()) {
+                conn.setRequestProperty(entry.getKey(), entry.getValue());
+            }
         }
-        return sb.toString();
+
+        final int responseCode = conn.getResponseCode();
+        if (responseCode != 200) {
+            throw new Exception("HTTP response code: " + responseCode + " url: " + urlStr);
+        }
+        return Requester.parseString(conn);
     }
 }
