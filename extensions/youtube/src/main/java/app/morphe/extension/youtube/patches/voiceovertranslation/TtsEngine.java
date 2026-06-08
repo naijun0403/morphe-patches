@@ -8,12 +8,11 @@
 package app.morphe.extension.youtube.patches.voiceovertranslation;
 
 import android.media.AudioAttributes;
+import android.media.MediaDataSource;
 import android.media.MediaPlayer;
 import android.util.Base64;
 
 import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -284,55 +283,56 @@ final class TtsEngine {
         }
     }
 
-    // Playback
-
     private void playMp3(byte[] mp3, float volume) throws Exception {
-        // MediaPlayer requires a file path; write to a temp file in the cache dir.
-        File tmp = File.createTempFile("vot_", ".mp3", Utils.getContext().getCacheDir());
+        CountDownLatch latch = new CountDownLatch(1);
+        MediaPlayer    mp    = new MediaPlayer();
+        playLatch.set(latch);
+        currentPlayer.set(mp);
+
         try {
-            try (FileOutputStream fos = new FileOutputStream(tmp)) {
-                fos.write(mp3);
-            }
-
-            CountDownLatch latch = new CountDownLatch(1);
-            MediaPlayer    mp    = new MediaPlayer();
-            playLatch.set(latch);
-            currentPlayer.set(mp);
-
-            try {
-                mp.setAudioAttributes(new AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .build());
-                mp.setVolume(volume, volume);
-                mp.setDataSource(tmp.getAbsolutePath());
-                mp.setOnCompletionListener(m -> { playLatch.compareAndSet(latch, null); latch.countDown(); });
-                mp.setOnErrorListener((m, what, extra) -> {
-                    Logger.printDebug(() -> "TtsEngine: MediaPlayer error what=" + what + " extra=" + extra);
-                    playLatch.compareAndSet(latch, null);
-                    latch.countDown();
-                    return true;
-                });
-                mp.prepare();
-                if (stopped.get()) return;
-                mp.start();
-                //noinspection ResultOfMethodCallIgnored
-                latch.await(60, TimeUnit.SECONDS);
-            } finally {
-                playLatch.compareAndSet(latch, null);
-                // Release only if stop() hasn't already done so.
-                if (currentPlayer.compareAndSet(mp, null)) {
-                    try { mp.stop(); }    catch (Exception ignored) {}
-                    try { mp.release(); } catch (Exception ignored) {}
+            mp.setAudioAttributes(new AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build());
+            mp.setVolume(volume, volume);
+            mp.setDataSource(new MediaDataSource() {
+                @Override
+                public int readAt(long position, byte[] buffer, int offset, int size) {
+                    if (position >= mp3.length) return -1;
+                    int pos   = (int) position;
+                    int count = Math.min(size, mp3.length - pos);
+                    System.arraycopy(mp3, pos, buffer, offset, count);
+                    return count;
                 }
-            }
-        } finally {
+
+                @Override
+                public long getSize() {
+                    return mp3.length;
+                }
+
+                @Override
+                public void close() {}
+            });
+            mp.setOnCompletionListener(m -> latch.countDown());
+            mp.setOnErrorListener((m, what, extra) -> {
+                Logger.printDebug(() -> "TtsEngine: MediaPlayer error what=" + what + " extra=" + extra);
+                latch.countDown();
+                return true;
+            });
+            mp.prepare();
+            if (stopped.get()) return;
+            mp.start();
             //noinspection ResultOfMethodCallIgnored
-            tmp.delete();
+            latch.await(60, TimeUnit.SECONDS);
+        } finally {
+            playLatch.compareAndSet(latch, null);
+            // Release only if stop() hasn't already done so.
+            if (currentPlayer.compareAndSet(mp, null)) {
+                try { mp.stop(); }    catch (Exception ignored) {}
+                try { mp.release(); } catch (Exception ignored) {}
+            }
         }
     }
-
-    // Utilities
 
     /**
      * Generates the Sec-MS-GEC DRM token required by the Edge TTS WebSocket endpoint.
