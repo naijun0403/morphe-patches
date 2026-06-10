@@ -19,7 +19,6 @@ import app.morphe.patches.youtube.misc.playercontrols.initializeLegacyBottomCont
 import app.morphe.patches.youtube.misc.playercontrols.injectVisibilityCheckCall
 import app.morphe.patches.youtube.misc.playercontrols.legacyPlayerControlsPatch
 import app.morphe.patches.youtube.misc.playertype.playerTypeHookPatch
-import app.morphe.patches.youtube.misc.playertype.videoStateHook
 import app.morphe.patches.youtube.misc.settings.PreferenceScreen
 import app.morphe.patches.youtube.shared.Constants.COMPATIBILITY_YOUTUBE
 import app.morphe.patches.youtube.video.information.videoInformationPatch
@@ -75,7 +74,6 @@ val voiceOverTranslationPatch = bytecodePatch(
 
         videoTimeHook(EXTENSION_CLASS, "videoTimeChanged")
         hookVideoId("$EXTENSION_CLASS->newVideoLoaded(Ljava/lang/String;)V")
-        videoStateHook(EXTENSION_CLASS, "onVideoStateChanged")
 
         addPlayerBottomButton(EXTENSION_BUTTON)
         initializeLegacyBottomControl(EXTENSION_BUTTON)

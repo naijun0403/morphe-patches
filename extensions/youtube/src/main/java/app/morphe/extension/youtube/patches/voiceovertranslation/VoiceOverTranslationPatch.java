@@ -23,9 +23,25 @@ import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.Utils;
 import app.morphe.extension.youtube.settings.Settings;
 import app.morphe.extension.youtube.shared.PlayerType;
+import app.morphe.extension.youtube.shared.VideoState;
 
 @SuppressWarnings("unused")
 public final class VoiceOverTranslationPatch {
+
+    static {
+        PlayerType.getOnChange().addObserver(playerType -> {
+            if (!playerType.isMaximizedOrFullscreen()) {
+                stopTts();
+            }
+            return kotlin.Unit.INSTANCE;
+        });
+        VideoState.getOnChange().addObserver(state -> {
+            if (state == VideoState.PAUSED || state == VideoState.ENDED) {
+                stopTts();
+            }
+            return kotlin.Unit.INSTANCE;
+        });
+    }
 
     private static volatile TextToSpeech tts;
     private static volatile boolean ttsReady = false;
@@ -68,16 +84,6 @@ public final class VoiceOverTranslationPatch {
     /**
      * Injection point.
      */
-    public static void onVideoStateChanged(Enum<?> videoState) {
-        String name = videoState.name();
-        if ("PAUSED".equals(name) || "ENDED".equals(name)) {
-            stopTts();
-        }
-    }
-
-    /**
-     * Injection point.
-     */
     public static void newVideoLoaded(String videoId) {
         if (videoId.equals(currentVideoId)) return;
         currentVideoId = videoId;
@@ -97,10 +103,7 @@ public final class VoiceOverTranslationPatch {
      */
     public static void videoTimeChanged(long timeMs) {
         if (!Settings.VOT_ENABLED.get() || !sessionEnabled) return;
-        if (PlayerType.getCurrent() == PlayerType.INLINE_MINIMAL) {
-            stopTts();
-            return;
-        }
+        if (!PlayerType.getCurrent().isMaximizedOrFullscreen()) return;
 
         List<TranscriptSegment> current = segments;
         if (current.isEmpty()) return;
