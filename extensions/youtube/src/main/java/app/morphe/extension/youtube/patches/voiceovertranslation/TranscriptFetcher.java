@@ -137,10 +137,10 @@ final class TranscriptFetcher {
             if (endIdx < 0) break;
 
             String url = json.substring(baseUrlIdx, endIdx)
-                             .replace("\\u0026", "&")
-                             .replace("\\u003d", "=")
-                             .replace("\\u003e", ">")
-                             .replace("\\u003c", "<");
+                    .replace("\\u0026", "&")
+                    .replace("\\u003d", "=")
+                    .replace("\\u003e", ">")
+                    .replace("\\u003c", "<");
 
             if (firstUrl == null) firstUrl = url;
             final boolean nonGemini = !url.contains("variant=gemini");
@@ -191,14 +191,23 @@ final class TranscriptFetcher {
         return "en";
     }
 
+    // Flush a merged sentence when it grows past this size, to keep TTS utterances manageable.
+    private static final int MAX_SENTENCE_CHARS = 300;
+    // A silence gap longer than this between lines starts a new utterance even mid-sentence.
+    private static final long MAX_SENTENCE_GAP_MS = 1_500;
+
     private static List<TranscriptSegment> parseJson3(String json) throws Exception {
-        List<TranscriptSegment> segments = new ArrayList<>();
+        List<TranscriptSegment> lines = new ArrayList<>();
         JSONObject root = new JSONObject(json);
         JSONArray events = root.optJSONArray("events");
-        if (events == null) return segments;
+        if (events == null) return lines;
 
         for (int i = 0, eventsLength = events.length(); i < eventsLength; i++) {
             JSONObject event = events.getJSONObject(i);
+            // ASR streams emit append events that only carry a "\n" to scroll the
+            // 2-line caption window. They duplicate timing of real lines - skip them.
+            if (event.optInt("aAppend", 0) == 1) continue;
+
             JSONArray segs = event.optJSONArray("segs");
             if (segs == null) continue;
 
@@ -212,12 +221,67 @@ final class TranscriptFetcher {
             }
 
             String textStr = text.toString().replace('\n', ' ').trim();
+            // Drop sound effect markers such as [Applause] or [Music] - they should not be spoken.
+            if (textStr.startsWith("[") && textStr.endsWith("]")) continue;
             if (!textStr.isEmpty()) {
-                segments.add(new TranscriptSegment(startMs,
+                lines.add(new TranscriptSegment(startMs,
                         startMs + Math.max(durationMs, 500), textStr));
             }
         }
-        return segments;
+
+        // dDurationMs is display time: with ASR a line stays on screen while the next
+        // line is already spoken, so ranges overlap. Clamp each end to the next start
+        // so segments represent actual speech time instead of caption visibility.
+        for (int i = 0, last = lines.size() - 1; i < last; i++) {
+            TranscriptSegment cur = lines.get(i);
+            long nextStart = lines.get(i + 1).startMs();
+            if (cur.endMs() > nextStart) {
+                lines.set(i, new TranscriptSegment(cur.startMs(), nextStart, cur.text()));
+            }
+        }
+
+        return mergeIntoSentences(lines);
+    }
+
+    /**
+     * Merges caption lines into sentence-sized segments so TTS speaks whole sentences
+     * without pauses at line breaks. A sentence ends on terminal punctuation,
+     * a long silence gap, or when the accumulated text grows too large.
+     */
+    private static List<TranscriptSegment> mergeIntoSentences(List<TranscriptSegment> lines) {
+        List<TranscriptSegment> sentences = new ArrayList<>();
+        StringBuilder text = new StringBuilder();
+        long startMs = 0;
+        long endMs;
+
+        for (int i = 0, size = lines.size(); i < size; i++) {
+            TranscriptSegment line = lines.get(i);
+            if (text.length() == 0) {
+                startMs = line.startMs();
+            } else {
+                text.append(' ');
+            }
+            text.append(line.text());
+            endMs = line.endMs();
+
+            final boolean sentenceEnd = endsSentence(text);
+            final boolean tooLong = text.length() >= MAX_SENTENCE_CHARS;
+            final boolean lastLine = i == size - 1;
+            final boolean longGap = !lastLine
+                    && lines.get(i + 1).startMs() - endMs > MAX_SENTENCE_GAP_MS;
+
+            if (sentenceEnd || tooLong || longGap || lastLine) {
+                sentences.add(new TranscriptSegment(startMs, endMs, text.toString()));
+                text.setLength(0);
+            }
+        }
+        return sentences;
+    }
+
+    private static boolean endsSentence(CharSequence text) {
+        if (text.length() == 0) return false;
+        final char c = text.charAt(text.length() - 1);
+        return c == '.' || c == '!' || c == '?' || c == '…';
     }
 
     private static String fetchUrl(String urlStr) throws Exception {
