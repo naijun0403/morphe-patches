@@ -17,6 +17,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 import app.morphe.extension.shared.Logger;
@@ -39,8 +40,11 @@ final class TranscriptFetcher {
      * Fetches and, if needed, translates the transcript. The returned list is immediately
      * usable; when translation spans multiple batches, later batches are published
      * asynchronously through {@code onUpdate} (see {@link TranscriptTranslator#translate}).
+     * {@code cancelled} is polled before each background batch so translation of an
+     * abandoned video stops early.
      */
-    static List<TranscriptSegment> fetch(String videoId, Consumer<List<TranscriptSegment>> onUpdate) {
+    static List<TranscriptSegment> fetch(String videoId, Consumer<List<TranscriptSegment>> onUpdate,
+                                         BooleanSupplier cancelled) {
         List<TranscriptSegment> segments = fetchEnglishSegments(videoId);
 
         if (!segments.isEmpty()) {
@@ -48,7 +52,7 @@ final class TranscriptFetcher {
             String targetLangCode = "auto".equals(targetLang) ? "" : targetLang.split("-")[0];
             // Skip translation when the caption track is already in the target language.
             if (!targetLangCode.isEmpty() && !targetLangCode.equals(lastSourceLang)) {
-                segments = TranscriptTranslator.translate(segments, targetLangCode, onUpdate);
+                segments = TranscriptTranslator.translate(segments, targetLangCode, onUpdate, cancelled);
             }
         }
 

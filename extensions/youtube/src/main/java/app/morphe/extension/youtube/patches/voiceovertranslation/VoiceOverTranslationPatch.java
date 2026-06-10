@@ -165,11 +165,13 @@ public final class VoiceOverTranslationPatch {
                 // Later translation batches arrive asynchronously; swap the list in only
                 // while the same video is still playing. Timings and size are identical
                 // across updates, so lastSpokenIndex stays valid.
-                List<TranscriptSegment> fetched = TranscriptFetcher.fetch(videoId, updated -> {
-                    if (videoId.equals(currentVideoId)) {
-                        segments = updated;
-                    }
-                });
+                List<TranscriptSegment> fetched = TranscriptFetcher.fetch(videoId,
+                        updated -> {
+                            if (videoId.equals(currentVideoId)) {
+                                segments = updated;
+                            }
+                        },
+                        () -> !videoId.equals(currentVideoId));
                 if (videoId.equals(currentVideoId)) {
                     segments = fetched;
                     detectedSourceLang = TranscriptFetcher.lastSourceLang;
@@ -181,6 +183,12 @@ public final class VoiceOverTranslationPatch {
                 Logger.printException(() -> "VoiceOverTranslation: transcript fetch failed", ex);
             } finally {
                 isLoading = false;
+                // The video may have changed while this fetch was in flight - the isLoading
+                // gate blocked that load, so restart it for the current video.
+                String latest = currentVideoId;
+                if (!latest.isEmpty() && !latest.equals(videoId) && Settings.VOT_ENABLED.get()) {
+                    loadTranscript(latest);
+                }
             }
         });
     }

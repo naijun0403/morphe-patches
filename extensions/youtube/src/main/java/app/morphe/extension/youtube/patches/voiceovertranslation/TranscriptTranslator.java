@@ -19,6 +19,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 import app.morphe.extension.shared.Logger;
@@ -48,7 +49,8 @@ final class TranscriptTranslator {
      * may keep indexing into the list across snapshots.
      */
     static List<TranscriptSegment> translate(List<TranscriptSegment> segments, String targetLang,
-                                             Consumer<List<TranscriptSegment>> onUpdate) {
+                                             Consumer<List<TranscriptSegment>> onUpdate,
+                                             BooleanSupplier cancelled) {
         if (segments.isEmpty()) return segments;
 
         List<List<TranscriptSegment>> batches = splitByCharBudget(segments);
@@ -73,6 +75,8 @@ final class TranscriptTranslator {
         for (int b = 1, batchCount = batches.size(); b < batchCount; b++) {
             final int batchIndex = b;
             pool.execute(() -> {
+                // Skip remaining work when the result is no longer needed (video changed).
+                if (cancelled != null && cancelled.getAsBoolean()) return;
                 List<String> translated = translateBatchSafe(batches.get(batchIndex), targetLang);
                 List<TranscriptSegment> snapshot;
                 synchronized (working) {
