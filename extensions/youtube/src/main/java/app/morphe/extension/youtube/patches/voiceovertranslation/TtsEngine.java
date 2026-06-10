@@ -68,17 +68,18 @@ final class TtsEngine {
 
     /**
      * Non-blocking. Synthesizes {@code text} with the given Edge TTS {@code voice} on a
-     * background thread, then plays the MP3 result. Calls {@code onDone} (on the main thread)
-     * when playback finishes or on any failure.
+     * background thread, then plays the MP3 result. {@code rate} is a speed multiplier
+     * (1.0 = normal). Calls {@code onDone} (on the main thread) when playback finishes
+     * or on any failure.
      */
-    void speak(String text, String voice, float volume, Runnable onDone) {
+    void speak(String text, String voice, float volume, float rate, Runnable onDone) {
         stopped.set(false);
         speaking.set(true);
 
         new Thread(() -> {
             try {
                 if (stopped.get()) return;
-                byte[] mp3 = synthesizeEdge(text, voice);
+                byte[] mp3 = synthesizeEdge(text, voice, rate);
                 if (mp3.length == 0) {
                     Logger.printDebug(() -> "TtsEngine: empty audio for «"
                             + text.substring(0, Math.min(text.length(), 50)) + "»");
@@ -114,7 +115,7 @@ final class TtsEngine {
         }
     }
 
-    private byte[] synthesizeEdge(String text, String voice) throws Exception {
+    private byte[] synthesizeEdge(String text, String voice, float rate) throws Exception {
         String secMsGec     = genSecMsGec();
         String connectionId = uuidHex();
         String requestId    = uuidHex();
@@ -145,10 +146,16 @@ final class TtsEngine {
                     + "\"wordBoundaryEnabled\":\"false\"},"
                     + "\"outputFormat\":\"" + AUDIO_FORMAT + "\"}}}}");
 
-            // SSML synthesis request.
+            // SSML synthesis request. Edge TTS expects rate as a percentage delta, e.g. "+30%".
+            String inner = escapeXml(text);
+            int ratePercent = Math.round((rate - 1.0f) * 100);
+            if (ratePercent != 0) {
+                inner = "<prosody rate='" + (ratePercent > 0 ? "+" : "") + ratePercent + "%'>"
+                        + inner + "</prosody>";
+            }
             String ssml = "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis'"
                     + " xml:lang='" + localePart(voice) + "'>"
-                    + "<voice name='" + voice + "'>" + escapeXml(text) + "</voice></speak>";
+                    + "<voice name='" + voice + "'>" + inner + "</voice></speak>";
             sendText(socket, "Path: ssml\r\n"
                     + "X-RequestId: " + requestId + "\r\n"
                     + "X-Timestamp: " + timestamp + "\r\n"
@@ -381,9 +388,9 @@ final class TtsEngine {
 
     private static String escapeXml(String text) {
         return text.replace("&", "&amp;")
-                   .replace("<", "&lt;")
-                   .replace(">", "&gt;")
-                   .replace("'", "&apos;")
-                   .replace("\"", "&quot;");
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("'", "&apos;")
+                .replace("\"", "&quot;");
     }
 }

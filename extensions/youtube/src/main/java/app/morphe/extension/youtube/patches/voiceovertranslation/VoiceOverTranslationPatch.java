@@ -43,6 +43,12 @@ public final class VoiceOverTranslationPatch {
     private static final long SEEK_JUMP_THRESHOLD_MS = 3_000;
     private static final long TTS_LOOKAHEAD_MS = 400;
 
+    // Rough estimate of natural speech duration (~15 chars per second) used to
+    // decide how much the TTS rate must be raised to fit the segment time slot.
+    private static final long ESTIMATED_MS_PER_CHAR = 65;
+    private static final float MIN_SPEECH_RATE = 1.0f;
+    private static final float MAX_SPEECH_RATE = 1.8f;
+
     private static volatile AudioManager audioManager;
     // Kept as a field so abandonAudioFocus() uses the same listener instance as requestAudioFocus().
     private static final AudioManager.OnAudioFocusChangeListener focusChangeListener = focusChange -> { };
@@ -95,7 +101,7 @@ public final class VoiceOverTranslationPatch {
                     boolean busy = edgeTtsEngine.isSpeaking() || (tts != null && tts.isSpeaking());
                     if (!busy) {
                         lastSpokenIndex = i;
-                        speak(seg.text());
+                        speak(seg);
                     }
                 }
                 return;
@@ -186,16 +192,22 @@ public final class VoiceOverTranslationPatch {
         });
     }
 
-    private static void speak(String text) {
+    private static void speak(TranscriptSegment seg) {
         String rawLang = Settings.VOT_CAPTION_LANGUAGE.get();
         String lang = "auto".equals(rawLang) ? detectedSourceLang : rawLang;
         float volume = Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f;
+
+        // Time left until the next segment starts, measured from the current playback
+        // position so a late start (busy engine, synthesis latency) raises the rate.
+        long availableMs = seg.endMs() - Math.max(lastVideoTimeMs, seg.startMs());
+        float rate = calculateSpeechRate(seg.text(), availableMs);
 
         if (!Settings.VOT_USE_NATIVE_TTS.get()) {
             String voice = VoiceCatalog.resolve(lang, !Settings.VOT_PREFER_FEMALE_VOICE.get());
             if (voice != null) {
                 requestDuck();
-                edgeTtsEngine.speak(text, voice, volume, VoiceOverTranslationPatch::abandonDuck);
+                edgeTtsEngine.speak(seg.text(), voice, volume, rate,
+                        VoiceOverTranslationPatch::abandonDuck);
                 return;
             }
         }
@@ -203,9 +215,21 @@ public final class VoiceOverTranslationPatch {
         ensureTts();
         if (!ttsReady) return;
         requestDuck();
+        tts.setSpeechRate(rate);
         Bundle params = new Bundle();
         params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume);
-        tts.speak(text, TextToSpeech.QUEUE_FLUSH, params, "vot");
+        tts.speak(seg.text(), TextToSpeech.QUEUE_FLUSH, params, "vot");
+    }
+
+    /**
+     * Returns a speech rate multiplier that fits the estimated natural duration of
+     * {@code text} into {@code availableMs}. Never slows below normal speed and is
+     * capped so fast videos stay intelligible.
+     */
+    private static float calculateSpeechRate(String text, long availableMs) {
+        if (availableMs <= 0) return MAX_SPEECH_RATE;
+        final float rate = (float) (text.length() * ESTIMATED_MS_PER_CHAR) / availableMs;
+        return Math.max(MIN_SPEECH_RATE, Math.min(MAX_SPEECH_RATE, rate));
     }
 
     private static void stopTts() {
