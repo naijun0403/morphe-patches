@@ -87,6 +87,11 @@ public final class VoiceOverTranslationPatch {
         List<TranscriptSegment> current = segments;
         if (current.isEmpty()) return;
 
+        // Hook is called ~once per second even when paused; a frozen timestamp means paused.
+        if (lastVideoTimeMs > 0 && timeMs == lastVideoTimeMs) {
+            stopTts();
+            return;
+        }
         if (lastVideoTimeMs > 0 && Math.abs(timeMs - lastVideoTimeMs) > SEEK_JUMP_THRESHOLD_MS) {
             stopTts();
             lastSpokenIndex = -1;
