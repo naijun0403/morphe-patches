@@ -68,8 +68,8 @@ public final class VoiceOverTranslationPatch {
     /**
      * Injection point.
      */
-    public static void onPlayerStatusChanged(Enum<?> playerStatus) {
-        String name = playerStatus.name();
+    public static void onVideoStateChanged(Enum<?> videoState) {
+        String name = videoState.name();
         if ("PAUSED".equals(name) || "ENDED".equals(name)) {
             stopTts();
         }
