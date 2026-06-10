@@ -207,6 +207,14 @@ final class TranscriptFetcher {
     // A silence gap longer than this between lines starts a new utterance even mid-sentence.
     private static final long MAX_SENTENCE_GAP_MS = 1_500;
 
+    // Heuristics for old ASR tracks that have no punctuation at all.
+    // A pause this long is treated as a sentence boundary on its own.
+    private static final long UNPUNCTUATED_GAP_MS = 700;
+    // A shorter pause counts as a boundary only when the next line starts with a capital.
+    private static final long UNPUNCTUATED_SOFT_GAP_MS = 250;
+    // Tighter length cap so unpunctuated chunks stay short and re-sync with the video often.
+    private static final int MAX_UNPUNCTUATED_CHARS = 200;
+
     private static List<TranscriptSegment> parseJson3(String json) throws Exception {
         List<TranscriptSegment> lines = new ArrayList<>();
         JSONObject root = new JSONObject(json);
@@ -256,10 +264,12 @@ final class TranscriptFetcher {
 
     /**
      * Merges caption lines into sentence-sized segments so TTS speaks whole sentences
-     * without pauses at line breaks. A sentence ends on terminal punctuation,
-     * a long silence gap, or when the accumulated text grows too large.
+     * without pauses at line breaks. For punctuated transcripts a sentence ends on
+     * terminal punctuation; old ASR tracks have no punctuation at all, so boundaries
+     * are approximated from speech pauses and capitalization instead.
      */
     private static List<TranscriptSegment> mergeIntoSentences(List<TranscriptSegment> lines) {
+        final boolean punctuated = detectPunctuation(lines);
         List<TranscriptSegment> sentences = new ArrayList<>();
         StringBuilder text = new StringBuilder();
         long startMs = 0;
@@ -275,18 +285,59 @@ final class TranscriptFetcher {
             text.append(line.text());
             endMs = line.endMs();
 
-            final boolean sentenceEnd = endsSentence(text);
-            final boolean tooLong = text.length() >= MAX_SENTENCE_CHARS;
-            final boolean lastLine = i == size - 1;
-            final boolean longGap = !lastLine
-                    && lines.get(i + 1).startMs() - endMs > MAX_SENTENCE_GAP_MS;
+            boolean flush;
+            if (i == size - 1) {
+                flush = true;
+            } else {
+                final long gap = lines.get(i + 1).startMs() - endMs;
+                if (punctuated) {
+                    flush = endsSentence(text)
+                            || text.length() >= MAX_SENTENCE_CHARS
+                            || gap > MAX_SENTENCE_GAP_MS;
+                } else {
+                    flush = gap > UNPUNCTUATED_GAP_MS
+                            || (gap > UNPUNCTUATED_SOFT_GAP_MS
+                            && startsWithUpperCase(lines.get(i + 1).text()))
+                            || text.length() >= MAX_UNPUNCTUATED_CHARS;
+                }
+            }
 
-            if (sentenceEnd || tooLong || longGap || lastLine) {
+            if (flush) {
                 sentences.add(new TranscriptSegment(startMs, endMs, text.toString()));
                 text.setLength(0);
             }
         }
         return sentences;
+    }
+
+    /**
+     * Returns true when a meaningful share of lines contains terminal punctuation.
+     * Old auto-generated tracks contain none, so punctuation can't be trusted there
+     * as a sentence boundary signal.
+     */
+    private static boolean detectPunctuation(List<TranscriptSegment> lines) {
+        int punctuatedLines = 0;
+        for (TranscriptSegment line : lines) {
+            String t = line.text();
+            for (int i = 0, len = t.length(); i < len; i++) {
+                final char c = t.charAt(i);
+                if (c == '.' || c == '!' || c == '?') {
+                    punctuatedLines++;
+                    break;
+                }
+            }
+        }
+        // At least ~10% of lines must carry punctuation - the occasional "$5.99"
+        // in an otherwise unpunctuated track should not flip the mode.
+        return punctuatedLines * 10 >= lines.size();
+    }
+
+    private static boolean startsWithUpperCase(String text) {
+        for (int i = 0, len = text.length(); i < len; i++) {
+            final char c = text.charAt(i);
+            if (Character.isLetter(c)) return Character.isUpperCase(c);
+        }
+        return false;
     }
 
     private static boolean endsSentence(CharSequence text) {
