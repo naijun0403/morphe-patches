@@ -157,7 +157,14 @@ public final class VoiceOverTranslationPatch {
 
         Utils.runOnBackgroundThread(() -> {
             try {
-                List<TranscriptSegment> fetched = TranscriptFetcher.fetch(videoId);
+                // Later translation batches arrive asynchronously; swap the list in only
+                // while the same video is still playing. Timings and size are identical
+                // across updates, so lastSpokenIndex stays valid.
+                List<TranscriptSegment> fetched = TranscriptFetcher.fetch(videoId, updated -> {
+                    if (videoId.equals(currentVideoId)) {
+                        segments = updated;
+                    }
+                });
                 if (videoId.equals(currentVideoId)) {
                     segments = fetched;
                     detectedSourceLang = TranscriptFetcher.lastSourceLang;

@@ -17,6 +17,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.innertube.utils.AuthUtils;
@@ -34,7 +35,12 @@ final class TranscriptFetcher {
     private static final String INNERTUBE_PLAYER_URL =
             "https://www.youtube.com/youtubei/v1/player?prettyPrint=false";
 
-    static List<TranscriptSegment> fetch(String videoId) {
+    /**
+     * Fetches and, if needed, translates the transcript. The returned list is immediately
+     * usable; when translation spans multiple batches, later batches are published
+     * asynchronously through {@code onUpdate} (see {@link TranscriptTranslator#translate}).
+     */
+    static List<TranscriptSegment> fetch(String videoId, Consumer<List<TranscriptSegment>> onUpdate) {
         List<TranscriptSegment> segments = fetchEnglishSegments(videoId);
 
         if (!segments.isEmpty()) {
@@ -42,7 +48,7 @@ final class TranscriptFetcher {
             String targetLangCode = "auto".equals(targetLang) ? "" : targetLang.split("-")[0];
             // Skip translation when the caption track is already in the target language.
             if (!targetLangCode.isEmpty() && !targetLangCode.equals(lastSourceLang)) {
-                segments = TranscriptTranslator.translate(segments, targetLangCode);
+                segments = TranscriptTranslator.translate(segments, targetLangCode, onUpdate);
             }
         }
 

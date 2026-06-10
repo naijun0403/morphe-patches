@@ -19,8 +19,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.requests.Requester;
@@ -38,46 +37,78 @@ final class TranscriptTranslator {
     private static final int MAX_BATCH_CHARS = 4_000;
     // Concurrent requests to the translate endpoint. Keep modest to avoid rate limiting.
     private static final int PARALLEL_REQUESTS = 4;
-    private static final long BATCH_TIMEOUT_SECONDS = 30;
 
-    static List<TranscriptSegment> translate(List<TranscriptSegment> segments, String targetLang) {
+    /**
+     * Progressive translation. The first batch is translated synchronously so the returned
+     * list is immediately usable for playback; remaining batches are translated on background
+     * threads and published through {@code onUpdate} (called once per completed batch with a
+     * full snapshot of the segment list). Failed batches keep their original text.
+     *
+     * <p>Timings and list size never change between updates - only segment text - so callers
+     * may keep indexing into the list across snapshots.
+     */
+    static List<TranscriptSegment> translate(List<TranscriptSegment> segments, String targetLang,
+                                             Consumer<List<TranscriptSegment>> onUpdate) {
         if (segments.isEmpty()) return segments;
 
         List<List<TranscriptSegment>> batches = splitByCharBudget(segments);
+
+        // Working copy that accumulates translated batches over the original text.
+        List<TranscriptSegment> working = new ArrayList<>(segments);
+
+        int[] offsets = new int[batches.size()];
+        for (int b = 1, batchCount = batches.size(); b < batchCount; b++) {
+            offsets[b] = offsets[b - 1] + batches.get(b - 1).size();
+        }
+
+        applyBatch(working, batches.get(0), 0, translateBatchSafe(batches.get(0), targetLang));
+        if (batches.size() == 1) return working;
+
+        // Snapshot to return before background batches start mutating the working copy.
+        List<TranscriptSegment> initial = new ArrayList<>(working);
+
         //noinspection resource
         ExecutorService pool = Executors.newFixedThreadPool(
-                Math.min(PARALLEL_REQUESTS, batches.size()));
+                Math.min(PARALLEL_REQUESTS, batches.size() - 1));
+        for (int b = 1, batchCount = batches.size(); b < batchCount; b++) {
+            final int batchIndex = b;
+            pool.execute(() -> {
+                List<String> translated = translateBatchSafe(batches.get(batchIndex), targetLang);
+                List<TranscriptSegment> snapshot;
+                synchronized (working) {
+                    applyBatch(working, batches.get(batchIndex), offsets[batchIndex], translated);
+                    snapshot = new ArrayList<>(working);
+                }
+                if (onUpdate != null) onUpdate.accept(snapshot);
+            });
+        }
+        // Graceful shutdown - queued batches still run, the pool exits when they finish.
+        pool.shutdown();
+
+        return initial;
+    }
+
+    /**
+     * Writes translated text over the batch's slots in {@code target}, preserving timings.
+     * A {@code null} translation (failed batch) leaves the original text in place.
+     */
+    private static void applyBatch(List<TranscriptSegment> target, List<TranscriptSegment> batch,
+                                   int offset, List<String> translated) {
+        if (translated == null) return;
+        final int limit = Math.min(batch.size(), translated.size());
+        for (int j = 0; j < limit; j++) {
+            TranscriptSegment orig = batch.get(j);
+            target.set(offset + j,
+                    new TranscriptSegment(orig.startMs(), orig.endMs(), translated.get(j)));
+        }
+    }
+
+    private static List<String> translateBatchSafe(List<TranscriptSegment> batch, String targetLang) {
         try {
-            List<Future<List<String>>> futures = new ArrayList<>(batches.size());
-            for (List<TranscriptSegment> batch : batches) {
-                futures.add(pool.submit(() -> translateBatch(batch, targetLang)));
-            }
-
-            List<TranscriptSegment> result = new ArrayList<>(segments.size());
-            for (int b = 0, batchCount = batches.size(); b < batchCount; b++) {
-                List<TranscriptSegment> batch = batches.get(b);
-                List<String> translated = null;
-                try {
-                    translated = futures.get(b).get(BATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-                } catch (Exception ex) {
-                    Logger.printDebug(() -> "TranscriptTranslator: batch failed: " + ex.getMessage());
-                }
-
-                if (translated == null) {
-                    // Keep original text for this batch on failure rather than losing segments.
-                    result.addAll(batch);
-                    continue;
-                }
-                final int translatedSize = translated.size();
-                for (int j = 0, batchSize = batch.size(); j < batchSize; j++) {
-                    TranscriptSegment orig = batch.get(j);
-                    String text = j < translatedSize ? translated.get(j) : orig.text();
-                    result.add(new TranscriptSegment(orig.startMs(), orig.endMs(), text));
-                }
-            }
-            return result;
-        } finally {
-            pool.shutdownNow();
+            return translateBatch(batch, targetLang);
+        } catch (Exception ex) {
+            Logger.printDebug(() -> "TranscriptTranslator: batch failed: " + ex.getMessage());
+            return null;
         }
     }
 
