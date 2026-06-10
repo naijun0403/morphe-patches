@@ -137,6 +137,7 @@ Changes include:
     <string name="morphe_hide_medical_panels_title">Hide medical panels</string>
     <string name="morphe_hide_snackbar_title">Hide snackbar</string>
     <string name="morphe_hide_subscribers_community_guidelines_title">Hide subscribers guidelines</string>
+    <string name="morphe_hide_sync_button_title">Hide \'Sync to video\' button</string>
     <string name="morphe_hide_timed_reactions_title">Hide timed reactions</string>
     <string name="morphe_hide_timed_reactions_summary">Hides the feature that allows users to react with emojis in the comments section and live chat</string>
     <string name="morphe_hide_video_title_title">Hide video title</string>
@@ -296,13 +297,13 @@ Limitations:
     <string name="morphe_double_tap_length_180s" translatable="false">180</string>
     <string name="morphe_double_tap_length_240s" translatable="false">240</string>
 
-    <!-- interaction.copyvideourlbutton.copyVideoURLButtonPatch -->
-    <string name="morphe_share_copy_url_button_success">URL copied to clipboard</string>
-    <string name="morphe_share_copy_url_button_timestamp_success">URL with timestamp copied to clipboard</string>
-    <string name="morphe_copy_video_url_button_title">Show Copy video URL button</string>
-    <string name="morphe_copy_video_url_button_summary">Tap to copy the video URL, tap and hold to copy with timestamp</string>
-    <string name="morphe_copy_video_url_button_timestamp_title">Copy timestamp by default</string>
-    <string name="morphe_copy_video_url_button_timestamp_summary">Reverses the tap and tap-and-hold actions of \'Copy video URL\' button</string>
+    <!-- interaction.copyvideolink.copyVideoLinkButtonPatch -->
+    <string name="morphe_share_copy_link_button_success">Link copied to clipboard</string>
+    <string name="morphe_share_copy_link_with_timestamp_button_success">Link with timestamp copied to clipboard</string>
+    <string name="morphe_copy_video_link_button_title">Show Copy video link button</string>
+    <string name="morphe_copy_video_link_button_summary">Tap to copy the video link, tap and hold to copy with timestamp</string>
+    <string name="morphe_copy_video_link_with_timestamp_button_title">Copy timestamp by default</string>
+    <string name="morphe_copy_video_link_with_timestamp_button_summary">Reverses the tap and tap-and-hold actions of \'Copy video link\' button</string>
 
     <!-- interaction.dialog.removeViewerDiscretionDialogPatch -->
     <string name="morphe_remove_viewer_discretion_dialog_title">Remove viewer discretion dialog</string>
@@ -1199,7 +1200,6 @@ Limitation: Using the back button on the toolbar may not work"</string>
     <string name="morphe_miniplayer_disable_horizontal_drag_summary">Prevents closing the miniplayer by swiping it horizontally off-screen</string>
     <string name="morphe_miniplayer_hide_overlay_buttons_title">Hide overlay buttons</string>
     <string name="morphe_miniplayer_hide_subtext_title">Hide subtexts</string>
-    <string name="morphe_miniplayer_hide_rewind_forward_title">Hide skip forward and back buttons</string>
     <string name="morphe_miniplayer_width_dip_title">Default size</string>
     <string name="morphe_miniplayer_width_dip_summary">Set the starting on-screen size, in pixels</string>
     <string name="morphe_miniplayer_width_dip_invalid_toast">Pixel size must be between %1$s and %2$s</string>
@@ -1309,9 +1309,9 @@ Tap here to learn more about DeArrow"</string>
     <!-- misc.gms.accountCredentialsInvalidTextPatch -->
     <string name="microg_offline_account_login_error">If you recently changed your account login details, then uninstall and reinstall MicroG.</string>
 
-    <!-- misc.links.bypassURLRedirectsPatch -->
-    <string name="morphe_bypass_url_redirects_title">Bypass URL redirects</string>
-    <string name="morphe_bypass_url_redirects_summary">Opens the original URL directly, bypassing the tracking link (youtube.com/redirect)</string>
+    <!-- misc.links.bypassLinkRedirectsPatch -->
+    <string name="morphe_bypass_link_redirects_title">Bypass link redirects</string>
+    <string name="morphe_bypass_link_redirects_summary">Opens the original link directly, bypassing the tracking link (youtube.com/redirect)</string>
 
     <!-- misc.links.openLinksExternallyPatch -->
     <string name="morphe_external_browser_title">Open links in browser</string>
@@ -1361,6 +1361,8 @@ Tap here to learn more about DeArrow"</string>
     <string name="morphe_remember_playback_speed_last_selected_toast_summary">Shows a notification when a new default playback speed is saved</string>
     <string name="morphe_playback_speed_default_title">Default playback speed</string>
     <string name="morphe_remember_playback_speed_toast">Changed default playback speed to: %s</string>
+    <string name="morphe_disable_playback_speed_music_title">Use normal speed for music</string>
+    <string name="morphe_disable_playback_speed_music_summary">Always play music videos at 1.0x speed</string>
 
     <!-- video.codecs.disableVideoCodecsPatch -->
     <string name="morphe_disable_hdr_video_title">Disable HDR video</string>
