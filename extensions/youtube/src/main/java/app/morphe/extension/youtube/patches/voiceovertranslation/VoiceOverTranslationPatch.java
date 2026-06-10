@@ -48,6 +48,11 @@ public final class VoiceOverTranslationPatch {
     private static final long ESTIMATED_MS_PER_CHAR = 65;
     private static final float MIN_SPEECH_RATE = 1.0f;
     private static final float MAX_SPEECH_RATE = 1.8f;
+    // Max rate increase between consecutive utterances. One delayed segment then
+    // raises the pace gradually over a few sentences instead of jumping straight
+    // from normal speed to maximum. Slowing back down is applied immediately.
+    private static final float MAX_RATE_STEP_UP = 0.25f;
+    private static volatile float lastSpeechRate = MIN_SPEECH_RATE;
 
     private static volatile AudioManager audioManager;
     // Kept as a field so abandonAudioFocus() uses the same listener instance as requestAudioFocus().
@@ -225,11 +230,14 @@ public final class VoiceOverTranslationPatch {
         // Time left until the next segment starts, measured from the current playback
         // position so a late start (busy engine, synthesis latency) raises the rate.
         long availableMs = seg.endMs() - Math.max(lastVideoTimeMs, seg.startMs());
-        float rate = calculateSpeechRate(seg.text(), availableMs);
 
         if (!Settings.VOT_USE_NATIVE_TTS.get()) {
             String voice = VoiceCatalog.resolve(lang, !Settings.VOT_PREFER_FEMALE_VOICE.get());
             if (voice != null) {
+                // Edge TTS synthesizes over the network before playback starts - subtract
+                // the typical synthesis time so the delay doesn't eat into speaking time.
+                float rate = smoothRate(calculateSpeechRate(seg.text(),
+                        availableMs - edgeTtsEngine.averageSynthesisMs()));
                 requestDuck();
                 edgeTtsEngine.speak(seg.text(), voice, volume, rate,
                         VoiceOverTranslationPatch::abandonDuck);
@@ -239,6 +247,7 @@ public final class VoiceOverTranslationPatch {
 
         ensureTts();
         if (!ttsReady) return;
+        float rate = smoothRate(calculateSpeechRate(seg.text(), availableMs));
         requestDuck();
         tts.setSpeechRate(rate);
         Bundle params = new Bundle();
@@ -257,10 +266,24 @@ public final class VoiceOverTranslationPatch {
         return Math.max(MIN_SPEECH_RATE, Math.min(MAX_SPEECH_RATE, rate));
     }
 
+    /**
+     * Limits how much the rate may rise relative to the previous utterance, so a single
+     * stall does not produce a jarring jump to maximum speed - the pace catches up
+     * gradually instead. Decreases pass through unchanged.
+     */
+    private static float smoothRate(float targetRate) {
+        final float rate = Math.min(targetRate, lastSpeechRate + MAX_RATE_STEP_UP);
+        lastSpeechRate = rate;
+        return rate;
+    }
+
     private static void stopTts() {
         edgeTtsEngine.stop();
         TextToSpeech localTts = tts;
         if (localTts != null) localTts.stop();
+        // Speech was interrupted (new video, seek, pause) - no backlog left to catch
+        // up on, so the next utterance starts from normal speed again.
+        lastSpeechRate = MIN_SPEECH_RATE;
         abandonDuck();
     }
 

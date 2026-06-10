@@ -28,6 +28,7 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import javax.net.ssl.SSLSocket;
@@ -62,8 +63,17 @@ final class TtsEngine {
     private final AtomicReference<MediaPlayer> currentPlayer = new AtomicReference<>();
     private final AtomicReference<CountDownLatch>    playLatch     = new AtomicReference<>();
 
+    // Exponential moving average of synthesis latency (request to audio ready).
+    // Callers subtract it from the time budget when computing speech rate, so the
+    // delay before playback starts does not eat into the speaking time.
+    private final AtomicLong averageSynthesisMs = new AtomicLong(600);
+
     boolean isSpeaking() {
         return speaking.get();
+    }
+
+    long averageSynthesisMs() {
+        return averageSynthesisMs.get();
     }
 
     /**
@@ -79,12 +89,16 @@ final class TtsEngine {
         new Thread(() -> {
             try {
                 if (stopped.get()) return;
+                final long synthStart = System.currentTimeMillis();
                 byte[] mp3 = synthesizeEdge(text, voice, rate);
                 if (mp3.length == 0) {
                     Logger.printDebug(() -> "TtsEngine: empty audio for «"
                             + text.substring(0, Math.min(text.length(), 50)) + "»");
                     return;
                 }
+                // Update the latency average only on successful synthesis.
+                final long synthMs = System.currentTimeMillis() - synthStart;
+                averageSynthesisMs.updateAndGet(avg -> (avg * 3 + synthMs) / 4);
                 if (!stopped.get()) playMp3(mp3, volume);
             } catch (Exception ex) {
                 // Suppress exceptions caused by stop() closing the connection mid-request.
