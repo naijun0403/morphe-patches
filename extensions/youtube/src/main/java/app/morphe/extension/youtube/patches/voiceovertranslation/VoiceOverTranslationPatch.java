@@ -63,6 +63,16 @@ public final class VoiceOverTranslationPatch {
     /**
      * Injection point.
      */
+    public static void onPlayerStatusChanged(Enum<?> playerStatus) {
+        String name = playerStatus.name();
+        if ("PAUSED".equals(name) || "ENDED".equals(name)) {
+            stopTts();
+        }
+    }
+
+    /**
+     * Injection point.
+     */
     public static void newVideoLoaded(String videoId) {
         if (videoId.equals(currentVideoId)) return;
         currentVideoId = videoId;
@@ -87,11 +97,6 @@ public final class VoiceOverTranslationPatch {
         List<TranscriptSegment> current = segments;
         if (current.isEmpty()) return;
 
-        // Hook is called ~once per second even when paused; a frozen timestamp means paused.
-        if (lastVideoTimeMs > 0 && timeMs == lastVideoTimeMs) {
-            stopTts();
-            return;
-        }
         if (lastVideoTimeMs > 0 && Math.abs(timeMs - lastVideoTimeMs) > SEEK_JUMP_THRESHOLD_MS) {
             stopTts();
             lastSpokenIndex = -1;
