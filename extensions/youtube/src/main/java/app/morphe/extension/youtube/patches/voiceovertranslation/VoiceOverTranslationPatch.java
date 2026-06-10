@@ -97,7 +97,10 @@ public final class VoiceOverTranslationPatch {
      */
     public static void videoTimeChanged(long timeMs) {
         if (!Settings.VOT_ENABLED.get() || !sessionEnabled) return;
-        if (PlayerType.getCurrent() == PlayerType.INLINE_MINIMAL) return;
+        if (PlayerType.getCurrent() == PlayerType.INLINE_MINIMAL) {
+            stopTts();
+            return;
+        }
 
         List<TranscriptSegment> current = segments;
         if (current.isEmpty()) return;
