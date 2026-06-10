@@ -88,7 +88,6 @@ public final class VoiceOverTranslationPatch {
         if (videoId.equals(currentVideoId)) return;
         currentVideoId = videoId;
         lastVideoTimeMs = 0;
-        sessionEnabled = true;
         stopTts();
         segments = new ArrayList<>();
         lastSpokenIndex = -1;
