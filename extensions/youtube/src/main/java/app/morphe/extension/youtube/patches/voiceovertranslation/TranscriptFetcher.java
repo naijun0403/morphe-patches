@@ -40,7 +40,8 @@ final class TranscriptFetcher {
         if (!segments.isEmpty()) {
             String targetLang = Settings.VOT_CAPTION_LANGUAGE.get();
             String targetLangCode = "auto".equals(targetLang) ? "" : targetLang.split("-")[0];
-            if (!targetLangCode.isEmpty() && !"en".equals(targetLangCode)) {
+            // Skip translation when the caption track is already in the target language.
+            if (!targetLangCode.isEmpty() && !targetLangCode.equals(lastSourceLang)) {
                 segments = TranscriptTranslator.translate(segments, targetLangCode);
             }
         }

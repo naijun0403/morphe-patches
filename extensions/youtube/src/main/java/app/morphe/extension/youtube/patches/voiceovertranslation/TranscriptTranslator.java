@@ -17,6 +17,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.requests.Requester;
@@ -29,29 +33,70 @@ final class TranscriptTranslator {
     private static final String TRANSLATE_URL =
             "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&dt=t&tl=";
 
-    // Max segments per POST body to stay within reasonable request size.
-    private static final int BATCH_SIZE = 50;
+    // Batches are built by character budget rather than segment count, so request
+    // sizes stay uniform regardless of how long the merged sentences are.
+    private static final int MAX_BATCH_CHARS = 4_000;
+    // Concurrent requests to the translate endpoint. Keep modest to avoid rate limiting.
+    private static final int PARALLEL_REQUESTS = 4;
+    private static final long BATCH_TIMEOUT_SECONDS = 30;
 
     static List<TranscriptSegment> translate(List<TranscriptSegment> segments, String targetLang) {
         if (segments.isEmpty()) return segments;
-        List<TranscriptSegment> result = new ArrayList<>(segments.size());
-        for (int i = 0, segmentsSize = segments.size(); i < segmentsSize; i += BATCH_SIZE) {
-            List<TranscriptSegment> batch = segments.subList(i, Math.min(i + BATCH_SIZE, segments.size()));
-            try {
-                List<String> translated = translateBatch(batch, targetLang);
+
+        List<List<TranscriptSegment>> batches = splitByCharBudget(segments);
+        //noinspection resource
+        ExecutorService pool = Executors.newFixedThreadPool(
+                Math.min(PARALLEL_REQUESTS, batches.size()));
+        try {
+            List<Future<List<String>>> futures = new ArrayList<>(batches.size());
+            for (List<TranscriptSegment> batch : batches) {
+                futures.add(pool.submit(() -> translateBatch(batch, targetLang)));
+            }
+
+            List<TranscriptSegment> result = new ArrayList<>(segments.size());
+            for (int b = 0, batchCount = batches.size(); b < batchCount; b++) {
+                List<TranscriptSegment> batch = batches.get(b);
+                List<String> translated = null;
+                try {
+                    translated = futures.get(b).get(BATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                } catch (Exception ex) {
+                    Logger.printDebug(() -> "TranscriptTranslator: batch failed: " + ex.getMessage());
+                }
+
+                if (translated == null) {
+                    // Keep original text for this batch on failure rather than losing segments.
+                    result.addAll(batch);
+                    continue;
+                }
                 final int translatedSize = translated.size();
                 for (int j = 0, batchSize = batch.size(); j < batchSize; j++) {
                     TranscriptSegment orig = batch.get(j);
                     String text = j < translatedSize ? translated.get(j) : orig.text();
                     result.add(new TranscriptSegment(orig.startMs(), orig.endMs(), text));
                 }
-            } catch (Exception ex) {
-                // Keep original text for this batch on failure rather than losing segments.
-                result.addAll(batch);
-                Logger.printDebug(() -> "TranscriptTranslator: batch failed: " + ex.getMessage());
             }
+            return result;
+        } finally {
+            pool.shutdownNow();
         }
-        return result;
+    }
+
+    private static List<List<TranscriptSegment>> splitByCharBudget(List<TranscriptSegment> segments) {
+        List<List<TranscriptSegment>> batches = new ArrayList<>();
+        List<TranscriptSegment> batch = new ArrayList<>();
+        int chars = 0;
+        for (TranscriptSegment seg : segments) {
+            final int len = seg.text().length() + 1;
+            if (!batch.isEmpty() && chars + len > MAX_BATCH_CHARS) {
+                batches.add(batch);
+                batch = new ArrayList<>();
+                chars = 0;
+            }
+            batch.add(seg);
+            chars += len;
+        }
+        if (!batch.isEmpty()) batches.add(batch);
+        return batches;
     }
 
     private static List<String> translateBatch(List<TranscriptSegment> segments, String targetLang) throws Exception {
