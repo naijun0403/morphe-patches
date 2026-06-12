@@ -78,12 +78,23 @@ val voiceOverTranslationPatch = bytecodePatch(
                 preferences = setOf(
                     SwitchPreference("morphe_vot_enabled"),
                     ListPreference("morphe_vot_caption_language"),
+                    ListPreference("morphe_vot_translation_service"),
                     noTitleUnsortedPreferenceCategory(
                         NonInteractivePreference("morphe_vot_libretranslate_info"),
                         TextPreference("morphe_vot_libretranslate_url"),
                         TextPreference("morphe_vot_libretranslate_api_key"),
                     ),
-                ),
+                    SwitchPreference("morphe_vot_use_native_tts", summary = true),
+                    NonInteractivePreference("morphe_vot_original_audio_volume",
+                        tag = "app.morphe.extension.shared.settings.preference.SeekBarPreference",
+                        selectable = true),
+                    NonInteractivePreference("morphe_vot_max_speech_rate",
+                        tag = "app.morphe.extension.shared.settings.preference.SeekBarPreference",
+                        selectable = true),
+                    NonInteractivePreference("morphe_vot_pitch",
+                        tag = "app.morphe.extension.shared.settings.preference.SeekBarPreference",
+                        selectable = true)
+                )
             )
         )
 
