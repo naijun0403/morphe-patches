@@ -277,6 +277,8 @@ public final class VoiceOverTranslationPatch {
                     try {
                         byte[] data = edgeTtsEngine.synthesize(seg.text(), voice, rate);
                         if (data.length > 0) {
+                            // Only cache 1.0x audio; rate-adjusted audio has the speed baked
+                            // into SSML and cannot be reused for segments with different timing.
                             if (rate == 1.0f) {
                                 TtsCache.put(currentVideoId, index, voice, seg.text(), data);
                             }

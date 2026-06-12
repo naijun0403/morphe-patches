@@ -79,9 +79,9 @@ final class TtsEngine {
     @GuardedBy("lock")
     private boolean       configSent;
 
-    // Exponential moving average of synthesis latency (request to audio ready).
-    // Callers subtract it from the time budget when computing speech rate, so the
-    // delay before playback starts does not eat into the speaking time.
+    // Fixed estimate of synthesis latency (request to audio ready).
+    // Callers subtract it from the available time when computing speech rate, so the
+    // network round-trip does not eat into the speaking time.
     private final AtomicLong averageSynthesisMs = new AtomicLong(600);
 
     boolean isSpeaking() {
