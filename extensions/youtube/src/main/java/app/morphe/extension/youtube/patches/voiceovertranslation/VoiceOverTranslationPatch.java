@@ -78,7 +78,7 @@ public final class VoiceOverTranslationPatch {
         });
 
         VideoState.getOnChange().addObserver(state -> {
-            if (state == VideoState.PAUSED || state == VideoState.ENDED) {
+            if (state == VideoState.PAUSED) {
                 Logger.printDebug(() -> "Stopping TTS for video state: " + state);
                 stopTts();
             }
