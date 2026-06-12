@@ -12,6 +12,8 @@ import android.media.MediaDataSource;
 import android.media.MediaPlayer;
 import android.util.Base64;
 
+import androidx.annotation.GuardedBy;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -44,6 +46,9 @@ import app.morphe.extension.shared.Utils;
  *
  * <p>One instance is shared for the lifetime of the patch; {@link #speak} is non-blocking
  * and only one synthesis + playback runs at a time (callers gate on {@link #isSpeaking()}).
+ *
+ * <p>The underlying WebSocket connection is kept alive across calls and only torn down
+ * on {@link #stop()} or when the server closes it. Reconnection is transparent to callers.
  */
 final class TtsEngine {
 
@@ -59,9 +64,18 @@ final class TtsEngine {
 
     private final AtomicBoolean                     stopped       = new AtomicBoolean();
     private final AtomicBoolean                     speaking      = new AtomicBoolean();
-    private final AtomicReference<SSLSocket>        currentSocket = new AtomicReference<>();
     private final AtomicReference<MediaPlayer>      currentPlayer = new AtomicReference<>();
     private final AtomicReference<CountDownLatch>   playLatch     = new AtomicReference<>();
+
+    @GuardedBy("TtsEngine.class")
+    private SSLSocket     persistentSocket;
+    @GuardedBy("TtsEngine.class")
+    private InputStream   persistentIn;
+    @GuardedBy("TtsEngine.class")
+    private OutputStream  persistentOut;
+    // speech.config only needs to be sent once per connection.
+    @GuardedBy("TtsEngine.class")
+    private boolean       configSent;
 
     // Exponential moving average of synthesis latency (request to audio ready).
     // Callers subtract it from the time budget when computing speech rate, so the
@@ -92,7 +106,7 @@ final class TtsEngine {
                 final long synthStart = System.currentTimeMillis();
                 byte[] mp3 = synthesizeEdge(text, voice, rate);
                 if (mp3.length == 0) {
-                    Logger.printDebug(() -> "TtsEngine: empty audio for «"
+                    Logger.printDebug(() -> "Empty audio for «"
                             + text.substring(0, Math.min(text.length(), 50)) + "»");
                     return;
                 }
@@ -102,7 +116,7 @@ final class TtsEngine {
                 if (!stopped.get()) playMp3(mp3, volume);
             } catch (Exception ex) {
                 // Suppress exceptions caused by stop() closing the connection mid-request.
-                if (!stopped.get()) Logger.printException(() -> "TtsEngine: speak failed", ex);
+                if (!stopped.get()) Logger.printException(() -> "Speak failed", ex);
             } finally {
                 speaking.set(false);
                 if (onDone != null) Utils.runOnMainThread(onDone);
@@ -115,8 +129,9 @@ final class TtsEngine {
         stopped.set(true);
         speaking.set(false);
 
-        SSLSocket s = currentSocket.getAndSet(null);
-        if (s != null) try { s.close(); } catch (Exception ignored) {}
+        synchronized (TtsEngine.class) {
+            closeSocket();
+        }
 
         // Unblock latch.await() in playMp3() so the thread exits quickly.
         CountDownLatch l = playLatch.getAndSet(null);
@@ -130,35 +145,24 @@ final class TtsEngine {
     }
 
     private byte[] synthesizeEdge(String text, String voice, float rate) throws Exception {
-        String secMsGec     = genSecMsGec();
-        String connectionId = uuidHex();
-        String requestId    = uuidHex();
-        String timestamp    = edgeTimestamp();
+        synchronized (TtsEngine.class) {
+            // Reconnect lazily if the socket was closed (first call, stop(), or server timeout).
+            ensureConnected();
 
-        String path = "/consumer/speech/synthesize/readaloud/edge/v1"
-                + "?TrustedClientToken=" + TOKEN
-                + "&ConnectionId=" + connectionId
-                + "&Sec-MS-GEC=" + secMsGec
-                + "&Sec-MS-GEC-Version=" + SEC_MS_GEC_VERSION;
+            String timestamp = edgeTimestamp();
+            String requestId = uuidHex();
 
-        SSLSocket socket = (SSLSocket) SSLSocketFactory.getDefault().createSocket();
-        currentSocket.set(socket);
-        try {
-            socket.connect(new InetSocketAddress(WS_HOST, WS_PORT), CONNECT_TIMEOUT_MS);
-            socket.setSoTimeout(READ_TIMEOUT_MS);
-            socket.startHandshake();
-
-            sendHttpUpgrade(socket, path);
-            readHttpUpgrade(socket);
-
-            // speech.config - sets audio format and disables word/sentence boundary events.
-            sendText(socket, "Path: speech.config\r\n"
-                    + "Content-Type: application/json; charset=utf-8\r\n"
-                    + "X-Timestamp: " + timestamp + "\r\n\r\n"
-                    + "{\"context\":{\"synthesis\":{\"audio\":{"
-                    + "\"metadataoptions\":{\"sentenceBoundaryEnabled\":\"false\","
-                    + "\"wordBoundaryEnabled\":\"false\"},"
-                    + "\"outputFormat\":\"" + AUDIO_FORMAT + "\"}}}}");
+            // speech.config is sent once per connection.
+            if (!configSent) {
+                sendText(persistentOut, "Path: speech.config\r\n"
+                        + "Content-Type: application/json; charset=utf-8\r\n"
+                        + "X-Timestamp: " + timestamp + "\r\n\r\n"
+                        + "{\"context\":{\"synthesis\":{\"audio\":{"
+                        + "\"metadataoptions\":{\"sentenceBoundaryEnabled\":\"false\","
+                        + "\"wordBoundaryEnabled\":\"false\"},"
+                        + "\"outputFormat\":\"" + AUDIO_FORMAT + "\"}}}}");
+                configSent = true;
+            }
 
             // SSML synthesis request. Edge TTS expects rate as a percentage delta, e.g. "+30%".
             String inner = escapeXml(text);
@@ -170,18 +174,65 @@ final class TtsEngine {
             String ssml = "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis'"
                     + " xml:lang='" + localePart(voice) + "'>"
                     + "<voice name='" + voice + "'>" + inner + "</voice></speak>";
-            sendText(socket, "Path: ssml\r\n"
+            sendText(persistentOut, "Path: ssml\r\n"
                     + "X-RequestId: " + requestId + "\r\n"
                     + "X-Timestamp: " + timestamp + "\r\n"
                     + "Content-Type: application/ssml+xml\r\n\r\n" + ssml);
 
             // Collect audio frames until the server signals turn.end.
             ByteArrayOutputStream audioOut = new ByteArrayOutputStream();
-            collectAudio(socket.getInputStream(), audioOut);
+            try {
+                collectAudio(persistentIn, audioOut);
+            } catch (IOException ex) {
+                // Socket died mid-stream (e.g. server idle timeout). Drop it so the next
+                // call reconnects cleanly, then surface the error to the caller.
+                closeSocket();
+                throw ex;
+            }
             return audioOut.toByteArray();
-        } finally {
-            currentSocket.set(null);
-            try { socket.close(); } catch (Exception ignored) {}
+        }
+    }
+
+    /**
+     * Opens a new TLS connection and performs the WebSocket upgrade handshake.
+     * Must be called with class lock held.
+     */
+    private void ensureConnected() throws Exception {
+        if (persistentSocket != null && !persistentSocket.isClosed()) return;
+
+        String secMsGec     = genSecMsGec();
+        String connectionId = uuidHex();
+        String path = "/consumer/speech/synthesize/readaloud/edge/v1"
+                + "?TrustedClientToken=" + TOKEN
+                + "&ConnectionId=" + connectionId
+                + "&Sec-MS-GEC=" + secMsGec
+                + "&Sec-MS-GEC-Version=" + SEC_MS_GEC_VERSION;
+
+        SSLSocket socket = (SSLSocket) SSLSocketFactory.getDefault().createSocket();
+        socket.connect(new InetSocketAddress(WS_HOST, WS_PORT), CONNECT_TIMEOUT_MS);
+        socket.setSoTimeout(READ_TIMEOUT_MS);
+        socket.startHandshake();
+
+        // Assign streams before the handshake readers so they are available immediately.
+        persistentSocket = socket;
+        persistentOut    = socket.getOutputStream();
+        persistentIn     = socket.getInputStream();
+        configSent       = false;
+
+        sendHttpUpgrade(socket, path);
+        readHttpUpgrade(persistentIn);
+    }
+
+    /**
+     * Closes and nulls the persistent socket. Must be called with class lock held.
+     */
+    private void closeSocket() {
+        if (persistentSocket != null) {
+            try { persistentSocket.close(); } catch (Exception ignored) {}
+            persistentSocket = null;
+            persistentIn     = null;
+            persistentOut    = null;
+            configSent       = false;
         }
     }
 
@@ -207,8 +258,7 @@ final class TtsEngine {
         out.flush();
     }
 
-    private void readHttpUpgrade(SSLSocket socket) throws IOException {
-        InputStream in = socket.getInputStream();
+    private void readHttpUpgrade(InputStream in) throws IOException {
         StringBuilder sb = new StringBuilder();
         for (int b; (b = in.read()) != -1; ) {
             sb.append((char) b);
@@ -223,7 +273,7 @@ final class TtsEngine {
     }
 
     // WebSocket frame encoding - client-to-server frames must be masked per RFC 6455.
-    private void sendText(SSLSocket socket, String text) throws IOException {
+    private void sendText(OutputStream out, String text) throws IOException {
         byte[] payload = text.getBytes(StandardCharsets.UTF_8);
         byte[] mask    = randomBytes(4);
         int    len     = payload.length;
@@ -244,7 +294,6 @@ final class TtsEngine {
         buf.write(mask);
         for (int i = 0; i < len; i++) buf.write(payload[i] ^ mask[i % 4]);
 
-        OutputStream out = socket.getOutputStream();
         out.write(buf.toByteArray());
         out.flush();
     }
@@ -336,7 +385,7 @@ final class TtsEngine {
             });
             mp.setOnCompletionListener(m -> latch.countDown());
             mp.setOnErrorListener((m, what, extra) -> {
-                Logger.printDebug(() -> "TtsEngine: MediaPlayer error what=" + what + " extra=" + extra);
+                Logger.printDebug(() -> "MediaPlayer error what: " + what + " extra: " + extra);
                 latch.countDown();
                 return true;
             });
