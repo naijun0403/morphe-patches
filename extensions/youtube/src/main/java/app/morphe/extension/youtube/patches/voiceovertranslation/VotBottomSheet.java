@@ -161,8 +161,8 @@ public final class VotBottomSheet {
     }
 
     private static void showTranslationServicePicker(Context context, Runnable onChanged) {
-        String[] entries = {str("morphe_vot_service_google"), str("morphe_vot_service_libretranslate"), str("morphe_vot_service_lingva")};
-        String[] values = {"google", "libretranslate", "lingva"};
+        String[] entries = {str("morphe_vot_service_google"), str("morphe_vot_service_lingva"), str("morphe_vot_service_libretranslate")};
+        String[] values = {"google", "lingva", "libretranslate"};
 
         SheetBottomDialog.DraggableLinearLayout pickerRoot =
                 SheetBottomDialog.createMainLayout(context, getDialogBackgroundColor());
