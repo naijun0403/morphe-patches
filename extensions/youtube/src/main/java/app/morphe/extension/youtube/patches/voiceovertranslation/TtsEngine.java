@@ -117,11 +117,12 @@ final class TtsEngine {
     }
 
     /**
-     * Plays the MP3 result through Android's MediaPlayer at the given speed {@code rate}.
-     * Use 1.0f when the rate is already encoded in the audio (e.g. via SSML prosody).
-     * This is the underlying playback logic used by callers and the prefetcher.
+     * Plays the MP3 result through Android's MediaPlayer at the given speed {@code rate} and
+     * pitch multiplier {@code pitch} (1.0f = unchanged). Use rate 1.0f when the rate is already
+     * encoded in the audio (e.g. via SSML prosody); pitch is never encoded in SSML so always
+     * pass the actual multiplier.
      */
-    void play(byte[] mp3, float volume, float rate, Runnable onDone) {
+    void play(byte[] mp3, float volume, float rate, float pitch, Runnable onDone) {
         // Reject audio that completed synthesis after stop() was called (e.g. post-seek).
         if (stopped.get()) {
             speaking.set(false);
@@ -132,7 +133,7 @@ final class TtsEngine {
 
         Utils.runOnBackgroundThread(() -> {
             try {
-                if (!stopped.get()) playMp3(mp3, volume, rate);
+                if (!stopped.get()) playMp3(mp3, volume, rate, pitch);
             } catch (Exception ex) {
                 if (!stopped.get()) Logger.printException(() -> "Playback failed", ex);
             } finally {
@@ -377,7 +378,7 @@ final class TtsEngine {
         }
     }
 
-    private void playMp3(byte[] mp3, float volume, float rate) throws Exception {
+    private void playMp3(byte[] mp3, float volume, float rate, float pitch) throws Exception {
         CountDownLatch latch = new CountDownLatch(1);
         MediaPlayer    mp    = new MediaPlayer();
         playLatch.set(latch);
@@ -414,8 +415,8 @@ final class TtsEngine {
                 return true;
             });
             mp.prepare();
-            if (rate != 1.0f) {
-                mp.setPlaybackParams(new PlaybackParams().setSpeed(rate));
+            if (rate != 1.0f || pitch != 1.0f) {
+                mp.setPlaybackParams(new PlaybackParams().setSpeed(rate).setPitch(pitch));
             }
             if (stopped.get()) return;
             mp.start();

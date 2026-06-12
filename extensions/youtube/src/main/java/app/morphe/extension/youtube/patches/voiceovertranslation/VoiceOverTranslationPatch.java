@@ -244,6 +244,7 @@ public final class VoiceOverTranslationPatch {
         String rawLang = Settings.VOT_CAPTION_LANGUAGE.get();
         String lang = "auto".equals(rawLang) ? detectedSourceLang : rawLang;
         final float volume = Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f;
+        final float pitch = 1.0f + Settings.VOT_PITCH.get() / 10.0f;
 
         // Time left until the next segment starts, measured from the current playback
         // position so a late start (busy engine, synthesis latency) raises the rate.
@@ -260,7 +261,7 @@ public final class VoiceOverTranslationPatch {
                     requestDuck();
                     // markBusy before play so isSpeaking() is true for the full duration.
                     edgeTtsEngine.markBusy();
-                    edgeTtsEngine.play(cached, volume, rate, VoiceOverTranslationPatch::abandonDuck);
+                    edgeTtsEngine.play(cached, volume, rate, pitch, VoiceOverTranslationPatch::abandonDuck);
                     return;
                 }
 
@@ -282,7 +283,7 @@ public final class VoiceOverTranslationPatch {
                                 TtsCache.put(currentVideoId, index, voice, seg.text(), data);
                             }
                             // Rate is already encoded in SSML; play at 1.0x.
-                            edgeTtsEngine.play(data, volume, 1.0f, VoiceOverTranslationPatch::abandonDuck);
+                            edgeTtsEngine.play(data, volume, 1.0f, pitch, VoiceOverTranslationPatch::abandonDuck);
                         } else {
                             edgeTtsEngine.clearBusy();
                             abandonDuck();
@@ -305,6 +306,7 @@ public final class VoiceOverTranslationPatch {
         final float rate = smoothRate(calculateSpeechRate(seg.text(), availableMs));
         requestDuck();
         tts.setSpeechRate(rate);
+        tts.setPitch(pitch);
         Bundle params = new Bundle();
         params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume);
         tts.speak(seg.text(), TextToSpeech.QUEUE_FLUSH, params, "vot");

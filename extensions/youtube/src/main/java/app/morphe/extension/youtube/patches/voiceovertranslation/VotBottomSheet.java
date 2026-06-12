@@ -85,6 +85,11 @@ public final class VotBottomSheet {
                 Settings.VOT_MAX_SPEECH_RATE.get(),
                 fg,
                 Settings.VOT_MAX_SPEECH_RATE::save));
+        root.addView(makePitchSliderRow(context,
+                str("morphe_vot_pitch_label"),
+                Settings.VOT_PITCH.get(),
+                fg,
+                Settings.VOT_PITCH::save));
 
         SheetBottomDialog.SlideDialog dialog =
                 SheetBottomDialog.createSlideDialog(context, root, fadeInDuration);
@@ -301,6 +306,61 @@ public final class VotBottomSheet {
         params.setMargins(0, Dim.dp4, 0, Dim.dp4);
         divider.setLayoutParams(params);
         return divider;
+    }
+
+    // storedValue encodes pitch offset × 10: -5 = -50%, 0 = default, +5 = +50%.
+    private static LinearLayout makePitchSliderRow(Context context, String label, int storedValue,
+                                                    int fgColor, IntConsumer onChanged) {
+        LinearLayout row = new LinearLayout(context);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        rowParams.setMargins(0, Dim.dp8, 0, 0);
+        row.setLayoutParams(rowParams);
+
+        TextView labelView = new TextView(context);
+        labelView.setText(label);
+        labelView.setTextColor(fgColor);
+        labelView.setTextSize(15);
+        labelView.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        row.addView(labelView);
+
+        SeekBar seekBar = new SeekBar(context);
+        seekBar.setMax(10);
+        seekBar.setProgress(storedValue + 5);
+        seekBar.getProgressDrawable().setColorFilter(new PorterDuffColorFilter(fgColor, PorterDuff.Mode.SRC_IN));
+        seekBar.getThumb().setColorFilter(new PorterDuffColorFilter(fgColor, PorterDuff.Mode.SRC_IN));
+        LinearLayout.LayoutParams seekParams = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        seekParams.setMargins(Dim.dp12, 0, Dim.dp12, 0);
+        seekBar.setLayoutParams(seekParams);
+        row.addView(seekBar);
+
+        TextView valueView = new TextView(context);
+        valueView.setText(String.format(Locale.ROOT, "%+d%%", storedValue * 10));
+        valueView.setTextColor(fgColor);
+        valueView.setTextSize(15);
+        valueView.setMinWidth(Dim.dp40);
+        valueView.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        row.addView(valueView);
+
+        seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                if (fromUser) {
+                    final int stored = progress - 5;
+                    valueView.setText(String.format(Locale.ROOT, "%+d%%", stored * 10));
+                    onChanged.accept(stored);
+                }
+            }
+            @Override public void onStartTrackingTouch(SeekBar bar) { }
+            @Override public void onStopTrackingTouch(SeekBar bar) { }
+        });
+
+        return row;
     }
 
     // storedValue encodes rate × 10: 10 = 1.0x, 18 = 1.8x, 20 = 2.0x.
