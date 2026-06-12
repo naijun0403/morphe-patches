@@ -30,7 +30,11 @@ public final class VoiceOverTranslationPatch {
 
     static {
         PlayerType.getOnChange().addObserver(playerType -> {
-            if (!playerType.isMaximizedOrFullscreen()) {
+            if (!playerType.isMaximizedOrFullscreen()
+                    && playerType != PlayerType.WATCH_WHILE_MINIMIZED
+                    && playerType != PlayerType.WATCH_WHILE_PICTURE_IN_PICTURE
+                    && playerType != PlayerType.WATCH_WHILE_SLIDING_MINIMIZED_MAXIMIZED) {
+                Logger.printDebug(() -> "Stopping TTS for player type: " + playerType);
                 stopTts();
             }
             return kotlin.Unit.INSTANCE;
