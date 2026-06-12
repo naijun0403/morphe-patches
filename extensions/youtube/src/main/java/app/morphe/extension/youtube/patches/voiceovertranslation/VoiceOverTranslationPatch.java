@@ -25,7 +25,7 @@ import app.morphe.extension.youtube.settings.Settings;
 import app.morphe.extension.youtube.shared.PlayerType;
 import app.morphe.extension.youtube.shared.VideoState;
 
-@SuppressWarnings("unused")
+@SuppressWarnings({"unused", "deprecation"})
 public final class VoiceOverTranslationPatch {
 
     private static final long SEEK_JUMP_THRESHOLD_MS = 3_000;
