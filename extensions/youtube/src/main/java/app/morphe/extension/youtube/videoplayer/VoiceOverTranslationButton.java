@@ -7,7 +7,6 @@
 
 package app.morphe.extension.youtube.videoplayer;
 
-import static app.morphe.extension.shared.StringRef.str;
 import static app.morphe.extension.youtube.patches.LegacyPlayerControlsPatch.RESTORE_OLD_PLAYER_BUTTONS;
 
 import android.view.View;
@@ -46,7 +45,6 @@ public final class VoiceOverTranslationButton {
                     view -> {
                         VoiceOverTranslationPatch.toggleTranslation();
                         refreshActivatedState();
-                        showToggleToast();
                     },
                     view -> {
                         VotBottomSheet.show(view.getContext());
@@ -75,7 +73,6 @@ public final class VoiceOverTranslationButton {
                     view -> {
                         VoiceOverTranslationPatch.toggleTranslation();
                         refreshActivatedState();
-                        showToggleToast();
                     },
                     view -> {
                         VotBottomSheet.show(view.getContext());
@@ -84,11 +81,6 @@ public final class VoiceOverTranslationButton {
         } catch (Exception ex) {
             Logger.printException(() -> "initializeLegacyButton failure", ex);
         }
-    }
-
-    private static void showToggleToast() {
-        boolean enabled = VoiceOverTranslationPatch.isSessionEnabled();
-        Utils.showToastShort(str(enabled ? "morphe_vot_toast_on" : "morphe_vot_toast_off"));
     }
 
     private static void refreshActivatedState() {
