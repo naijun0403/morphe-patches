@@ -10,6 +10,7 @@ package app.morphe.extension.youtube.patches.voiceovertranslation;
 import androidx.annotation.Nullable;
 
 import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
@@ -27,9 +28,11 @@ import java.util.function.Consumer;
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.Utils;
 import app.morphe.extension.shared.requests.Requester;
+import app.morphe.extension.youtube.settings.Settings;
 
 /**
- * Translates transcript segments via the Google Translate public endpoint.
+ * Translates transcript segments via the configured translation service
+ * (Google Translate or LibreTranslate).
  */
 final class TranscriptTranslator {
 
@@ -144,6 +147,13 @@ final class TranscriptTranslator {
     }
 
     private static List<String> translateBatch(List<TranscriptSegment> segments, String targetLang) throws Exception {
+        if ("libretranslate".equals(Settings.VOT_TRANSLATION_SERVICE.get())) {
+            return translateBatchLibreTranslate(segments, targetLang);
+        }
+        return translateBatchGoogle(segments, targetLang);
+    }
+
+    private static List<String> translateBatchGoogle(List<TranscriptSegment> segments, String targetLang) throws Exception {
         Utils.verifyOffMainThread();
 
         StringBuilder joined = new StringBuilder();
@@ -180,5 +190,44 @@ final class TranscriptTranslator {
         }
 
         return Arrays.asList(translatedJoined.toString().split("\n", -1));
+    }
+
+    private static List<String> translateBatchLibreTranslate(List<TranscriptSegment> segments, String targetLang) throws Exception {
+        Utils.verifyOffMainThread();
+
+        StringBuilder joined = new StringBuilder();
+        for (TranscriptSegment seg : segments) {
+            if (joined.length() > 0) joined.append('\n');
+            joined.append(seg.text());
+        }
+
+        String baseUrl = Settings.VOT_LIBRETRANSLATE_URL.get().replaceAll("/+$", "");
+        HttpURLConnection conn = (HttpURLConnection) new URL(baseUrl + "/translate").openConnection();
+        conn.setRequestMethod("POST");
+        conn.setConnectTimeout(10_000);
+        conn.setReadTimeout(15_000);
+        conn.setRequestProperty("Content-Type", "application/json");
+        conn.setDoOutput(true);
+
+        JSONObject body = new JSONObject();
+        body.put("q", joined.toString());
+        body.put("source", TranscriptFetcher.lastSourceLang);
+        body.put("target", targetLang);
+        body.put("format", "text");
+        String apiKey = Settings.VOT_LIBRETRANSLATE_API_KEY.get();
+        if (!apiKey.isEmpty()) body.put("api_key", apiKey);
+
+        byte[] bodyBytes = body.toString().getBytes(StandardCharsets.UTF_8);
+        conn.setFixedLengthStreamingMode(bodyBytes.length);
+        try (OutputStream os = conn.getOutputStream()) {
+            os.write(bodyBytes);
+        }
+
+        final int code = conn.getResponseCode();
+        if (code != 200) throw new Exception("HTTP " + code);
+
+        // Response: {"translatedText": "..."} — newline separators from joined input are preserved.
+        String translated = new JSONObject(Requester.parseString(conn)).getString("translatedText");
+        return Arrays.asList(translated.split("\n", -1));
     }
 }

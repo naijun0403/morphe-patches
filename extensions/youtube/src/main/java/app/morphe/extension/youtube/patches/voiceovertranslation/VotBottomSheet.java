@@ -65,14 +65,22 @@ public final class VotBottomSheet {
         }
 
         LinearLayout engineRow = makeValueRow(context, fg, str("morphe_vot_tts_engine_label"));
+        Runnable refreshEngine = () -> refreshEngineRow(engineRow);
+        engineRow.setOnClickListener(v -> showEnginePicker(context, refreshEngine));
+        refreshEngine.run();
 
-        Runnable refresh = () -> refreshEngineRow(engineRow);
-        engineRow.setOnClickListener(v -> showEnginePicker(context, refresh));
-        refresh.run();
+        LinearLayout translationRow = makeValueRow(context, fg, str("morphe_vot_translation_service_label"));
+        Runnable refreshTranslation = () -> ((TextView) translationRow.getTag()).setText(
+                "libretranslate".equals(Settings.VOT_TRANSLATION_SERVICE.get())
+                        ? str("morphe_vot_service_libretranslate")
+                        : str("morphe_vot_service_google"));
+        translationRow.setOnClickListener(v -> showTranslationServicePicker(context, refreshTranslation));
+        refreshTranslation.run();
 
         root.addView(makeTitle(context, str("morphe_vot_enabled_title"), fg));
         root.addView(makeLanguageRow(context, str("morphe_vot_caption_language_title"), fg,
-                langEntries, langValues, refresh));
+                langEntries, langValues, refreshEngine));
+        root.addView(translationRow);
         root.addView(engineRow);
         root.addView(makeDivider(context, fg));
         root.addView(makeSliderRow(context,
@@ -146,6 +154,38 @@ public final class VotBottomSheet {
         final boolean edgeAvailable = VoiceCatalog.resolve(lang, null) != null;
         row.setAlpha(edgeAvailable ? 1f : 0.4f);
         row.setClickable(edgeAvailable);
+    }
+
+    private static void showTranslationServicePicker(Context context, Runnable onChanged) {
+        String[] entries = {str("morphe_vot_service_google"), str("morphe_vot_service_libretranslate")};
+        String[] values = {"google", "libretranslate"};
+
+        SheetBottomDialog.DraggableLinearLayout pickerRoot =
+                SheetBottomDialog.createMainLayout(context, getDialogBackgroundColor());
+        pickerRoot.setPadding(Dim.dp16, 0, Dim.dp16, Dim.dp16);
+        pickerRoot.addView(makeTitle(context, str("morphe_vot_translation_service_label"),
+                Utils.getAppForegroundColor()));
+
+        ListView listView = new ListView(context);
+        listView.setDivider(null);
+        CustomDialogListPreference.ListPreferenceArrayAdapter adapter =
+                new CustomDialogListPreference.ListPreferenceArrayAdapter(
+                        context, LAYOUT_MORPHE_CUSTOM_LIST_ITEM_CHECKED, entries, values,
+                        Settings.VOT_TRANSLATION_SERVICE.get());
+        listView.setAdapter(adapter);
+
+        SheetBottomDialog.SlideDialog pickerDialog =
+                SheetBottomDialog.createSlideDialog(context, pickerRoot, fadeInDuration);
+
+        listView.setOnItemClickListener((parent, view, position, id) -> {
+            Settings.VOT_TRANSLATION_SERVICE.save(values[position]);
+            VoiceOverTranslationPatch.reloadTranscript();
+            onChanged.run();
+            pickerDialog.dismiss();
+        });
+
+        pickerRoot.addView(listView);
+        pickerDialog.show();
     }
 
     private static void showEnginePicker(Context context, Runnable onChanged) {

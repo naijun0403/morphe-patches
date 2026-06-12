@@ -10,7 +10,10 @@ package app.morphe.patches.youtube.video.voiceovertranslation
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
 import app.morphe.patches.shared.misc.settings.preference.ListPreference
+import app.morphe.patches.shared.misc.settings.preference.NonInteractivePreference
 import app.morphe.patches.shared.misc.settings.preference.SwitchPreference
+import app.morphe.patches.shared.misc.settings.preference.TextPreference
+import app.morphe.patches.shared.misc.settings.preference.noTitleUnsortedPreferenceCategory
 import app.morphe.patches.youtube.layout.player.buttons.addPlayerBottomButton
 import app.morphe.patches.youtube.layout.player.buttons.playerOverlayButtonsHookPatch
 import app.morphe.patches.youtube.misc.extension.sharedExtensionPatch
@@ -70,6 +73,11 @@ val voiceOverTranslationPatch = bytecodePatch(
         PreferenceScreen.VIDEO.addPreferences(
             SwitchPreference("morphe_vot_enabled"),
             ListPreference("morphe_vot_caption_language"),
+            noTitleUnsortedPreferenceCategory(
+                NonInteractivePreference("morphe_vot_libretranslate_info"),
+                TextPreference("morphe_vot_libretranslate_url"),
+                TextPreference("morphe_vot_libretranslate_api_key"),
+            ),
         )
 
         videoTimeHook(EXTENSION_CLASS, "videoTimeChanged")
