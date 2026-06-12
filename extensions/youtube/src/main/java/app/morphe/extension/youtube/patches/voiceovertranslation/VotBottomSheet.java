@@ -69,7 +69,7 @@ public final class VotBottomSheet {
         engineRow.setOnClickListener(v -> showEnginePicker(context, refreshEngine));
         refreshEngine.run();
 
-        LinearLayout translationRow = makeValueRow(context, fg, str("morphe_vot_translation_service_label"));
+        LinearLayout translationRow = makeValueRow(context, fg, str("morphe_vot_translation_service_title"));
         Runnable refreshTranslation = () -> ((TextView) translationRow.getTag()).setText(
                 "libretranslate".equals(Settings.VOT_TRANSLATION_SERVICE.get())
                         ? str("morphe_vot_service_libretranslate")
@@ -84,17 +84,17 @@ public final class VotBottomSheet {
         root.addView(engineRow);
         root.addView(makeDivider(context, fg));
         root.addView(makeSliderRow(context,
-                str("morphe_vot_original_audio_label"),
+                str("morphe_vot_original_audio_volume_title"),
                 Settings.VOT_ORIGINAL_AUDIO_VOLUME.get(),
                 fg,
                 Settings.VOT_ORIGINAL_AUDIO_VOLUME::save));
         root.addView(makeRateSliderRow(context,
-                str("morphe_vot_max_rate_label"),
+                str("morphe_vot_max_speech_rate_title"),
                 Settings.VOT_MAX_SPEECH_RATE.get(),
                 fg,
                 Settings.VOT_MAX_SPEECH_RATE::save));
         root.addView(makePitchSliderRow(context,
-                str("morphe_vot_pitch_label"),
+                str("morphe_vot_pitch_title"),
                 Settings.VOT_PITCH.get(),
                 fg,
                 Settings.VOT_PITCH::save));
@@ -163,7 +163,7 @@ public final class VotBottomSheet {
         SheetBottomDialog.DraggableLinearLayout pickerRoot =
                 SheetBottomDialog.createMainLayout(context, getDialogBackgroundColor());
         pickerRoot.setPadding(Dim.dp16, 0, Dim.dp16, Dim.dp16);
-        pickerRoot.addView(makeTitle(context, str("morphe_vot_translation_service_label"),
+        pickerRoot.addView(makeTitle(context, str("morphe_vot_translation_service_title"),
                 Utils.getAppForegroundColor()));
 
         ListView listView = new ListView(context);
