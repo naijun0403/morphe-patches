@@ -343,8 +343,11 @@ Verify the package name is correct and the app is installed"</string>
     <string name="morphe_vot_use_native_tts_title">Use system TTS</string>
     <string name="morphe_vot_use_native_tts_summary">Use the device\'s built-in text-to-speech engine instead of Edge TTS</string>
     <string name="morphe_vot_original_audio_volume_title">Voice volume</string>
+    <string name="morphe_vot_original_audio_volume_summary">Adjust the dubbed voice volume relative to the original audio (0 is silent, 100 is full volume)</string>
     <string name="morphe_vot_max_speech_rate_title">Max speech rate</string>
+    <string name="morphe_vot_max_speech_rate_summary">Maximum speed multiplier when fitting speech into a subtitle slot (10 = 1.0x, 20 = 2.0x)</string>
     <string name="morphe_vot_pitch_title">Voice pitch</string>
+    <string name="morphe_vot_pitch_summary">Adjust the voice pitch (-5 is lower pitch, 5 is higher pitch)</string>
     <string name="morphe_vot_original_audio_label">Voice volume</string>
     <string name="morphe_vot_max_rate_label">Max speech rate</string>
     <string name="morphe_vot_pitch_label">Voice pitch</string>
