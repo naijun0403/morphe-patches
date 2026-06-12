@@ -258,6 +258,8 @@ public final class VoiceOverTranslationPatch {
                     // Cached audio was synthesized at 1.0x - apply speed at playback time.
                     final float rate = smoothRate(calculateSpeechRate(seg.text(), availableMs));
                     requestDuck();
+                    // markBusy before play so isSpeaking() is true for the full duration.
+                    edgeTtsEngine.markBusy();
                     edgeTtsEngine.play(cached, volume, rate, VoiceOverTranslationPatch::abandonDuck);
                     return;
                 }
@@ -267,6 +269,9 @@ public final class VoiceOverTranslationPatch {
                 final float rate = smoothRate(calculateSpeechRate(seg.text(),
                         availableMs - edgeTtsEngine.averageSynthesisMs()));
                 requestDuck();
+                // markBusy before the background thread so isSpeaking() returns true
+                // during the network round-trip, preventing a concurrent segment from starting.
+                edgeTtsEngine.markBusy();
                 Utils.runOnBackgroundThread(() -> {
                     try {
                         byte[] data = edgeTtsEngine.synthesize(seg.text(), voice, rate);
@@ -276,9 +281,13 @@ public final class VoiceOverTranslationPatch {
                             }
                             // Rate is already encoded in SSML; play at 1.0x.
                             edgeTtsEngine.play(data, volume, 1.0f, VoiceOverTranslationPatch::abandonDuck);
+                        } else {
+                            edgeTtsEngine.clearBusy();
+                            abandonDuck();
                         }
                     } catch (Exception ex) {
                         Logger.printException(() -> "Synthesis failed", ex);
+                        edgeTtsEngine.clearBusy();
                         abandonDuck();
                     }
                 });

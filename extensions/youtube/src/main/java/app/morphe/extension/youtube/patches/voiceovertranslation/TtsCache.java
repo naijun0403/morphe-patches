@@ -7,116 +7,41 @@
 
 package app.morphe.extension.youtube.patches.voiceovertranslation;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
-import app.morphe.extension.shared.Logger;
-import app.morphe.extension.shared.Utils;
-
+/**
+ * In-memory LRU cache for synthesized Edge TTS MP3 segments.
+ *
+ * <p>Edge TTS audio at 24 kHz / 48 kbps uses ~6 KB/s. A full hour of speech is
+ * ~20 MB, so keeping up to {@value #MAX_ENTRIES} segments in memory is safe.
+ * No disk I/O or pruning needed.
+ */
 final class TtsCache {
 
-    private static final String CACHE_DIR = "vot_cache";
-    private static final long MAX_CACHE_SIZE = 100 * 1024 * 1024; // 100 MB
+    private static final int MAX_ENTRIES = 1000;
 
-    private static final AtomicBoolean pruning = new AtomicBoolean();
-
-    static boolean notCached(String videoId, int segmentIndex, String voice, String text) {
-        return !getCacheFile(videoId, segmentIndex, voice, text).exists();
-    }
-
-    static byte[] get(String videoId, int segmentIndex, String voice, String text) {
-        File file = getCacheFile(videoId, segmentIndex, voice, text);
-        if (!file.exists()) return null;
-
-        try (FileInputStream fis = new FileInputStream(file)) {
-            byte[] data = new byte[(int) file.length()];
-            int read = fis.read(data);
-            // Update last modified to keep it in LRU
-            //noinspection ResultOfMethodCallIgnored
-            file.setLastModified(System.currentTimeMillis());
-            return read == data.length ? data : null;
-        } catch (IOException e) {
-            return null;
-        }
-    }
-
-    static void put(String videoId, int segmentIndex, String voice, String text, byte[] data) {
-        File file = getCacheFile(videoId, segmentIndex, voice, text);
-        File dir = file.getParentFile();
-        if (dir != null && !dir.exists() && !dir.mkdirs()) return;
-
-        try (FileOutputStream fos = new FileOutputStream(file)) {
-            fos.write(data);
-        } catch (IOException e) {
-            Logger.printException(() -> "Failed to write TTS cache", e);
-        }
-
-        if (!pruning.get()) Utils.runOnBackgroundThread(TtsCache::pruneCache);
-    }
-
-    private static File getCacheFile(String videoId, int segmentIndex, String voice, String text) {
-        String key = videoId + "_" + segmentIndex + "_" + voice + "_" + text;
-        String hash = md5(key);
-        return new File(getCacheDir(), hash + ".mp3");
-    }
-
-    private static File getCacheDir() {
-        File dir = new File(Utils.getContext().getCacheDir(), CACHE_DIR);
-        if (!dir.exists()) {
-            //noinspection ResultOfMethodCallIgnored
-            dir.mkdirs();
-        }
-        return dir;
-    }
-
-    private static void pruneCache() {
-        if (!pruning.compareAndSet(false, true)) return;
-        try {
-            File dir = getCacheDir();
-            File[] files = dir.listFiles();
-            if (files == null) return;
-
-            long totalSize = 0;
-            for (File f : files) totalSize += f.length();
-
-            if (totalSize > MAX_CACHE_SIZE) {
-                Arrays.sort(files, Comparator.comparingLong(File::lastModified));
-                for (File f : files) {
-                    totalSize -= f.length();
-                    //noinspection ResultOfMethodCallIgnored
-                    f.delete();
-                    if (totalSize <= MAX_CACHE_SIZE * 0.8) break; // Prune down to 80%
+    private static final LinkedHashMap<String, byte[]> cache =
+            new LinkedHashMap<>(16, 0.75f, false) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, byte[]> eldest) {
+                    return size() > MAX_ENTRIES;
                 }
-            }
-        } finally {
-            pruning.set(false);
-        }
+            };
+
+    static synchronized boolean notCached(String videoId, int segmentIndex, String voice, String text) {
+        return !cache.containsKey(key(videoId, segmentIndex, voice, text));
     }
 
-    private static String md5(String s) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("MD5");
-            digest.update(s.getBytes(StandardCharsets.UTF_8));
-            byte[] messageDigest = digest.digest();
-            StringBuilder hexString = new StringBuilder(2 * messageDigest.length);
-            for (byte b : messageDigest) {
-                final int val = 0xFF & b;
-                if (val < 16) {
-                    hexString.append('0');
-                }
-                hexString.append(Integer.toHexString(val));
-            }
-            return hexString.toString();
-        } catch (NoSuchAlgorithmException e) {
-            return String.valueOf(s.hashCode());
-        }
+    static synchronized byte[] get(String videoId, int segmentIndex, String voice, String text) {
+        return cache.get(key(videoId, segmentIndex, voice, text));
+    }
+
+    static synchronized void put(String videoId, int segmentIndex, String voice, String text, byte[] data) {
+        cache.put(key(videoId, segmentIndex, voice, text), data);
+    }
+
+    private static String key(String videoId, int segmentIndex, String voice, String text) {
+        return videoId + ':' + segmentIndex + ':' + voice + ':' + text.hashCode();
     }
 }

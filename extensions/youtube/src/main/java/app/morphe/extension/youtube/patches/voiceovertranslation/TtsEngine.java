@@ -88,6 +88,22 @@ final class TtsEngine {
         return speaking.get();
     }
 
+    /**
+     * Marks the engine as busy before synthesis or playback begins, so that
+     * {@link #isSpeaking()} returns {@code true} during the network round-trip.
+     * Must be paired with either {@link #play} (on success) or {@link #clearBusy}
+     * (if synthesis fails before play is reached).
+     */
+    void markBusy() {
+        stopped.set(false);
+        speaking.set(true);
+    }
+
+    /** Clears the busy flag without a full stop; used when synthesis fails before play. */
+    void clearBusy() {
+        speaking.set(false);
+    }
+
     long averageSynthesisMs() {
         return averageSynthesisMs.get();
     }
@@ -106,8 +122,13 @@ final class TtsEngine {
      * This is the underlying playback logic used by callers and the prefetcher.
      */
     void play(byte[] mp3, float volume, float rate, Runnable onDone) {
-        stopped.set(false);
-        speaking.set(true);
+        // Reject audio that completed synthesis after stop() was called (e.g. post-seek).
+        if (stopped.get()) {
+            speaking.set(false);
+            if (onDone != null) Utils.runOnMainThread(onDone);
+            return;
+        }
+        // speaking is already true from markBusy(); keep it for the playback lifetime.
 
         Utils.runOnBackgroundThread(() -> {
             try {
