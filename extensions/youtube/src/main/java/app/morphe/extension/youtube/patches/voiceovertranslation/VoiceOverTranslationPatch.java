@@ -111,8 +111,9 @@ public final class VoiceOverTranslationPatch {
      * Injection point.
      */
     public static void videoTimeChanged(long timeMs) {
-        if (!Settings.VOT_ENABLED.get() || !sessionEnabled) return;
-        if (!PlayerType.getCurrent().isMaximizedOrFullscreen()) return;
+        if (!Settings.VOT_ENABLED.get() || !sessionEnabled) return; // feature or session disabled
+        if (!PlayerType.getCurrent().isMaximizedOrFullscreen()) return; // minimized, PiP, etc.
+        if (VideoState.getCurrent() != VideoState.PLAYING) return; // paused, ended, or loading
 
         TtsPrefetcher.updateTime(timeMs);
 
