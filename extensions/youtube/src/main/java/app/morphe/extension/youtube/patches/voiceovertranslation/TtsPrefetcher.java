@@ -117,7 +117,7 @@ final class TtsPrefetcher {
 
             String lang = Settings.VOT_CAPTION_LANGUAGE.get();
             String voiceLang = "auto".equals(lang) ? VoiceOverTranslationPatch.detectedSourceLang : lang;
-            String voice = VoiceCatalog.resolve(voiceLang, !Settings.VOT_PREFER_FEMALE_VOICE.get());
+            String voice = VoiceCatalog.resolve(voiceLang, Settings.VOT_TTS_VOICE_TYPE.get());
 
             if (voice == null) {
                 if (!waitOnLock(2000)) return;

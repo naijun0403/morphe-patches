@@ -17,6 +17,7 @@ import android.graphics.Color;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.Typeface;
+import android.util.Pair;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.LinearLayout;
@@ -24,6 +25,9 @@ import android.widget.ListView;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Locale;
 
 import app.morphe.extension.shared.ResourceType;
@@ -37,21 +41,32 @@ import app.morphe.extension.youtube.settings.Settings;
 public final class VotBottomSheet {
 
     public static void show(Context context) {
-        SheetBottomDialog.DraggableLinearLayout root =
-                SheetBottomDialog.createMainLayout(context, getDialogBackgroundColor());
+        SheetBottomDialog.DraggableLinearLayout root = SheetBottomDialog
+                .createMainLayout(context, getDialogBackgroundColor());
         root.setPadding(Dim.dp16, 0, Dim.dp16, Dim.dp16);
 
-        int fg = Utils.getAppForegroundColor();
+        final int fg = Utils.getAppForegroundColor();
 
-        String[] langEntries = context.getResources().getStringArray(
-                ResourceUtils.getIdentifierOrThrow(ResourceType.ARRAY, "morphe_vot_caption_language_entries"));
-        String[] langValues = context.getResources().getStringArray(
-                ResourceUtils.getIdentifierOrThrow(ResourceType.ARRAY, "morphe_vot_caption_language_entry_values"));
+        String[] langEntries = context.getResources().getStringArray(ResourceUtils
+                .getIdentifierOrThrow(ResourceType.ARRAY, "morphe_vot_caption_language_entries"));
+        String[] langValues = context.getResources().getStringArray(ResourceUtils
+                .getIdentifierOrThrow(ResourceType.ARRAY, "morphe_vot_caption_language_entry_values"));
+
+        if (langEntries.length > 1) {
+            List<Pair<String, String>> list = new ArrayList<>();
+            for (int i = 1; i < langEntries.length; i++) {
+                list.add(new Pair<>(langEntries[i], langValues[i]));
+            }
+            Collections.sort(list, (p1, p2) -> p1.first.compareToIgnoreCase(p2.first));
+            for (int i = 1; i < langEntries.length; i++) {
+                langEntries[i] = list.get(i - 1).first;
+                langValues[i] = list.get(i - 1).second;
+            }
+        }
 
         LinearLayout engineRow = makeValueRow(context, fg, str("morphe_vot_tts_engine_label"));
 
         Runnable refresh = () -> refreshEngineRow(engineRow);
-
         engineRow.setOnClickListener(v -> showEnginePicker(context, refresh));
         refresh.run();
 
@@ -104,17 +119,21 @@ public final class VotBottomSheet {
         String lang = Settings.VOT_CAPTION_LANGUAGE.get();
         if ("auto".equals(lang)) lang = VoiceOverTranslationPatch.detectedSourceLang;
 
-        boolean preferFemale = Settings.VOT_PREFER_FEMALE_VOICE.get();
-        String voice = VoiceCatalog.resolve(lang, !preferFemale);
+        String voiceId = Settings.VOT_TTS_VOICE_TYPE.get();
+        VoiceCatalog.Voice voice = VoiceCatalog.getVoice(voiceId);
 
-        if (voice == null || Settings.VOT_USE_NATIVE_TTS.get()) {
+        if (Settings.VOT_USE_NATIVE_TTS.get() || (voice == null && VoiceCatalog.resolve(lang, null) == null)) {
             valueView.setText(str("morphe_vot_tts_system"));
+        } else if (voice != null && voice.id.startsWith(lang)) {
+            valueView.setText(voice.dialogDisplayName);
         } else {
-            valueView.setText(VoiceCatalog.shortName(voice));
+            String defaultVoiceId = VoiceCatalog.resolve(lang, null);
+            VoiceCatalog.Voice defaultVoice = VoiceCatalog.getVoice(defaultVoiceId);
+            valueView.setText(defaultVoice != null ? defaultVoice.dialogDisplayName : str("morphe_vot_tts_system"));
         }
 
         // Dim and disable when no Edge voice is available for the current language.
-        boolean edgeAvailable = voice != null;
+        final boolean edgeAvailable = VoiceCatalog.resolve(lang, null) != null;
         row.setAlpha(edgeAvailable ? 1f : 0.4f);
         row.setClickable(edgeAvailable);
     }
@@ -123,22 +142,33 @@ public final class VotBottomSheet {
         String lang = Settings.VOT_CAPTION_LANGUAGE.get();
         if ("auto".equals(lang)) lang = VoiceOverTranslationPatch.detectedSourceLang;
 
-        String maleVoice   = VoiceCatalog.resolve(lang, true);
-        String femaleVoice = VoiceCatalog.resolve(lang, false);
-
-        String[] entries = {
-                VoiceCatalog.shortName(maleVoice)   + " (" + str("morphe_vot_voice_male")   + ")",
-                VoiceCatalog.shortName(femaleVoice)  + " (" + str("morphe_vot_voice_female") + ")",
-                str("morphe_vot_tts_system")
-        };
-        String[] values = {"male", "female", "system"};
-
-        String selected;
-        if (Settings.VOT_USE_NATIVE_TTS.get()) {
-            selected = "system";
+        List<VoiceCatalog.Voice> voices = VoiceCatalog.getVoicesForLang(lang);
+        if (voices == null) {
+            voices = Collections.emptyList();
         } else {
-            selected = Settings.VOT_PREFER_FEMALE_VOICE.get() ? "female" : "male";
+            voices = new ArrayList<>(voices);
+            voices.sort((v1, v2) -> {
+                if (v1.isMale != v2.isMale) return v1.isMale ? -1 : 1;
+                return v1.shortName.compareToIgnoreCase(v2.shortName);
+            });
         }
+
+        int voicesSize = voices.size();
+        final int entryValuesSize = voicesSize + 1;
+        String[] entries = new String[entryValuesSize];
+        String[] values = new String[entryValuesSize];
+
+        for (int i = 0; i < voicesSize; i++) {
+            VoiceCatalog.Voice v = voices.get(i);
+            entries[i] = v.dialogDisplayName;
+            values[i] = v.id;
+        }
+        entries[entryValuesSize - 1] = str("morphe_vot_tts_system");
+        values[entryValuesSize - 1] = "system";
+
+        String selectedValue = Settings.VOT_USE_NATIVE_TTS.get()
+                ? "system"
+                : Settings.VOT_TTS_VOICE_TYPE.get();
 
         SheetBottomDialog.DraggableLinearLayout pickerRoot =
                 SheetBottomDialog.createMainLayout(context, getDialogBackgroundColor());
@@ -149,25 +179,18 @@ public final class VotBottomSheet {
         listView.setDivider(null);
         CustomDialogListPreference.ListPreferenceArrayAdapter adapter =
                 new CustomDialogListPreference.ListPreferenceArrayAdapter(
-                        context, LAYOUT_MORPHE_CUSTOM_LIST_ITEM_CHECKED, entries, values, selected);
+                        context, LAYOUT_MORPHE_CUSTOM_LIST_ITEM_CHECKED, entries, values, selectedValue);
         listView.setAdapter(adapter);
 
         SheetBottomDialog.SlideDialog pickerDialog =
                 SheetBottomDialog.createSlideDialog(context, pickerRoot, fadeInDuration);
 
         listView.setOnItemClickListener((parent, view, position, id) -> {
-            switch (values[position]) {
-                case "male":
-                    Settings.VOT_USE_NATIVE_TTS.save(false);
-                    Settings.VOT_PREFER_FEMALE_VOICE.save(false);
-                    break;
-                case "female":
-                    Settings.VOT_USE_NATIVE_TTS.save(false);
-                    Settings.VOT_PREFER_FEMALE_VOICE.save(true);
-                    break;
-                default:
-                    Settings.VOT_USE_NATIVE_TTS.save(true);
-                    break;
+            if ("system".equals(values[position])) {
+                Settings.VOT_USE_NATIVE_TTS.save(true);
+            } else {
+                Settings.VOT_USE_NATIVE_TTS.save(false);
+                Settings.VOT_TTS_VOICE_TYPE.save(values[position]);
             }
             onChanged.run();
             pickerDialog.dismiss();
@@ -244,7 +267,7 @@ public final class VotBottomSheet {
     }
 
     private static String getLangDisplayName(String code, String[] langEntries, String[] langValues) {
-        for (int i = 0; i < langValues.length; i++) {
+        for (int i = 0, length = langValues.length; i < length; i++) {
             if (langValues[i].equals(code)) return langEntries[i];
         }
         return langEntries[0];

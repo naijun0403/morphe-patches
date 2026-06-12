@@ -343,8 +343,10 @@ Verify the package name is correct and the app is installed"</string>
     <string name="morphe_vot_tts_engine_label">Engine</string>
     <string name="morphe_vot_tts_system">System</string>
     <string name="morphe_vot_tts_edge">Edge</string>
-    <string name="morphe_vot_voice_male">Male</string>
-    <string name="morphe_vot_voice_female">Female</string>
+    <string name="morphe_vot_voice_original_language">Original language</string>
+    <string name="morphe_vot_voice_multilingual">Multilingual</string>
+    <string name="morphe_vot_voice_gender_male">Male</string>
+    <string name="morphe_vot_voice_gender_female">Female</string>
 
     <!-- interaction.loop.loopVideoPatch -->
     <string name="morphe_loop_video_title">Enable loop video</string>

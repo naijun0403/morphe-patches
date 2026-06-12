@@ -250,7 +250,8 @@ public final class VoiceOverTranslationPatch {
         final long availableMs = seg.endMs() - Math.max(lastVideoTimeMs, seg.startMs());
 
         if (!Settings.VOT_USE_NATIVE_TTS.get()) {
-            String voice = VoiceCatalog.resolve(lang, !Settings.VOT_PREFER_FEMALE_VOICE.get());
+            final String voice = VoiceCatalog.resolve(lang, Settings.VOT_TTS_VOICE_TYPE.get());
+
             if (voice != null) {
                 byte[] cached = TtsCache.get(currentVideoId, index, voice, seg.text());
                 if (cached != null) {
