@@ -100,7 +100,7 @@ final class TtsEngine {
         stopped.set(false);
         speaking.set(true);
 
-        new Thread(() -> {
+        Utils.runOnBackgroundThread(() -> {
             try {
                 if (stopped.get()) return;
                 final long synthStart = System.currentTimeMillis();
@@ -110,6 +110,7 @@ final class TtsEngine {
                             + text.substring(0, Math.min(text.length(), 50)) + "»");
                     return;
                 }
+
                 // Update the latency average only on successful synthesis.
                 final long synthMs = System.currentTimeMillis() - synthStart;
                 averageSynthesisMs.updateAndGet(avg -> (avg * 3 + synthMs) / 4);
@@ -121,7 +122,7 @@ final class TtsEngine {
                 speaking.set(false);
                 if (onDone != null) Utils.runOnMainThread(onDone);
             }
-        }, "TtsEngine-speak").start();
+        });
     }
 
     /** Stops any in-progress synthesis or playback immediately. */
