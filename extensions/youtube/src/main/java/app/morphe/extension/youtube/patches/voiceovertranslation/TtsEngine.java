@@ -2,7 +2,7 @@
  * Copyright 2026 Morphe.
  * https://github.com/MorpheApp/morphe-patches
  *
- * See the included NOTICE file for GPLv3 §7(b) and §7(c) terms that apply to Morphe contributions.
+ * See the included NOTICE file for GPLv3 §7(b) and §7(c) terms that apply to this code.
  */
 
 package app.morphe.extension.youtube.patches.voiceovertranslation;
@@ -67,14 +67,15 @@ final class TtsEngine {
     private final AtomicReference<MediaPlayer>      currentPlayer = new AtomicReference<>();
     private final AtomicReference<CountDownLatch>   playLatch     = new AtomicReference<>();
 
-    @GuardedBy("TtsEngine.class")
+    private final Object lock = new Object();
+    @GuardedBy("lock")
     private SSLSocket     persistentSocket;
-    @GuardedBy("TtsEngine.class")
+    @GuardedBy("lock")
     private InputStream   persistentIn;
-    @GuardedBy("TtsEngine.class")
+    @GuardedBy("lock")
     private OutputStream  persistentOut;
     // speech.config only needs to be sent once per connection.
-    @GuardedBy("TtsEngine.class")
+    @GuardedBy("lock")
     private boolean       configSent;
 
     // Exponential moving average of synthesis latency (request to audio ready).
@@ -91,6 +92,34 @@ final class TtsEngine {
     }
 
     /**
+     * Synthesizes {@code text} with the given Edge TTS {@code voice} on a background thread.
+     * This is the underlying synthesis logic used by {@link #speak} and the prefetcher.
+     */
+    byte[] synthesize(String text, String voice, float rate) throws Exception {
+        return synthesizeEdge(text, voice, rate);
+    }
+
+    /**
+     * Plays the MP3 result through Android's MediaPlayer.
+     * This is the underlying playback logic used by {@link #speak} and the prefetcher.
+     */
+    void play(byte[] mp3, float volume, Runnable onDone) {
+        stopped.set(false);
+        speaking.set(true);
+
+        Utils.runOnBackgroundThread(() -> {
+            try {
+                if (!stopped.get()) playMp3(mp3, volume);
+            } catch (Exception ex) {
+                if (!stopped.get()) Logger.printException(() -> "Playback failed", ex);
+            } finally {
+                speaking.set(false);
+                if (onDone != null) Utils.runOnMainThread(onDone);
+            }
+        });
+    }
+
+    /**
      * Non-blocking. Synthesizes {@code text} with the given Edge TTS {@code voice} on a
      * background thread, then plays the MP3 result. {@code rate} is a speed multiplier
      * (1.0 = normal). Calls {@code onDone} (on the main thread) when playback finishes
@@ -104,7 +133,7 @@ final class TtsEngine {
             try {
                 if (stopped.get()) return;
                 final long synthStart = System.currentTimeMillis();
-                byte[] mp3 = synthesizeEdge(text, voice, rate);
+                byte[] mp3 = synthesize(text, voice, rate);
                 if (mp3.length == 0) {
                     Logger.printDebug(() -> "Empty audio for «"
                             + text.substring(0, Math.min(text.length(), 50)) + "»");
@@ -130,7 +159,7 @@ final class TtsEngine {
         stopped.set(true);
         speaking.set(false);
 
-        synchronized (TtsEngine.class) {
+        synchronized (lock) {
             closeSocket();
         }
 
@@ -146,7 +175,7 @@ final class TtsEngine {
     }
 
     private byte[] synthesizeEdge(String text, String voice, float rate) throws Exception {
-        synchronized (TtsEngine.class) {
+        synchronized (lock) {
             // Reconnect lazily if the socket was closed (first call, stop(), or server timeout).
             ensureConnected();
 

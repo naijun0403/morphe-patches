@@ -2,7 +2,7 @@
  * Copyright 2026 Morphe.
  * https://github.com/MorpheApp/morphe-patches
  *
- * See the included NOTICE file for GPLv3 §7(b) and §7(c) terms that apply to Morphe contributions.
+ * See the included NOTICE file for GPLv3 §7(b) and §7(c) terms that apply to this code.
  */
 
 package app.morphe.extension.youtube.patches.voiceovertranslation;
@@ -28,38 +28,6 @@ import app.morphe.extension.youtube.shared.VideoState;
 @SuppressWarnings("unused")
 public final class VoiceOverTranslationPatch {
 
-    static {
-        PlayerType.getOnChange().addObserver(playerType -> {
-            if (!playerType.isMaximizedOrFullscreen()
-                    && playerType != PlayerType.WATCH_WHILE_MINIMIZED
-                    && playerType != PlayerType.WATCH_WHILE_PICTURE_IN_PICTURE
-                    && playerType != PlayerType.WATCH_WHILE_SLIDING_MINIMIZED_MAXIMIZED) {
-                Logger.printDebug(() -> "Stopping TTS for player type: " + playerType);
-                stopTts();
-            }
-            return kotlin.Unit.INSTANCE;
-        });
-        VideoState.getOnChange().addObserver(state -> {
-            if (state == VideoState.PAUSED || state == VideoState.ENDED) {
-                stopTts();
-            }
-            return kotlin.Unit.INSTANCE;
-        });
-    }
-
-    private static volatile TextToSpeech tts;
-    private static volatile boolean ttsReady;
-
-    private static volatile List<TranscriptSegment> segments = new ArrayList<>();
-    private static volatile int lastSpokenIndex = -1;
-    private static volatile String currentVideoId = "";
-    private static volatile boolean isLoading;
-
-    private static volatile boolean sessionEnabled = true;
-
-    private static volatile Runnable onStateChangeCallback;
-
-    private static volatile long lastVideoTimeMs = 0;
     private static final long SEEK_JUMP_THRESHOLD_MS = 3_000;
     private static final long TTS_LOOKAHEAD_MS = 400;
 
@@ -73,32 +41,70 @@ public final class VoiceOverTranslationPatch {
     // from normal speed to maximum. Slowing back down is applied immediately.
     private static final float MAX_RATE_STEP_UP = 0.25f;
     private static volatile float lastSpeechRate = MIN_SPEECH_RATE;
+    private static volatile long lastVideoTimeMs;
+
+    private static volatile TextToSpeech tts;
+    private static volatile boolean ttsReady;
+
+    private static volatile List<TranscriptSegment> segments = new ArrayList<>();
+    private static volatile int lastSpokenIndex = -1;
+    private static volatile String currentVideoId = "";
+    private static volatile boolean isLoading;
+    private static volatile boolean sessionEnabled = Settings.VOT_ENABLED.get();
+
+    private static volatile Runnable onStateChangeCallback;
 
     private static volatile AudioManager audioManager;
     // Kept as a field so abandonAudioFocus() uses the same listener instance as requestAudioFocus().
     private static final AudioManager.OnAudioFocusChangeListener focusChangeListener = focusChange -> { };
     private static volatile AudioFocusRequest focusRequest;
-    private static volatile boolean isDucking = false;
+    private static volatile boolean isDucking;
 
     private static final TtsEngine edgeTtsEngine = new TtsEngine();
 
     /** Language code of the video's own caption track, detected on each transcript fetch. */
     static volatile String detectedSourceLang = "en";
 
+    static {
+        PlayerType.getOnChange().addObserver(playerType -> {
+            if (!playerType.isMaximizedOrFullscreen()
+                    && playerType != PlayerType.WATCH_WHILE_MINIMIZED
+                    && playerType != PlayerType.WATCH_WHILE_PICTURE_IN_PICTURE
+                    && playerType != PlayerType.WATCH_WHILE_SLIDING_MINIMIZED_MAXIMIZED) {
+                Logger.printDebug(() -> "Stopping TTS for player type: " + playerType);
+                stopTts();
+            }
+            return kotlin.Unit.INSTANCE;
+        });
+
+        VideoState.getOnChange().addObserver(state -> {
+            if (state == VideoState.PAUSED || state == VideoState.ENDED) {
+                Logger.printDebug(() -> "Stopping TTS for video state: " + state);
+                stopTts();
+            }
+            return kotlin.Unit.INSTANCE;
+        });
+    }
+
     /**
      * Injection point.
      */
     public static void newVideoLoaded(String videoId) {
-        if (videoId.equals(currentVideoId)) return;
-        currentVideoId = videoId;
-        lastVideoTimeMs = 0;
-        stopTts();
-        segments = new ArrayList<>();
-        lastSpokenIndex = -1;
+        try {
+            if (videoId.equals(currentVideoId)) return;
+            currentVideoId = videoId;
+            lastVideoTimeMs = 0;
+            stopTts();
+            segments = new ArrayList<>();
+            lastSpokenIndex = -1;
 
-        if (!Settings.VOT_ENABLED.get()) return;
-        if (PlayerType.getCurrent() == PlayerType.INLINE_MINIMAL) return;
-        loadTranscript(videoId);
+            if (!Settings.VOT_ENABLED.get()) return;
+            if (PlayerType.getCurrent() == PlayerType.INLINE_MINIMAL) return;
+            TtsPrefetcher.updateVideo(videoId, segments);
+            loadTranscript(videoId);
+        } catch (Exception ex) {
+            Logger.printException(() -> "newVideoLoaded failure", ex);
+        }
     }
 
     /**
@@ -107,6 +113,8 @@ public final class VoiceOverTranslationPatch {
     public static void videoTimeChanged(long timeMs) {
         if (!Settings.VOT_ENABLED.get() || !sessionEnabled) return;
         if (!PlayerType.getCurrent().isMaximizedOrFullscreen()) return;
+
+        TtsPrefetcher.updateTime(timeMs);
 
         List<TranscriptSegment> current = segments;
         if (current.isEmpty()) return;
@@ -125,7 +133,7 @@ public final class VoiceOverTranslationPatch {
                     boolean busy = edgeTtsEngine.isSpeaking() || (tts != null && tts.isSpeaking());
                     if (!busy) {
                         lastSpokenIndex = i;
-                        speak(seg);
+                        speak(seg, i);
                     }
                 }
                 return;
@@ -188,6 +196,7 @@ public final class VoiceOverTranslationPatch {
                         () -> !videoId.equals(currentVideoId));
                 if (videoId.equals(currentVideoId)) {
                     segments = fetched;
+                    TtsPrefetcher.updateVideo(videoId, fetched);
                     detectedSourceLang = TranscriptFetcher.lastSourceLang;
                     Logger.printDebug(() -> "Loaded: " + fetched.size()
                             + " segments for :" + videoId);
@@ -231,7 +240,7 @@ public final class VoiceOverTranslationPatch {
         });
     }
 
-    private static void speak(TranscriptSegment seg) {
+    private static void speak(TranscriptSegment seg, int index) {
         String rawLang = Settings.VOT_CAPTION_LANGUAGE.get();
         String lang = "auto".equals(rawLang) ? detectedSourceLang : rawLang;
         final float volume = Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f;
@@ -243,13 +252,32 @@ public final class VoiceOverTranslationPatch {
         if (!Settings.VOT_USE_NATIVE_TTS.get()) {
             String voice = VoiceCatalog.resolve(lang, !Settings.VOT_PREFER_FEMALE_VOICE.get());
             if (voice != null) {
+                byte[] cached = TtsCache.get(currentVideoId, index, voice, seg.text());
+                if (cached != null) {
+                    requestDuck();
+                    edgeTtsEngine.play(cached, volume, VoiceOverTranslationPatch::abandonDuck);
+                    return;
+                }
+
                 // Edge TTS synthesizes over the network before playback starts - subtract
                 // the typical synthesis time so the delay doesn't eat into speaking time.
                 final float rate = smoothRate(calculateSpeechRate(seg.text(),
                         availableMs - edgeTtsEngine.averageSynthesisMs()));
                 requestDuck();
-                edgeTtsEngine.speak(seg.text(), voice, volume, rate,
-                        VoiceOverTranslationPatch::abandonDuck);
+                Utils.runOnBackgroundThread(() -> {
+                    try {
+                        byte[] data = edgeTtsEngine.synthesize(seg.text(), voice, rate);
+                        if (data.length > 0) {
+                            if (rate == 1.0f) {
+                                TtsCache.put(currentVideoId, index, voice, seg.text(), data);
+                            }
+                            edgeTtsEngine.play(data, volume, VoiceOverTranslationPatch::abandonDuck);
+                        }
+                    } catch (Exception ex) {
+                        Logger.printException(() -> "Synthesis failed", ex);
+                        abandonDuck();
+                    }
+                });
                 return;
             }
         }
