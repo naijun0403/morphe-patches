@@ -10,6 +10,7 @@ package app.morphe.extension.youtube.patches.voiceovertranslation;
 import android.media.AudioAttributes;
 import android.media.MediaDataSource;
 import android.media.MediaPlayer;
+import android.media.PlaybackParams;
 import android.util.Base64;
 
 import androidx.annotation.GuardedBy;
@@ -100,16 +101,17 @@ final class TtsEngine {
     }
 
     /**
-     * Plays the MP3 result through Android's MediaPlayer.
+     * Plays the MP3 result through Android's MediaPlayer at the given speed {@code rate}.
+     * Use 1.0f when the rate is already encoded in the audio (e.g. via SSML prosody).
      * This is the underlying playback logic used by {@link #speak} and the prefetcher.
      */
-    void play(byte[] mp3, float volume, Runnable onDone) {
+    void play(byte[] mp3, float volume, float rate, Runnable onDone) {
         stopped.set(false);
         speaking.set(true);
 
         Utils.runOnBackgroundThread(() -> {
             try {
-                if (!stopped.get()) playMp3(mp3, volume);
+                if (!stopped.get()) playMp3(mp3, volume, rate);
             } catch (Exception ex) {
                 if (!stopped.get()) Logger.printException(() -> "Playback failed", ex);
             } finally {
@@ -143,7 +145,8 @@ final class TtsEngine {
                 // Update the latency average only on successful synthesis.
                 final long synthMs = System.currentTimeMillis() - synthStart;
                 averageSynthesisMs.updateAndGet(avg -> (avg * 3 + synthMs) / 4);
-                if (!stopped.get()) playMp3(mp3, volume);
+                // Rate is already encoded in the SSML prosody element; play at 1.0x.
+                if (!stopped.get()) playMp3(mp3, volume, 1.0f);
             } catch (Exception ex) {
                 // Suppress exceptions caused by stop() closing the connection mid-request.
                 if (!stopped.get()) Logger.printException(() -> "Speak failed", ex);
@@ -387,7 +390,7 @@ final class TtsEngine {
         }
     }
 
-    private void playMp3(byte[] mp3, float volume) throws Exception {
+    private void playMp3(byte[] mp3, float volume, float rate) throws Exception {
         CountDownLatch latch = new CountDownLatch(1);
         MediaPlayer    mp    = new MediaPlayer();
         playLatch.set(latch);
@@ -424,6 +427,9 @@ final class TtsEngine {
                 return true;
             });
             mp.prepare();
+            if (rate != 1.0f) {
+                mp.setPlaybackParams(new PlaybackParams().setSpeed(rate));
+            }
             if (stopped.get()) return;
             mp.start();
             //noinspection ResultOfMethodCallIgnored

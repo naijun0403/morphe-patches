@@ -255,8 +255,10 @@ public final class VoiceOverTranslationPatch {
             if (voice != null) {
                 byte[] cached = TtsCache.get(currentVideoId, index, voice, seg.text());
                 if (cached != null) {
+                    // Cached audio was synthesized at 1.0x - apply speed at playback time.
+                    final float rate = smoothRate(calculateSpeechRate(seg.text(), availableMs));
                     requestDuck();
-                    edgeTtsEngine.play(cached, volume, VoiceOverTranslationPatch::abandonDuck);
+                    edgeTtsEngine.play(cached, volume, rate, VoiceOverTranslationPatch::abandonDuck);
                     return;
                 }
 
@@ -272,7 +274,8 @@ public final class VoiceOverTranslationPatch {
                             if (rate == 1.0f) {
                                 TtsCache.put(currentVideoId, index, voice, seg.text(), data);
                             }
-                            edgeTtsEngine.play(data, volume, VoiceOverTranslationPatch::abandonDuck);
+                            // Rate is already encoded in SSML; play at 1.0x.
+                            edgeTtsEngine.play(data, volume, 1.0f, VoiceOverTranslationPatch::abandonDuck);
                         }
                     } catch (Exception ex) {
                         Logger.printException(() -> "Synthesis failed", ex);
