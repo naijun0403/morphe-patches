@@ -57,11 +57,11 @@ final class TtsEngine {
     private static final int CONNECT_TIMEOUT_MS = 10_000;
     private static final int READ_TIMEOUT_MS    = 20_000;
 
-    private final AtomicBoolean                      stopped       = new AtomicBoolean(false);
-    private final AtomicBoolean                      speaking      = new AtomicBoolean(false);
-    private final AtomicReference<SSLSocket>   currentSocket = new AtomicReference<>();
-    private final AtomicReference<MediaPlayer> currentPlayer = new AtomicReference<>();
-    private final AtomicReference<CountDownLatch>    playLatch     = new AtomicReference<>();
+    private final AtomicBoolean                     stopped       = new AtomicBoolean();
+    private final AtomicBoolean                     speaking      = new AtomicBoolean();
+    private final AtomicReference<SSLSocket>        currentSocket = new AtomicReference<>();
+    private final AtomicReference<MediaPlayer>      currentPlayer = new AtomicReference<>();
+    private final AtomicReference<CountDownLatch>   playLatch     = new AtomicReference<>();
 
     // Exponential moving average of synthesis latency (request to audio ready).
     // Callers subtract it from the time budget when computing speech rate, so the

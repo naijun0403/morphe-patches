@@ -7,6 +7,8 @@
 
 package app.morphe.extension.youtube.patches.voiceovertranslation;
 
+import androidx.annotation.Nullable;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -21,6 +23,7 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 import app.morphe.extension.shared.Logger;
+import app.morphe.extension.shared.Utils;
 import app.morphe.extension.shared.innertube.utils.AuthUtils;
 import app.morphe.extension.shared.requests.Requester;
 import app.morphe.extension.youtube.patches.CaptionCookiesPatch;
@@ -28,13 +31,13 @@ import app.morphe.extension.youtube.settings.Settings;
 
 final class TranscriptFetcher {
 
-    /** Language code detected from the video's own caption track. Updated on every successful fetch. */
-    static volatile String lastSourceLang = "en";
-
     private static final int CONNECT_TIMEOUT_MS = 10_000;
     private static final int READ_TIMEOUT_MS = 15_000;
     private static final String INNERTUBE_PLAYER_URL =
             "https://www.youtube.com/youtubei/v1/player?prettyPrint=false";
+
+    /** Language code detected from the video's own caption track. Updated on every successful fetch. */
+    static volatile String lastSourceLang = "en";
 
     /**
      * Fetches and, if needed, translates the transcript. The returned list is immediately
@@ -67,7 +70,7 @@ final class TranscriptFetcher {
             captionUrl = innertubeResult[0];
             poToken    = innertubeResult[1];
         } catch (Exception ex) {
-            Logger.printDebug(() -> "VoiceOverTranslation: innertube player failed: " + ex.getMessage());
+            Logger.printDebug(() -> "Innertube player failed: " + ex.getMessage());
         }
 
         if (captionUrl != null) {
@@ -82,7 +85,7 @@ final class TranscriptFetcher {
                     return segments;
                 }
             } catch (Exception ex) {
-                Logger.printDebug(() -> "Innertube caption fetch failed, trying direct", ex);
+                Logger.printDebug(() -> "Caption fetch failed, trying direct", ex);
             }
         }
 
@@ -90,6 +93,8 @@ final class TranscriptFetcher {
     }
 
     private static String[] fetchFromInnertube(String videoId) throws Exception {
+        Utils.verifyOffMainThread();
+
         String body = "{\"context\":{\"client\":{\"clientName\":\"ANDROID\","
                 + "\"clientVersion\":\"20.10.38\"}},"
                 + "\"videoId\":\"" + videoId + "\"}";
@@ -111,17 +116,18 @@ final class TranscriptFetcher {
         }
 
         final int code = conn.getResponseCode();
-        if (code != 200) throw new Exception("Innertube HTTP response: " + code);
+        if (code != 200) throw new Exception("Unexpected response status: " + code);
 
         String response = Requester.parseString(conn);
         return new String[]{findBestCaptionUrl(response), extractPoToken(response)};
     }
 
+    @Nullable
     private static String extractPoToken(String json) {
         int idx = json.indexOf("\"poToken\":\"");
         if (idx < 0) return null;
         idx += "\"poToken\":\"".length();
-        int end = json.indexOf('"', idx);
+        final int end = json.indexOf('"', idx);
         return end < 0 ? null : json.substring(idx, end);
     }
 
@@ -130,6 +136,7 @@ final class TranscriptFetcher {
      * Prefers a non-gemini English track; falls back to the first non-gemini track,
      * then the first available.
      */
+    @Nullable
     private static String findBestCaptionUrl(String json) {
         final int tracksIdx = json.indexOf("\"captionTracks\":[");
         if (tracksIdx < 0) return null;

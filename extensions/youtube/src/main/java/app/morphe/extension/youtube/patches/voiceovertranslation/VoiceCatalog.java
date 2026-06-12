@@ -7,6 +7,8 @@
 
 package app.morphe.extension.youtube.patches.voiceovertranslation;
 
+import androidx.annotation.Nullable;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -39,6 +41,7 @@ final class VoiceCatalog {
      * Returns a voice name for {@code lang} and the requested gender,
      * or {@code null} if the language is not supported.
      */
+    @Nullable
     static String resolve(String lang, boolean preferMale) {
         String[] pair = VOICES.get(lang);
         if (pair == null) return null;

@@ -7,6 +7,8 @@
 
 package app.morphe.extension.youtube.patches.voiceovertranslation;
 
+import androidx.annotation.Nullable;
+
 import org.json.JSONArray;
 
 import java.io.OutputStream;
@@ -23,6 +25,7 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 import app.morphe.extension.shared.Logger;
+import app.morphe.extension.shared.Utils;
 import app.morphe.extension.shared.requests.Requester;
 
 /**
@@ -97,7 +100,7 @@ final class TranscriptTranslator {
      * A {@code null} translation (failed batch) leaves the original text in place.
      */
     private static void applyBatch(List<TranscriptSegment> target, List<TranscriptSegment> batch,
-                                   int offset, List<String> translated) {
+                                   int offset, @Nullable List<String> translated) {
         if (translated == null) return;
         final int limit = Math.min(batch.size(), translated.size());
         for (int j = 0; j < limit; j++) {
@@ -107,6 +110,7 @@ final class TranscriptTranslator {
         }
     }
 
+    @Nullable
     private static List<String> translateBatchSafe(List<TranscriptSegment> batch, String targetLang) {
         try {
             return translateBatch(batch, targetLang);
@@ -135,6 +139,8 @@ final class TranscriptTranslator {
     }
 
     private static List<String> translateBatch(List<TranscriptSegment> segments, String targetLang) throws Exception {
+        Utils.verifyOffMainThread();
+
         StringBuilder joined = new StringBuilder();
         for (TranscriptSegment seg : segments) {
             if (joined.length() > 0) joined.append('\n');

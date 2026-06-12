@@ -48,16 +48,16 @@ public final class VoiceOverTranslationPatch {
     }
 
     private static volatile TextToSpeech tts;
-    private static volatile boolean ttsReady = false;
+    private static volatile boolean ttsReady;
 
     private static volatile List<TranscriptSegment> segments = new ArrayList<>();
     private static volatile int lastSpokenIndex = -1;
     private static volatile String currentVideoId = "";
-    private static volatile boolean isLoading = false;
+    private static volatile boolean isLoading;
 
     private static volatile boolean sessionEnabled = true;
 
-    private static volatile Runnable onStateChangeCallback = null;
+    private static volatile Runnable onStateChangeCallback;
 
     private static volatile long lastVideoTimeMs = 0;
     private static final long SEEK_JUMP_THRESHOLD_MS = 3_000;
@@ -189,12 +189,12 @@ public final class VoiceOverTranslationPatch {
                 if (videoId.equals(currentVideoId)) {
                     segments = fetched;
                     detectedSourceLang = TranscriptFetcher.lastSourceLang;
-                    Logger.printInfo(() -> "VoiceOverTranslation: loaded " + fetched.size()
-                            + " segments for " + videoId);
+                    Logger.printDebug(() -> "Loaded: " + fetched.size()
+                            + " segments for :" + videoId);
                     notifyStateChanged();
                 }
             } catch (Exception ex) {
-                Logger.printException(() -> "VoiceOverTranslation: transcript fetch failed", ex);
+                Logger.printException(() -> "Transcript fetch failed", ex);
             } finally {
                 isLoading = false;
                 // The video may have changed while this fetch was in flight - the isLoading
@@ -211,12 +211,12 @@ public final class VoiceOverTranslationPatch {
         if (tts != null) return;
         tts = new TextToSpeech(Utils.getContext(), status -> {
             if (status != TextToSpeech.SUCCESS) {
-                Logger.printDebug(() -> "VoiceOverTranslation: TTS initialization failed");
+                Logger.printDebug(() -> "TTS initialization failed");
                 return;
             }
             updateTtsLanguage();
             // USAGE_ASSISTANCE_NAVIGATION_GUIDANCE plays TTS on a dedicated audio usage
-            // so its volume is controlled independently from YouTube's media stream.
+            // so its volume is controlled independently of YouTube's media stream.
             tts.setAudioAttributes(new AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
@@ -234,18 +234,18 @@ public final class VoiceOverTranslationPatch {
     private static void speak(TranscriptSegment seg) {
         String rawLang = Settings.VOT_CAPTION_LANGUAGE.get();
         String lang = "auto".equals(rawLang) ? detectedSourceLang : rawLang;
-        float volume = Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f;
+        final float volume = Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f;
 
         // Time left until the next segment starts, measured from the current playback
         // position so a late start (busy engine, synthesis latency) raises the rate.
-        long availableMs = seg.endMs() - Math.max(lastVideoTimeMs, seg.startMs());
+        final long availableMs = seg.endMs() - Math.max(lastVideoTimeMs, seg.startMs());
 
         if (!Settings.VOT_USE_NATIVE_TTS.get()) {
             String voice = VoiceCatalog.resolve(lang, !Settings.VOT_PREFER_FEMALE_VOICE.get());
             if (voice != null) {
                 // Edge TTS synthesizes over the network before playback starts - subtract
                 // the typical synthesis time so the delay doesn't eat into speaking time.
-                float rate = smoothRate(calculateSpeechRate(seg.text(),
+                final float rate = smoothRate(calculateSpeechRate(seg.text(),
                         availableMs - edgeTtsEngine.averageSynthesisMs()));
                 requestDuck();
                 edgeTtsEngine.speak(seg.text(), voice, volume, rate,
@@ -256,7 +256,7 @@ public final class VoiceOverTranslationPatch {
 
         ensureTts();
         if (!ttsReady) return;
-        float rate = smoothRate(calculateSpeechRate(seg.text(), availableMs));
+        final float rate = smoothRate(calculateSpeechRate(seg.text(), availableMs));
         requestDuck();
         tts.setSpeechRate(rate);
         Bundle params = new Bundle();
