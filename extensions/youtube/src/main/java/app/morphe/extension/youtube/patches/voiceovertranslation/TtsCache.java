@@ -15,7 +15,6 @@ import java.util.Map;
  *
  * <p>Edge TTS audio at 24 kHz / 48 kbps uses ~6 KB/s. A full hour of speech is
  * ~20 MB, so keeping up to {@value #MAX_ENTRIES} segments in memory is safe.
- * No disk I/O or pruning needed.
  */
 final class TtsCache {
 
