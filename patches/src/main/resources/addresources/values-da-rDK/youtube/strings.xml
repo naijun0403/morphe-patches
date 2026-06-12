@@ -368,6 +368,7 @@ Info: Virker muligvis ikke på live streams"</string>
   <string name="morphe_queue_manager_fetch_succeeded_create">Kø oprettet</string>
   <string name="morphe_queue_manager_fetch_succeeded_remove">Fjernet fra køen</string>
   <string name="morphe_queue_manager_fetch_succeeded_save">Kø gemt til %s</string>
+  <string name="morphe_queue_manager_playlist_title">Morphe-kø</string>
   <string name="morphe_queue_manager_add_to_queue">Tilføj til køen</string>
   <string name="morphe_queue_manager_add_to_queue_and_open_queue">Tilføj til køen og åbn</string>
   <string name="morphe_queue_manager_add_to_queue_and_play_video">Tilføj til køen og afspil</string>
@@ -1023,6 +1024,8 @@ Bil layout
 • Remix-knap og lydknap er ikke tilgængelige i Shorts
 • Shorts åbnes i den almindelige afspiller
 • Videohandlingslinjen er ikke foldet sammen"</string>
+  <string name="morphe_tablet_layout_in_player_title">Aktivér tabletlayout i afspilleren</string>
+  <string name="morphe_tablet_layout_in_player_summary">Gendanner det gamle layout for afspilleren</string>
   <!-- layout.spoofappversion.spoofAppVersionPatch -->
   <string name="morphe_spoof_app_version_title">Spoof app-version</string>
   <string name="morphe_spoof_app_version_summary">Snyder serveren til at tro, at du bruger en ældre appversion for at genoprette brugergrænsefladen, som den så ud tidligere</string>
@@ -1106,7 +1109,6 @@ Begrænsning: Brug af tilbage-knappen på værktøjslinjen fungerer muligvis ikk
   <string name="morphe_miniplayer_disable_horizontal_drag_title">Deaktiver vandret trækbevægelse</string>
   <string name="morphe_miniplayer_disable_horizontal_drag_summary">Forhindrer lukning af miniafspilleren ved at svajpe den vandret af skærmen</string>
   <string name="morphe_miniplayer_hide_overlay_buttons_title">Skjul overlay-knapper</string>
-  <string name="morphe_miniplayer_hide_subtext_title">Skjul undertekster</string>
   <string name="morphe_miniplayer_width_dip_title">Standardstørrelse</string>
   <string name="morphe_miniplayer_width_dip_summary">Indstil den indledende størrelse på skærmen i pixels</string>
   <string name="morphe_miniplayer_width_dip_invalid_toast">Pixel størrelse skal være mellem %1$s og %2$s</string>

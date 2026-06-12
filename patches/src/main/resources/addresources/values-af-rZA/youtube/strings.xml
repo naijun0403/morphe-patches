@@ -368,6 +368,7 @@ Info: Werk moontlik nie op regstreekse uitsendings nie"</string>
   <string name="morphe_queue_manager_fetch_succeeded_create">Waglys geskep</string>
   <string name="morphe_queue_manager_fetch_succeeded_remove">Van waglys verwyder</string>
   <string name="morphe_queue_manager_fetch_succeeded_save">Waglys gestoor na %s</string>
+  <string name="morphe_queue_manager_playlist_title">Morphe Queue</string>
   <string name="morphe_queue_manager_add_to_queue">By waglys voeg</string>
   <string name="morphe_queue_manager_add_to_queue_and_open_queue">By waglys voeg en oopmaak</string>
   <string name="morphe_queue_manager_add_to_queue_and_play_video">By waglys voeg en video speel</string>
@@ -1023,6 +1024,8 @@ Motorvoertuig uitleg
 • Remix knoppie en Klank knoppie is nie in Shorts beskikbaar nie
 • Shorts open in die gewone speler
 • Video aksiebalk is nie ingeklap nie"</string>
+  <string name="morphe_tablet_layout_in_player_title">Aktiveer tablet-uitleg in die speler</string>
+  <string name="morphe_tablet_layout_in_player_summary">Herstel die ou speleruitleg</string>
   <!-- layout.spoofappversion.spoofAppVersionPatch -->
   <string name="morphe_spoof_app_version_title">Spoof app weergawe</string>
   <string name="morphe_spoof_app_version_summary">Wenke die bediener om te dink dat jy \'n ouer weergawe van die app gebruik om erfgoed UI-funksies te herstel</string>
@@ -1106,7 +1109,6 @@ Beperking: Die gebruik van die terugknoppie op die nutsbalk werk dalk nie"</stri
   <string name="morphe_miniplayer_disable_horizontal_drag_title">Deaktiveer horisontale sleep gebaar</string>
   <string name="morphe_miniplayer_disable_horizontal_drag_summary">Verhoed dat die minispeler gesluit word deur dit horisontaal van die skerm af te swiep</string>
   <string name="morphe_miniplayer_hide_overlay_buttons_title">Verberg oorleg knoppies</string>
-  <string name="morphe_miniplayer_hide_subtext_title">Verberg subteks</string>
   <string name="morphe_miniplayer_width_dip_title">Standaardgrootte</string>
   <string name="morphe_miniplayer_width_dip_summary">Stel die begin-aan-skerm-grootte, in pixels</string>
   <string name="morphe_miniplayer_width_dip_invalid_toast">Pixel grootte moet tussen %1$s en %2$s wees</string>

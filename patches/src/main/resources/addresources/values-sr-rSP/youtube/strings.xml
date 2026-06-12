@@ -368,6 +368,7 @@ Promene uključuju:
   <string name="morphe_queue_manager_fetch_succeeded_create">Ред чекања креиран</string>
   <string name="morphe_queue_manager_fetch_succeeded_remove">Уклоњено из реда чекања</string>
   <string name="morphe_queue_manager_fetch_succeeded_save">Ред чекања је сачуван на %s</string>
+  <string name="morphe_queue_manager_playlist_title">Morphe ред</string>
   <string name="morphe_queue_manager_add_to_queue">Додај у ред чекања</string>
   <string name="morphe_queue_manager_add_to_queue_and_open_queue">Додај у ред чекања и отвори</string>
   <string name="morphe_queue_manager_add_to_queue_and_play_video">Додај у ред чекања и пусти</string>
@@ -1021,6 +1022,8 @@ Vaš korisnički ID je kao lozinka i nikada ga ne treba deliti."</string>
 • Дугме за ремикс и дугме за звук нису доступна у Shorts
 • Shorts се отварају у редовном плејеру
 • Видео трака акција није савијена"</string>
+  <string name="morphe_tablet_layout_in_player_title">Укључи таблет распоред у плејеру</string>
+  <string name="morphe_tablet_layout_in_player_summary">Враћа стари изглед плејера</string>
   <!-- layout.spoofappversion.spoofAppVersionPatch -->
   <string name="morphe_spoof_app_version_title">Лажирана верзија апликације</string>
   <string name="morphe_spoof_app_version_summary">Триковање сервера да мисли да користите старију верзију апликације како би се обновиле старије визуелне функције</string>
@@ -1104,7 +1107,6 @@ Vaš korisnički ID je kao lozinka i nikada ga ne treba deliti."</string>
   <string name="morphe_miniplayer_disable_horizontal_drag_title">Онемогући покрет хоризонталног превлачења</string>
   <string name="morphe_miniplayer_disable_horizontal_drag_summary">Спречава затварање мини-плејера превлачењем хоризонтално преко екрана</string>
   <string name="morphe_miniplayer_hide_overlay_buttons_title">Сакриј дугмад преклопа</string>
-  <string name="morphe_miniplayer_hide_subtext_title">Сакриј подтекстове</string>
   <string name="morphe_miniplayer_width_dip_title">Подразумевана величина</string>
   <string name="morphe_miniplayer_width_dip_summary">Подесите почетну величину на екрану, у пикселима</string>
   <string name="morphe_miniplayer_width_dip_invalid_toast">Величина пиксела мора бити између %1$s и %2$s</string>

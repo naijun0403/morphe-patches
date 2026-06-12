@@ -368,6 +368,7 @@ Second \"item\" text"</string>
   <string name="morphe_queue_manager_fetch_succeeded_create">已建立佇列</string>
   <string name="morphe_queue_manager_fetch_succeeded_remove">已從佇列移除</string>
   <string name="morphe_queue_manager_fetch_succeeded_save">佇列已儲存至 %s</string>
+  <string name="morphe_queue_manager_playlist_title">Morphe 佇列</string>
   <string name="morphe_queue_manager_add_to_queue">加入佇列</string>
   <string name="morphe_queue_manager_add_to_queue_and_open_queue">加入佇列並開啟</string>
   <string name="morphe_queue_manager_add_to_queue_and_play_video">加入佇列並播放</string>
@@ -1022,6 +1023,8 @@ Second \"item\" text"</string>
 • Shorts 中無法使用「混音」按鈕和「音效」按鈕
 • Shorts 在常規播放器中開啟
 • 影片動作欄未摺疊"</string>
+  <string name="morphe_tablet_layout_in_player_title">在播放器中啟用平板版面配置</string>
+  <string name="morphe_tablet_layout_in_player_summary">還原舊版播放器版面配置</string>
   <!-- layout.spoofappversion.spoofAppVersionPatch -->
   <string name="morphe_spoof_app_version_title">偽裝應用程式版本</string>
   <string name="morphe_spoof_app_version_summary">欺騙伺服器，讓它以為您正在使用較舊的應用程式版本，以還原舊版 UI 功能</string>
@@ -1105,7 +1108,6 @@ Second \"item\" text"</string>
   <string name="morphe_miniplayer_disable_horizontal_drag_title">停用水平拖曳手勢</string>
   <string name="morphe_miniplayer_disable_horizontal_drag_summary">防止通過水平滑動迷你播放器關閉螢幕</string>
   <string name="morphe_miniplayer_hide_overlay_buttons_title">隱藏暫停時顯示的按鈕</string>
-  <string name="morphe_miniplayer_hide_subtext_title">隱藏字幕</string>
   <string name="morphe_miniplayer_width_dip_title">預設大小</string>
   <string name="morphe_miniplayer_width_dip_summary">設定開始的螢幕大小（以像素為單位）</string>
   <string name="morphe_miniplayer_width_dip_invalid_toast">像素大小必須介於 %1$s 和 %2$s 之間</string>

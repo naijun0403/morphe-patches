@@ -369,6 +369,7 @@ Second \"item\" text"</string>
   <string name="morphe_queue_manager_fetch_succeeded_create">تم إنشاء قائمة الانتظار</string>
   <string name="morphe_queue_manager_fetch_succeeded_remove">تمت الإزالة من قائمة الانتظار</string>
   <string name="morphe_queue_manager_fetch_succeeded_save">تم حفظ قائمة الانتظار في %s</string>
+  <string name="morphe_queue_manager_playlist_title">قائمة تشغيل Morphe</string>
   <string name="morphe_queue_manager_add_to_queue">إضافة إلى قائمة الانتظار</string>
   <string name="morphe_queue_manager_add_to_queue_and_open_queue">إضافة إلى قائمة الانتظار وفتح</string>
   <string name="morphe_queue_manager_add_to_queue_and_play_video">إضافة إلى قائمة الانتظار وتشغيل</string>
@@ -1027,6 +1028,8 @@ Second \"item\" text"</string>
 • زر ريمكس و زر الصوت غير متوفرين في Shorts
 • فيديوهات Shorts تفتح في المشغل العادي
 • شريط إجراءات الفيديو غير مطوي"</string>
+  <string name="morphe_tablet_layout_in_player_title">تمكين تخطيط الجهاز اللوحي في المشغل</string>
+  <string name="morphe_tablet_layout_in_player_summary">يستعيد تخطيط المشغل القديم</string>
   <!-- layout.spoofappversion.spoofAppVersionPatch -->
   <string name="morphe_spoof_app_version_title">إصدار تطبيق وهمي</string>
   <string name="morphe_spoof_app_version_summary">يجعل الخادم يعتقد أنك تستخدم إصدارًا أقدم من التطبيق لاستعادة ميزات الواجهة القديمة</string>
@@ -1110,7 +1113,6 @@ Second \"item\" text"</string>
   <string name="morphe_miniplayer_disable_horizontal_drag_title">تعطيل إيماءة السحب الأفقي</string>
   <string name="morphe_miniplayer_disable_horizontal_drag_summary">يمنع إغلاق المشغل المصغر عن طريق سحبه أفقيًا خارج الشاشة</string>
   <string name="morphe_miniplayer_hide_overlay_buttons_title">إخفاء أزرار الواجهة</string>
-  <string name="morphe_miniplayer_hide_subtext_title">إخفاء النصوص الفرعية</string>
   <string name="morphe_miniplayer_width_dip_title">الحجم الافتراضي</string>
   <string name="morphe_miniplayer_width_dip_summary">تعيين الحجم الأولي على الشاشة، بالبكسل</string>
   <string name="morphe_miniplayer_width_dip_invalid_toast">حجم البكسل يجب أن يكون بين %1$s و %2$s</string>

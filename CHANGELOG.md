@@ -1,3 +1,29 @@
+## [1.31.0-dev.13](https://github.com/MorpheApp/morphe-patches/compare/v1.31.0-dev.12...v1.31.0-dev.13) (2026-06-12)
+
+### 🐛 Bug Fixes
+
+* **YouTube - Hide layout components:** Allow partial matches for "Enable Library / You bottom menu filter" setting ([59ea065](https://github.com/MorpheApp/morphe-patches/commit/59ea06565cfbd55a69be4494f42d6734a7c25668))
+* **YouTube - Links shortening:** Exclude post links from shortening ([ce1dd46](https://github.com/MorpheApp/morphe-patches/commit/ce1dd46276e3cd830d8644774819b3395c355abb))
+
+### ✨ New Features
+
+* **YouTube - Hide ads:** Hide "Includes paid promotion" label in miniplayer ([#1699](https://github.com/MorpheApp/morphe-patches/issues/1699)) ([c9ce526](https://github.com/MorpheApp/morphe-patches/commit/c9ce5269d1e205e84e6e4160712463b86966714d))
+
+### 🚀 Updated App Support
+
+* **YouTube:** Add experimental support for `21.24.360` ([93f3acd](https://github.com/MorpheApp/morphe-patches/commit/93f3acd3af902edf1a5e063e4699d0471a0ef67d))
+
+## [1.31.0-dev.12](https://github.com/MorpheApp/morphe-patches/compare/v1.31.0-dev.11...v1.31.0-dev.12) (2026-06-11)
+
+### 🐛 Bug Fixes
+
+* **YouTube - Queue Manager:** Fix black queue icon in legacy player ([7416c24](https://github.com/MorpheApp/morphe-patches/commit/7416c240ca9412b50fd7a26bb638f3ce5fd375cd))
+* **YouTube - Remove viewer discretion dialog:** Dialog cannot be dismissed ([#1710](https://github.com/MorpheApp/morphe-patches/issues/1710)) ([b962bd0](https://github.com/MorpheApp/morphe-patches/commit/b962bd0c485a5bea1b46bd55fee5943aefd797bd))
+
+### ✨ New Features
+
+* **YouTube - Change form factor:** Add `Enable tablet layout in player` setting ([#1695](https://github.com/MorpheApp/morphe-patches/issues/1695)) ([6376142](https://github.com/MorpheApp/morphe-patches/commit/6376142395508e76e64ce8188e4477bb181842ed))
+
 ## [1.31.0-dev.11](https://github.com/MorpheApp/morphe-patches/compare/v1.31.0-dev.10...v1.31.0-dev.11) (2026-06-10)
 
 ### 🐛 Bug Fixes
