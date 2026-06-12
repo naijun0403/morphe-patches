@@ -178,7 +178,7 @@ public final class VoiceOverTranslationPatch {
         if (callback != null) Utils.runOnMainThread(callback);
     }
 
-    private static void loadTranscript(String videoId) {
+    private static synchronized void loadTranscript(String videoId) {
         if (isLoading) return;
         isLoading = true;
 

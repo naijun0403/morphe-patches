@@ -16,6 +16,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.Utils;
@@ -24,6 +25,8 @@ final class TtsCache {
 
     private static final String CACHE_DIR = "vot_cache";
     private static final long MAX_CACHE_SIZE = 100 * 1024 * 1024; // 100 MB
+
+    private static final AtomicBoolean pruning = new AtomicBoolean();
 
     static boolean notCached(String videoId, int segmentIndex, String voice, String text) {
         return !getCacheFile(videoId, segmentIndex, voice, text).exists();
@@ -56,7 +59,7 @@ final class TtsCache {
             Logger.printException(() -> "Failed to write TTS cache", e);
         }
 
-        Utils.runOnBackgroundThread(TtsCache::pruneCache);
+        if (!pruning.get()) Utils.runOnBackgroundThread(TtsCache::pruneCache);
     }
 
     private static File getCacheFile(String videoId, int segmentIndex, String voice, String text) {
@@ -75,21 +78,26 @@ final class TtsCache {
     }
 
     private static void pruneCache() {
-        File dir = getCacheDir();
-        File[] files = dir.listFiles();
-        if (files == null) return;
+        if (!pruning.compareAndSet(false, true)) return;
+        try {
+            File dir = getCacheDir();
+            File[] files = dir.listFiles();
+            if (files == null) return;
 
-        long totalSize = 0;
-        for (File f : files) totalSize += f.length();
+            long totalSize = 0;
+            for (File f : files) totalSize += f.length();
 
-        if (totalSize > MAX_CACHE_SIZE) {
-            Arrays.sort(files, Comparator.comparingLong(File::lastModified));
-            for (File f : files) {
-                totalSize -= f.length();
-                //noinspection ResultOfMethodCallIgnored
-                f.delete();
-                if (totalSize <= MAX_CACHE_SIZE * 0.8) break; // Prune down to 80%
+            if (totalSize > MAX_CACHE_SIZE) {
+                Arrays.sort(files, Comparator.comparingLong(File::lastModified));
+                for (File f : files) {
+                    totalSize -= f.length();
+                    //noinspection ResultOfMethodCallIgnored
+                    f.delete();
+                    if (totalSize <= MAX_CACHE_SIZE * 0.8) break; // Prune down to 80%
+                }
             }
+        } finally {
+            pruning.set(false);
         }
     }
 
