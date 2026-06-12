@@ -176,51 +176,55 @@ final class TtsEngine {
 
     private byte[] synthesizeEdge(String text, String voice, float rate) throws Exception {
         synchronized (lock) {
-            // Reconnect lazily if the socket was closed (first call, stop(), or server timeout).
-            ensureConnected();
+            for (int attempt = 1; attempt <= 2; attempt++) {
+                try {
+                    // Reconnect lazily if the socket was closed (first call, stop(), or server timeout).
+                    ensureConnected();
 
-            String timestamp = edgeTimestamp();
-            String requestId = uuidHex();
+                    String timestamp = edgeTimestamp();
+                    String requestId = uuidHex();
 
-            // speech.config is sent once per connection.
-            if (!configSent) {
-                sendText(persistentOut, "Path: speech.config\r\n"
-                        + "Content-Type: application/json; charset=utf-8\r\n"
-                        + "X-Timestamp: " + timestamp + "\r\n\r\n"
-                        + "{\"context\":{\"synthesis\":{\"audio\":{"
-                        + "\"metadataoptions\":{\"sentenceBoundaryEnabled\":\"false\","
-                        + "\"wordBoundaryEnabled\":\"false\"},"
-                        + "\"outputFormat\":\"" + AUDIO_FORMAT + "\"}}}}");
-                configSent = true;
+                    // speech.config is sent once per connection.
+                    if (!configSent) {
+                        sendText(persistentOut, "Path: speech.config\r\n"
+                                + "Content-Type: application/json; charset=utf-8\r\n"
+                                + "X-Timestamp: " + timestamp + "\r\n\r\n"
+                                + "{\"context\":{\"synthesis\":{\"audio\":{"
+                                + "\"metadataoptions\":{\"sentenceBoundaryEnabled\":\"false\","
+                                + "\"wordBoundaryEnabled\":\"false\"},"
+                                + "\"outputFormat\":\"" + AUDIO_FORMAT + "\"}}}}");
+                        configSent = true;
+                    }
+
+                    // SSML synthesis request. Edge TTS expects rate as a percentage delta, e.g. "+30%".
+                    String inner = escapeXml(text);
+                    int ratePercent = Math.round((rate - 1.0f) * 100);
+                    if (ratePercent != 0) {
+                        inner = "<prosody rate='" + (ratePercent > 0 ? "+" : "") + ratePercent + "%'>"
+                                + inner + "</prosody>";
+                    }
+                    String ssml = "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis'"
+                            + " xml:lang='" + localePart(voice) + "'>"
+                            + "<voice name='" + voice + "'>" + inner + "</voice></speak>";
+                    sendText(persistentOut, "Path: ssml\r\n"
+                            + "X-RequestId: " + requestId + "\r\n"
+                            + "X-Timestamp: " + timestamp + "\r\n"
+                            + "Content-Type: application/ssml+xml\r\n\r\n" + ssml);
+
+                    // Collect audio frames until the server signals turn.end.
+                    ByteArrayOutputStream audioOut = new ByteArrayOutputStream();
+                    collectAudio(persistentIn, audioOut);
+                    return audioOut.toByteArray();
+                } catch (IOException ex) {
+                    // Socket died (e.g. server idle timeout, Connection reset).
+                    // Drop it so the next attempt reconnects cleanly.
+                    closeSocket();
+                    if (attempt >= 2 || stopped.get()) throw ex;
+                    Logger.printDebug(() -> "TTS synthesis failed, retrying... ", ex);
+                }
             }
-
-            // SSML synthesis request. Edge TTS expects rate as a percentage delta, e.g. "+30%".
-            String inner = escapeXml(text);
-            int ratePercent = Math.round((rate - 1.0f) * 100);
-            if (ratePercent != 0) {
-                inner = "<prosody rate='" + (ratePercent > 0 ? "+" : "") + ratePercent + "%'>"
-                        + inner + "</prosody>";
-            }
-            String ssml = "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis'"
-                    + " xml:lang='" + localePart(voice) + "'>"
-                    + "<voice name='" + voice + "'>" + inner + "</voice></speak>";
-            sendText(persistentOut, "Path: ssml\r\n"
-                    + "X-RequestId: " + requestId + "\r\n"
-                    + "X-Timestamp: " + timestamp + "\r\n"
-                    + "Content-Type: application/ssml+xml\r\n\r\n" + ssml);
-
-            // Collect audio frames until the server signals turn.end.
-            ByteArrayOutputStream audioOut = new ByteArrayOutputStream();
-            try {
-                collectAudio(persistentIn, audioOut);
-            } catch (IOException ex) {
-                // Socket died mid-stream (e.g. server idle timeout). Drop it so the next
-                // call reconnects cleanly, then surface the error to the caller.
-                closeSocket();
-                throw ex;
-            }
-            return audioOut.toByteArray();
         }
+        throw new IOException("Synthesis failed");
     }
 
     /**
