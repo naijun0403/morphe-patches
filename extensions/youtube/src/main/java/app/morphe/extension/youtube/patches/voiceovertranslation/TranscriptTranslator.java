@@ -235,7 +235,10 @@ final class TranscriptTranslator {
         }
 
         final int code = conn.getResponseCode();
-        if (code == 403) throw new Exception("HTTP 403 - API key required. Enter your key in Settings → Video → Voice over translation");
+        // libretranslate.com returns 400 (not 403) when an API key is required.
+        if ((code == 400 || code == 403) && Settings.VOT_LIBRETRANSLATE_API_KEY.get().isEmpty()) {
+            throw new Exception("HTTP " + code + " - API key required. Enter your key in Settings → Video → Voice over translation.");
+        }
         if (code != 200) throw new Exception("HTTP " + code + " from " + baseUrl);
 
         // Response: {"translatedText": "..."} - newline separators from joined input are preserved.
