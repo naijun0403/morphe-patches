@@ -103,6 +103,11 @@ final class TranscriptTranslator {
                                    int offset, @Nullable List<String> translated) {
         if (translated == null) return;
         final int limit = Math.min(batch.size(), translated.size());
+        if (translated.size() != batch.size()) {
+            Logger.printDebug(() -> "TranscriptTranslator: line count mismatch — expected "
+                    + batch.size() + ", got " + translated.size() + "; last "
+                    + (batch.size() - limit) + " segment(s) keep original text");
+        }
         for (int j = 0; j < limit; j++) {
             TranscriptSegment orig = batch.get(j);
             target.set(offset + j,

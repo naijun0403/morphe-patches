@@ -296,7 +296,10 @@ public final class VoiceOverTranslationPatch {
         }
 
         ensureTts();
-        if (!ttsReady) return;
+        if (!ttsReady) {
+            Logger.printDebug(() -> "Native TTS not ready, skipping segment");
+            return;
+        }
         final float rate = smoothRate(calculateSpeechRate(seg.text(), availableMs));
         requestDuck();
         tts.setSpeechRate(rate);
