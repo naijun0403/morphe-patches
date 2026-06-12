@@ -57,7 +57,7 @@ public final class VotBottomSheet {
             for (int i = 1; i < langEntries.length; i++) {
                 list.add(new Pair<>(langEntries[i], langValues[i]));
             }
-            Collections.sort(list, (p1, p2) -> p1.first.compareToIgnoreCase(p2.first));
+            list.sort((p1, p2) -> p1.first.compareToIgnoreCase(p2.first));
             for (int i = 1; i < langEntries.length; i++) {
                 langEntries[i] = list.get(i - 1).first;
                 langValues[i] = list.get(i - 1).second;

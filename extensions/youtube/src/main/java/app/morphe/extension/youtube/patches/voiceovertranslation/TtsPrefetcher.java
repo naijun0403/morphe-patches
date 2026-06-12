@@ -59,19 +59,6 @@ final class TtsPrefetcher {
         }
     }
 
-    /**
-     * Clears current state and wakes the background thread so it idles rather than
-     * continuing to prefetch stale content.
-     */
-    static void stop() {
-        synchronized (lock) {
-            currentVideoId = "";
-            currentSegments = Collections.emptyList();
-            currentVideoTimeMs = 0;
-            lock.notifyAll();
-        }
-    }
-
     // -------------------------------------------------------------------------
     // Background thread
     // -------------------------------------------------------------------------
@@ -169,7 +156,7 @@ final class TtsPrefetcher {
                 if (currentIndex == segmentsSize) {
                     currentIndex = i; // record boundary on first encounter
                 }
-                if (!TtsCache.exists(videoId, i, voice, seg.text())) {
+                if (TtsCache.notCached(videoId, i, voice, seg.text())) {
                     return i;
                 }
             }
@@ -178,7 +165,7 @@ final class TtsPrefetcher {
         // Priority 2: Past segments (for loops/seeks), closest to current time first.
         for (int i = currentIndex - 1; i >= 0; i--) {
             final TranscriptSegment seg = segments.get(i);
-            if (!TtsCache.exists(videoId, i, voice, seg.text())) {
+            if (TtsCache.notCached(videoId, i, voice, seg.text())) {
                 return i;
             }
         }

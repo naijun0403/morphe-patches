@@ -45,8 +45,8 @@ import app.morphe.extension.shared.Utils;
  * through Android's MediaPlayer on the NAVIGATION_GUIDANCE audio channel (independent
  * volume from YouTube's media stream).
  *
- * <p>One instance is shared for the lifetime of the patch; {@link #speak} is non-blocking
- * and only one synthesis + playback runs at a time (callers gate on {@link #isSpeaking()}).
+ * <p>One instance is shared for the lifetime of the patch; only one synthesis + playback
+ * runs at a time (callers gate on {@link #isSpeaking()}).
  *
  * <p>The underlying WebSocket connection is kept alive across calls and only torn down
  * on {@link #stop()} or when the server closes it. Reconnection is transparent to callers.
@@ -94,7 +94,7 @@ final class TtsEngine {
 
     /**
      * Synthesizes {@code text} with the given Edge TTS {@code voice} on a background thread.
-     * This is the underlying synthesis logic used by {@link #speak} and the prefetcher.
+     * This is the underlying synthesis logic used by {@link #play} and the prefetcher.
      */
     byte[] synthesize(String text, String voice, float rate) throws Exception {
         return synthesizeEdge(text, voice, rate);
@@ -103,7 +103,7 @@ final class TtsEngine {
     /**
      * Plays the MP3 result through Android's MediaPlayer at the given speed {@code rate}.
      * Use 1.0f when the rate is already encoded in the audio (e.g. via SSML prosody).
-     * This is the underlying playback logic used by {@link #speak} and the prefetcher.
+     * This is the underlying playback logic used by callers and the prefetcher.
      */
     void play(byte[] mp3, float volume, float rate, Runnable onDone) {
         stopped.set(false);
@@ -114,42 +114,6 @@ final class TtsEngine {
                 if (!stopped.get()) playMp3(mp3, volume, rate);
             } catch (Exception ex) {
                 if (!stopped.get()) Logger.printException(() -> "Playback failed", ex);
-            } finally {
-                speaking.set(false);
-                if (onDone != null) Utils.runOnMainThread(onDone);
-            }
-        });
-    }
-
-    /**
-     * Non-blocking. Synthesizes {@code text} with the given Edge TTS {@code voice} on a
-     * background thread, then plays the MP3 result. {@code rate} is a speed multiplier
-     * (1.0 = normal). Calls {@code onDone} (on the main thread) when playback finishes
-     * or on any failure.
-     */
-    void speak(String text, String voice, float volume, float rate, Runnable onDone) {
-        stopped.set(false);
-        speaking.set(true);
-
-        Utils.runOnBackgroundThread(() -> {
-            try {
-                if (stopped.get()) return;
-                final long synthStart = System.currentTimeMillis();
-                byte[] mp3 = synthesize(text, voice, rate);
-                if (mp3.length == 0) {
-                    Logger.printDebug(() -> "Empty audio for «"
-                            + text.substring(0, Math.min(text.length(), 50)) + "»");
-                    return;
-                }
-
-                // Update the latency average only on successful synthesis.
-                final long synthMs = System.currentTimeMillis() - synthStart;
-                averageSynthesisMs.updateAndGet(avg -> (avg * 3 + synthMs) / 4);
-                // Rate is already encoded in the SSML prosody element; play at 1.0x.
-                if (!stopped.get()) playMp3(mp3, volume, 1.0f);
-            } catch (Exception ex) {
-                // Suppress exceptions caused by stop() closing the connection mid-request.
-                if (!stopped.get()) Logger.printException(() -> "Speak failed", ex);
             } finally {
                 speaking.set(false);
                 if (onDone != null) Utils.runOnMainThread(onDone);
@@ -179,6 +143,7 @@ final class TtsEngine {
 
     private byte[] synthesizeEdge(String text, String voice, float rate) throws Exception {
         synchronized (lock) {
+            IOException lastEx = new IOException("Synthesis failed");
             for (int attempt = 1; attempt <= 2; attempt++) {
                 try {
                     // Reconnect lazily if the socket was closed (first call, stop(), or server timeout).
@@ -222,12 +187,13 @@ final class TtsEngine {
                     // Socket died (e.g. server idle timeout, Connection reset).
                     // Drop it so the next attempt reconnects cleanly.
                     closeSocket();
-                    if (attempt >= 2 || stopped.get()) throw ex;
+                    lastEx = ex;
+                    if (stopped.get()) break;
                     Logger.printDebug(() -> "TTS synthesis failed, retrying... ", ex);
                 }
             }
+            throw lastEx;
         }
-        throw new IOException("Synthesis failed");
     }
 
     /**

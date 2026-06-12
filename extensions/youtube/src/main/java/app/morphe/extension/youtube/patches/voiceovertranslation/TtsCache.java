@@ -25,8 +25,8 @@ final class TtsCache {
     private static final String CACHE_DIR = "vot_cache";
     private static final long MAX_CACHE_SIZE = 100 * 1024 * 1024; // 100 MB
 
-    static boolean exists(String videoId, int segmentIndex, String voice, String text) {
-        return getCacheFile(videoId, segmentIndex, voice, text).exists();
+    static boolean notCached(String videoId, int segmentIndex, String voice, String text) {
+        return !getCacheFile(videoId, segmentIndex, voice, text).exists();
     }
 
     static byte[] get(String videoId, int segmentIndex, String voice, String text) {
