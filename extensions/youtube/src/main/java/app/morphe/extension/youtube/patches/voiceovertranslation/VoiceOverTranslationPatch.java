@@ -330,6 +330,16 @@ public final class VoiceOverTranslationPatch {
         return rate;
     }
 
+    /**
+     * Called when the video position is programmatically seeked (e.g. SponsorBlock).
+     * Stops any in-progress TTS immediately, regardless of how short the jump was,
+     * so stale audio never plays over the new video position.
+     */
+    public static void onVideoSeeked() {
+        stopTts();
+        lastSpokenIndex = -1;
+    }
+
     private static void stopTts() {
         edgeTtsEngine.stop();
         TextToSpeech localTts = tts;
