@@ -346,11 +346,11 @@ Verify the package name is correct and the app is installed"</string>
     <string name="morphe_vot_service_google">Google Translate</string>
     <string name="morphe_vot_service_libretranslate">LibreTranslate</string>
     <string name="morphe_vot_libretranslate_info_title">About LibreTranslate</string>
-    <string name="morphe_vot_libretranslate_info_summary">Open-source translation service. Uses the public server at libretranslate.com by default, or configure your own self-hosted instance. An API key may be required depending on the server.</string>
+    <string name="morphe_vot_libretranslate_info_summary">Open-source translation service. Uses the public server at libretranslate.com by default, or configure your own self-hosted instance. An API key may be required depending on the server</string>
     <string name="morphe_vot_libretranslate_url_title">Server URL</string>
-    <string name="morphe_vot_libretranslate_url_summary">LibreTranslate instance to use. Defaults to the public server at libretranslate.com.</string>
+    <string name="morphe_vot_libretranslate_url_summary">LibreTranslate instance to use. Defaults to the public server at libretranslate.com</string>
     <string name="morphe_vot_libretranslate_api_key_title">API key</string>
-    <string name="morphe_vot_libretranslate_api_key_summary">Required by some instances. Leave empty if the server does not require authentication.</string>
+    <string name="morphe_vot_libretranslate_api_key_summary">Required by some instances. Leave empty if the server does not require authentication</string>
     <string name="morphe_vot_tts_engine_label">Engine</string>
     <string name="morphe_vot_tts_system">System</string>
     <string name="morphe_vot_tts_edge">Edge</string>

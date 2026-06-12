@@ -11,6 +11,7 @@ import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
 import app.morphe.patches.shared.misc.settings.preference.ListPreference
 import app.morphe.patches.shared.misc.settings.preference.NonInteractivePreference
+import app.morphe.patches.shared.misc.settings.preference.PreferenceScreenPreference
 import app.morphe.patches.shared.misc.settings.preference.SwitchPreference
 import app.morphe.patches.shared.misc.settings.preference.TextPreference
 import app.morphe.patches.shared.misc.settings.preference.noTitleUnsortedPreferenceCategory
@@ -71,13 +72,19 @@ val voiceOverTranslationPatch = bytecodePatch(
 
     execute {
         PreferenceScreen.VIDEO.addPreferences(
-            SwitchPreference("morphe_vot_enabled"),
-            ListPreference("morphe_vot_caption_language"),
-            noTitleUnsortedPreferenceCategory(
-                NonInteractivePreference("morphe_vot_libretranslate_info"),
-                TextPreference("morphe_vot_libretranslate_url"),
-                TextPreference("morphe_vot_libretranslate_api_key"),
-            ),
+            PreferenceScreenPreference(
+                key = "morphe_vot_enabled",
+                sorting = PreferenceScreenPreference.Sorting.UNSORTED,
+                preferences = setOf(
+                    SwitchPreference("morphe_vot_enabled"),
+                    ListPreference("morphe_vot_caption_language"),
+                    noTitleUnsortedPreferenceCategory(
+                        NonInteractivePreference("morphe_vot_libretranslate_info"),
+                        TextPreference("morphe_vot_libretranslate_url"),
+                        TextPreference("morphe_vot_libretranslate_api_key"),
+                    ),
+                ),
+            )
         )
 
         videoTimeHook(EXTENSION_CLASS, "videoTimeChanged")
