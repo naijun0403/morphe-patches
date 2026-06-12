@@ -39,6 +39,9 @@ final class TranscriptTranslator {
     private static final String TRANSLATE_URL =
             "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&dt=t&tl=";
 
+    private static final int CONNECT_TIMEOUT_MS = 10_000;
+    private static final int READ_TIMEOUT_MS = 15_000;
+
     // Batches are built by character budget rather than segment count, so request
     // sizes stay uniform regardless of how long the merged sentences are.
     private static final int MAX_BATCH_CHARS = 4_000;
@@ -158,10 +161,11 @@ final class TranscriptTranslator {
     }
 
     private static List<String> translateBatch(List<TranscriptSegment> segments, String targetLang) throws Exception {
-        if ("libretranslate".equals(Settings.VOT_TRANSLATION_SERVICE.get())) {
-            return translateBatchLibreTranslate(segments, targetLang);
-        }
-        return translateBatchGoogle(segments, targetLang);
+        return switch (Settings.VOT_TRANSLATION_SERVICE.get()) {
+            case "libretranslate" -> translateBatchLibreTranslate(segments, targetLang);
+            case "lingva" -> translateBatchLingva(segments, targetLang);
+            default -> translateBatchGoogle(segments, targetLang);
+        };
     }
 
     private static List<String> translateBatchGoogle(List<TranscriptSegment> segments, String targetLang) throws Exception {
@@ -175,8 +179,8 @@ final class TranscriptTranslator {
 
         HttpURLConnection conn = (HttpURLConnection) new URL(TRANSLATE_URL + targetLang).openConnection();
         conn.setRequestMethod("POST");
-        conn.setConnectTimeout(10_000);
-        conn.setReadTimeout(15_000);
+        conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
+        conn.setReadTimeout(READ_TIMEOUT_MS);
         conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
         conn.setRequestProperty("User-Agent", "Mozilla/5.0");
         conn.setDoOutput(true);
@@ -215,8 +219,8 @@ final class TranscriptTranslator {
         String baseUrl = Settings.VOT_LIBRETRANSLATE_URL.get().replaceAll("/+$", "");
         HttpURLConnection conn = (HttpURLConnection) new URL(baseUrl + "/translate").openConnection();
         conn.setRequestMethod("POST");
-        conn.setConnectTimeout(10_000);
-        conn.setReadTimeout(15_000);
+        conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
+        conn.setReadTimeout(READ_TIMEOUT_MS);
         conn.setRequestProperty("Content-Type", "application/json");
         conn.setDoOutput(true);
 
@@ -244,5 +248,33 @@ final class TranscriptTranslator {
         // Response: {"translatedText": "..."} - newline separators from joined input are preserved.
         String translated = new JSONObject(Requester.parseString(conn)).getString("translatedText");
         return Arrays.asList(translated.split("\n", -1));
+    }
+
+    private static List<String> translateBatchLingva(List<TranscriptSegment> segments, String targetLang) throws Exception {
+        Utils.verifyOffMainThread();
+
+        StringBuilder joined = new StringBuilder();
+        for (TranscriptSegment seg : segments) {
+            if (joined.length() > 0) joined.append('\n');
+            joined.append(seg.text());
+        }
+
+        String baseUrl = Settings.VOT_LINGVA_URL.get().replaceAll("/+$", "");
+        String source = TranscriptFetcher.lastSourceLang;
+        //noinspection CharsetObjectCanBeUsed
+        String encoded = URLEncoder.encode(joined.toString(), StandardCharsets.UTF_8.name());
+
+        HttpURLConnection conn = (HttpURLConnection) new URL(
+                baseUrl + "/api/v1/" + source + "/" + targetLang + "/" + encoded).openConnection();
+        conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
+        conn.setReadTimeout(READ_TIMEOUT_MS);
+        conn.setRequestProperty("User-Agent", "Mozilla/5.0");
+
+        final int code = conn.getResponseCode();
+        if (code != 200) throw new Exception("HTTP " + code + " from " + baseUrl);
+
+        // Response: {"translation": "..."} - newline separators from joined input are preserved.
+        String translation = new JSONObject(Requester.parseString(conn)).getString("translation");
+        return Arrays.asList(translation.split("\n", -1));
     }
 }
