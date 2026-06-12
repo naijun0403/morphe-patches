@@ -340,6 +340,7 @@ Verify the package name is correct and the app is installed"</string>
     <string name="morphe_vot_enabled_summary">Read video captions aloud using on-device text-to-speech, synchronized with playback</string>
     <string name="morphe_vot_caption_language_title">Caption language</string>
     <string name="morphe_vot_original_audio_label">Voice volume</string>
+    <string name="morphe_vot_max_rate_label">Max speech rate</string>
     <string name="morphe_vot_tts_engine_label">Engine</string>
     <string name="morphe_vot_tts_system">System</string>
     <string name="morphe_vot_tts_edge">Edge</string>

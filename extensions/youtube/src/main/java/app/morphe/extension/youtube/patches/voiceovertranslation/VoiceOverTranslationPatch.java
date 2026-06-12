@@ -35,7 +35,6 @@ public final class VoiceOverTranslationPatch {
     // decide how much the TTS rate must be raised to fit the segment time slot.
     private static final long ESTIMATED_MS_PER_CHAR = 65;
     private static final float MIN_SPEECH_RATE = 1.0f;
-    private static final float MAX_SPEECH_RATE = 1.8f;
     // Max rate increase between consecutive utterances. One delayed segment then
     // raises the pace gradually over a few sentences instead of jumping straight
     // from normal speed to maximum. Slowing back down is applied immediately.
@@ -314,12 +313,13 @@ public final class VoiceOverTranslationPatch {
     /**
      * Returns a speech rate multiplier that fits the estimated natural duration of
      * {@code text} into {@code availableMs}. Never slows below normal speed and is
-     * capped so fast videos stay intelligible.
+     * capped by the user-configured max rate so fast videos stay intelligible.
      */
     private static float calculateSpeechRate(String text, long availableMs) {
-        if (availableMs <= 0) return MAX_SPEECH_RATE;
+        final float maxRate = Settings.VOT_MAX_SPEECH_RATE.get() / 10.0f;
+        if (availableMs <= 0) return maxRate;
         final float rate = (float) (text.length() * ESTIMATED_MS_PER_CHAR) / availableMs;
-        return Math.max(MIN_SPEECH_RATE, Math.min(MAX_SPEECH_RATE, rate));
+        return Math.max(MIN_SPEECH_RATE, Math.min(maxRate, rate));
     }
 
     /**
