@@ -354,8 +354,7 @@ Verify the package name is correct and the app is installed"</string>
     <string name="morphe_vot_translation_service_label">Translation</string>
     <string name="morphe_vot_service_google" translatable="false">Google Translate</string>
     <string name="morphe_vot_service_libretranslate" translatable="false">LibreTranslate</string>
-    <string name="morphe_vot_libretranslate_info_title">About LibreTranslate</string>
-    <string name="morphe_vot_libretranslate_info_summary">Open-source translation service. Uses the public server at libretranslate.com by default, or configure your own self-hosted instance. An API key may be required depending on the server</string>
+    <string name="morphe_vot_libretranslate_info_summary">Open-source translation service. Uses the public server at libretranslate.com by default, or configure your own self-hosted instance.\n\nThe public server requires a free API key - tap here to open libretranslate.com and register an account, then paste your key into the field below</string>
     <string name="morphe_vot_libretranslate_url_title">Server URL</string>
     <string name="morphe_vot_libretranslate_url_summary">LibreTranslate instance to use. Defaults to the public server at libretranslate.com</string>
     <string name="morphe_vot_libretranslate_api_key_title">API key</string>

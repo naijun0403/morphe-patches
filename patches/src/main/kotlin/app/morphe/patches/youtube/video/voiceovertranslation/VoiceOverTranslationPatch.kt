@@ -80,7 +80,10 @@ val voiceOverTranslationPatch = bytecodePatch(
                     ListPreference("morphe_vot_caption_language"),
                     ListPreference("morphe_vot_translation_service"),
                     noTitleUnsortedPreferenceCategory(
-                        NonInteractivePreference("morphe_vot_libretranslate_info"),
+                        NonInteractivePreference("morphe_vot_libretranslate_info",
+                            titleKey = "morphe_vot_service_libretranslate",
+                            tag = "app.morphe.extension.youtube.settings.preference.VoiceOverTranslationLibreTranslateInfoPreference",
+                            selectable = true),
                         TextPreference("morphe_vot_libretranslate_url"),
                         TextPreference("morphe_vot_libretranslate_api_key"),
                     ),

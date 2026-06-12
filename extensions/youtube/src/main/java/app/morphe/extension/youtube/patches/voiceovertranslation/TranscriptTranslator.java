@@ -45,6 +45,11 @@ final class TranscriptTranslator {
     // Concurrent requests to the translate endpoint. Keep modest to avoid rate limiting.
     private static final int PARALLEL_REQUESTS = 4;
 
+    // Set to true at the start of each translate() call so the first batch failure per
+    // video is reported via printException (visible to the user), while subsequent batch
+    // failures in the same session are downgraded to debug to avoid toast spam.
+    private static volatile boolean reportNextTranslationError;
+
     /**
      * Progressive translation. The first batch is translated synchronously so the returned
      * list is immediately usable for playback; remaining batches are translated on background
@@ -60,6 +65,7 @@ final class TranscriptTranslator {
         if (segments.isEmpty()) return segments;
 
         List<List<TranscriptSegment>> batches = splitByCharBudget(segments);
+        reportNextTranslationError = true;
 
         // Working copy that accumulates translated batches over the original text.
         List<TranscriptSegment> working = new ArrayList<>(segments);
@@ -107,7 +113,7 @@ final class TranscriptTranslator {
         if (translated == null) return;
         final int limit = Math.min(batch.size(), translated.size());
         if (translated.size() != batch.size()) {
-            Logger.printDebug(() -> "TranscriptTranslator: line count mismatch — expected "
+            Logger.printDebug(() -> "Line count mismatch - expected "
                     + batch.size() + ", got " + translated.size() + "; last "
                     + (batch.size() - limit) + " segment(s) keep original text");
         }
@@ -123,7 +129,12 @@ final class TranscriptTranslator {
         try {
             return translateBatch(batch, targetLang);
         } catch (Exception ex) {
-            Logger.printDebug(() -> "TranscriptTranslator: batch failed: " + ex.getMessage());
+            if (reportNextTranslationError) {
+                reportNextTranslationError = false;
+                Logger.printException(() -> "Translation failed: " + ex.getMessage(), ex);
+            } else {
+                Logger.printDebug(() -> "Batch failed: " + ex.getMessage());
+            }
             return null;
         }
     }
@@ -224,9 +235,10 @@ final class TranscriptTranslator {
         }
 
         final int code = conn.getResponseCode();
-        if (code != 200) throw new Exception("HTTP " + code);
+        if (code == 403) throw new Exception("HTTP 403 - API key required. Enter your key in Settings → Video → Voice over translation");
+        if (code != 200) throw new Exception("HTTP " + code + " from " + baseUrl);
 
-        // Response: {"translatedText": "..."} — newline separators from joined input are preserved.
+        // Response: {"translatedText": "..."} - newline separators from joined input are preserved.
         String translated = new JSONObject(Requester.parseString(conn)).getString("translatedText");
         return Arrays.asList(translated.split("\n", -1));
     }
