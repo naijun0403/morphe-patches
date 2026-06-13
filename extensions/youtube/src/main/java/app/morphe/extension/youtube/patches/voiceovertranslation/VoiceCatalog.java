@@ -36,26 +36,26 @@ final class VoiceCatalog {
         public final boolean isMale;
         public final String shortName;
         public final String dialogDisplayName;
+        public final boolean isMultilingual;
 
         Voice(boolean isMale, String id) {
             this.id = id;
             this.isMale = isMale;
             final int dash = id.indexOf('-');
             this.languageTag = dash >= 0 ? id.substring(0, dash) : id;
+            this.isMultilingual = id.contains(MULTILINGUAL_NEURAL_SUFFIX);
             this.shortName = parseShortName(id);
             this.dialogDisplayName = buildDisplayName(shortName, isMale, id);
         }
 
         private static String parseShortName(String voiceId) {
             if (voiceId == null || voiceId.isEmpty()) return "";
-            int dash = voiceId.lastIndexOf('-');
+            final int dash = voiceId.lastIndexOf('-');
             String name = dash >= 0 ? voiceId.substring(dash + 1) : voiceId;
-            if (name.endsWith(MULTILINGUAL_NEURAL_SUFFIX)) {
-                name = name.substring(0, name.length() - MULTILINGUAL_NEURAL_SUFFIX.length());
-            } else if (name.endsWith(NEURAL_SUFFIX)) {
-                name = name.substring(0, name.length() - NEURAL_SUFFIX.length());
-            }
-            return name;
+            final int suffixLength = name.endsWith(MULTILINGUAL_NEURAL_SUFFIX)
+                    ? MULTILINGUAL_NEURAL_SUFFIX.length()
+                    : NEURAL_SUFFIX.length();
+            return name.substring(0, name.length() - suffixLength);
         }
 
         private static String buildDisplayName(String shortName, boolean isMale, String voiceId) {
@@ -65,14 +65,11 @@ final class VoiceCatalog {
                         + str("morphe_vot_voice_expressive");
             }
 
-            final int dash = voiceId.lastIndexOf('-');
-            String suffix = dash >= 0 ? voiceId.substring(dash + 1) : voiceId;
-            final boolean multilingual = suffix.endsWith(MULTILINGUAL_NEURAL_SUFFIX);
-            final String gender = str(isMale
+            String gender = str(isMale
                     ? "morphe_vot_voice_gender_male"
                     : "morphe_vot_voice_gender_female");
-            return (multilingual ? name + " " + str("morphe_vot_voice_multilingual") : name)
-                    + " (" + gender + ")";
+
+            return name + " (" + gender + ")";
         }
     }
 
@@ -126,9 +123,9 @@ final class VoiceCatalog {
             new Voice(true, "en-TZ-ElimuNeural"),
             new Voice(true, "en-US-ChristopherNeural"),
             new Voice(true, "en-US-AndrewMultilingualNeural"),
-            new Voice(true, "en-US-AndrewNeural"),
+            // new Voice(true, "en-US-AndrewNeural"),
             new Voice(true, "en-US-BrianMultilingualNeural"),
-            new Voice(true, "en-US-BrianNeural"),
+            //new Voice(true, "en-US-BrianNeural"),
             new Voice(true, "en-US-EricNeural"),
             new Voice(true, "en-US-GuyNeural"),
             new Voice(true, "en-US-RogerNeural"),
@@ -289,9 +286,9 @@ final class VoiceCatalog {
             new Voice(false, "en-US-AnaNeural"),
             new Voice(false, "en-US-AriaNeural"),
             new Voice(false, "en-US-AvaMultilingualNeural"),
-            new Voice(false, "en-US-AvaNeural"),
+            //new Voice(false, "en-US-AvaNeural"),
             new Voice(false, "en-US-EmmaMultilingualNeural"),
-            new Voice(false, "en-US-EmmaNeural"),
+            // new Voice(false, "en-US-EmmaNeural"),
             new Voice(false, "en-US-JennyNeural"),
             new Voice(false, "en-US-MichelleNeural"),
             new Voice(false, "en-ZA-LeahNeural"),
@@ -407,12 +404,28 @@ final class VoiceCatalog {
     private static final Map<String, List<Voice>> VOICES_BY_LANG;
 
     static {
-        VOICES_BY_ID = new HashMap<>(2* ALL_VOICES.length);
+        VOICES_BY_ID = new HashMap<>(2 * ALL_VOICES.length);
         VOICES_BY_LANG = new HashMap<>();
+
+        List<Voice> multilingualVoices = new ArrayList<>();
 
         for (Voice v : ALL_VOICES) {
             VOICES_BY_ID.put(v.id, v);
             VOICES_BY_LANG.computeIfAbsent(v.languageTag, k -> new ArrayList<>()).add(v);
+            if (v.isMultilingual) {
+                multilingualVoices.add(v);
+            }
+        }
+
+        // Add multilingual voices to every language list that was created.
+        for (Map.Entry<String, List<Voice>> entry : VOICES_BY_LANG.entrySet()) {
+            String lang = entry.getKey();
+            List<Voice> voices = entry.getValue();
+            for (Voice mv : multilingualVoices) {
+                if (!mv.languageTag.equals(lang)) {
+                    voices.add(mv);
+                }
+            }
         }
     }
 
