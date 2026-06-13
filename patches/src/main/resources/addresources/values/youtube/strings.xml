@@ -355,6 +355,7 @@ Verify the package name is correct and the app is installed"</string>
     <string name="morphe_vot_voice_expressive">Expressive</string>
     <string name="morphe_vot_voice_gender_male">Male</string>
     <string name="morphe_vot_voice_gender_female">Female</string>
+    <string name="morphe_vot_tts_sample">It\'s morphing time!</string>
 
     <!-- interaction.loop.loopVideoPatch -->
     <string name="morphe_loop_video_title">Enable loop video</string>

@@ -7,6 +7,7 @@
 
 package app.morphe.extension.youtube.patches.voiceovertranslation;
 
+import static app.morphe.extension.shared.StringRef.str;
 import static app.morphe.extension.shared.settings.BaseSettings.DEBUG;
 import static app.morphe.extension.youtube.patches.voiceovertranslation.TranscriptTranslator.TRANSLATION_SERVICE_MY_MEMORY;
 
@@ -23,6 +24,7 @@ import java.util.List;
 import java.util.Locale;
 
 import app.morphe.extension.shared.Logger;
+import app.morphe.extension.shared.ResourceUtils;
 import app.morphe.extension.shared.Utils;
 import app.morphe.extension.shared.settings.AppLanguage;
 import app.morphe.extension.shared.settings.Setting;
@@ -59,7 +61,6 @@ public class VoiceOverTranslationPatch {
 
     static final String TTS_ENGINE_SYSTEM = "system";
     private static final String VOT_TEST_ID = "vot_test_";
-    private static final String TEST_PHRASE = "It's morphin time!";
     private static final String TEST_VIDEO_ID = "test";
     private static final int TEST_SEGMENT_INDEX = -1;
 
@@ -387,6 +388,11 @@ public class VoiceOverTranslationPatch {
         lastSpokenIndex = -1;
     }
 
+    public static String getTestString() {
+        Locale locale = Locale.forLanguageTag(resolveTargetLang());
+        return ResourceUtils.getStringByLocale("morphe_vot_tts_sample", locale);
+    }
+
     /**
      * Synthesizes and plays a short test phrase with the given voice.
      * If the engine is already speaking the same voice, stops it.
@@ -412,11 +418,11 @@ public class VoiceOverTranslationPatch {
             Bundle params = new Bundle();
             params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume);
             tts.setSpeechRate(1.0f);
-            tts.speak(TEST_PHRASE, TextToSpeech.QUEUE_FLUSH, params, VOT_TEST_ID + testId);
+            tts.speak(getTestString(), TextToSpeech.QUEUE_FLUSH, params, VOT_TEST_ID + testId);
             return;
         }
 
-        byte[] cached = TtsCache.get(TEST_VIDEO_ID, TEST_SEGMENT_INDEX, voiceId, TEST_PHRASE);
+        byte[] cached = TtsCache.get(TEST_VIDEO_ID, TEST_SEGMENT_INDEX, voiceId, getTestString());
         if (cached != null) {
             requestDuck();
             final long id = ttsEngine.markBusy();
@@ -425,7 +431,7 @@ public class VoiceOverTranslationPatch {
         }
 
         requestDuck();
-        ttsEngine.speak(TEST_PHRASE, voiceId, volume, 1.0f, () -> abandonDuckAfterTest(testId));
+        ttsEngine.speak(getTestString(), voiceId, volume, 1.0f, () -> abandonDuckAfterTest(testId));
     }
 
     /**
@@ -437,18 +443,21 @@ public class VoiceOverTranslationPatch {
         if (voices == null || voices.isEmpty()) return;
 
         Utils.runOnBackgroundThread(() -> {
+            String testString = getTestString();
             for (VoiceCatalog.Voice voice : voices) {
-                if (TtsCache.get(TEST_VIDEO_ID, TEST_SEGMENT_INDEX, voice.id, TEST_PHRASE) != null) {
+                if (TtsCache.get(TEST_VIDEO_ID, TEST_SEGMENT_INDEX, voice.id, testString) != null) {
                     continue;
                 }
 
                 try {
-                    byte[] data = ttsEngine.prefetch(TEST_PHRASE, voice.id);
+                    Logger.printDebug(() -> "Prefetching test phrase for: " + voice.id);
+                    byte[] data = ttsEngine.prefetch(testString, voice.id);
                     if (data.length > 0) {
-                        TtsCache.put(TEST_VIDEO_ID, TEST_SEGMENT_INDEX, voice.id, TEST_PHRASE, data);
+                        TtsCache.put(TEST_VIDEO_ID, TEST_SEGMENT_INDEX, voice.id, testString, data);
                     }
                 } catch (Exception ex) {
                     logError(() -> "preloadTestVoices failure: " + voice, ex);
+                    return;
                 }
             }
         });
