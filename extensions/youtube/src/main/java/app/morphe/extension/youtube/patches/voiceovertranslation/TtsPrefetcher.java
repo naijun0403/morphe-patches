@@ -177,11 +177,11 @@ final class TtsPrefetcher {
                 TtsCache.put(videoId, index, voice, seg.text(), data);
                 Logger.printDebug(() -> "Prefetched segment " + index + " for " + videoId);
             }
-        } catch (Exception e) {
-            VoiceOverTranslationPatch.logError(() -> "Prefetch failed for segment " + index, e);
+        } catch (Exception ex) {
+            VoiceOverTranslationPatch.logError(() -> "Prefetch failed for segment " + index, ex);
             // Back off before the next attempt to avoid hammering a failing endpoint.
             try {
-                Thread.sleep(2000);
+                Thread.sleep(3000);
             } catch (InterruptedException ie) {
                 // Restore the interrupt flag so the loop condition picks it up on the
                 // next iteration rather than silently swallowing the shutdown signal.

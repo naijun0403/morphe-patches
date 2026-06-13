@@ -71,6 +71,9 @@ final class TtsEngine {
     private MediaPlayer currentPlayer;
     @GuardedBy("lock")
     private CountDownLatch playLatch;
+    /** Tracks the active synthesis/playback session to prevent overlapping segments. */
+    @GuardedBy("lock")
+    private long playbackId;
 
     // Ensures only one synthesis turn happens on the WebSocket at a time.
     private final Object synthesisLock = new Object();
@@ -85,7 +88,7 @@ final class TtsEngine {
     @GuardedBy("lock")
     private boolean configSent;
 
-    private TtsEngine() {};
+    private TtsEngine() {}
 
     private boolean isStopped() {
         synchronized (lock) {
@@ -105,9 +108,12 @@ final class TtsEngine {
         }
     }
 
-    private void setIsSpeaking(boolean speaking) {
+    private void setIsNotSpeaking(long id) {
         synchronized (lock) {
-            this.speaking = speaking;
+            // Only clear the flag if we are the session that set it.
+            if (id == playbackId) {
+                this.speaking = false;
+            }
         }
     }
 
@@ -120,13 +126,16 @@ final class TtsEngine {
     void markBusy() {
         synchronized (lock) {
             setStopped(false);
-            setIsSpeaking(true);
+            playbackId++;
+            speaking = true;
         }
     }
 
     /** Clears the busy flag without a full stop; used when synthesis fails before play. */
     void clearBusy() {
-        setIsSpeaking(false);
+        synchronized (lock) {
+            setIsNotSpeaking(playbackId);
+        }
     }
 
     /**
@@ -145,28 +154,26 @@ final class TtsEngine {
      * Use rate 1.0f when the rate is already encoded in the audio (e.g. via SSML prosody).
      */
     void play(byte[] mp3, float volume, float rate, Runnable onDone) {
-        // Reject audio that completed synthesis after stop() was called (e.g. post-seek).
-        if (isStopped()) {
-            setIsSpeaking(false);
-            if (onDone != null) Utils.runOnMainThread(onDone);
-            return;
+        final long id;
+        synchronized (lock) {
+            id = playbackId;
+            // Reject audio that completed synthesis after stop() was called (e.g. post-seek).
+            if (stopped) {
+                speaking = false;
+                if (onDone != null) Utils.runOnMainThread(onDone);
+                return;
+            }
         }
         // speaking is already true from markBusy(); keep it for the playback lifetime.
 
         Utils.runOnBackgroundThread(() -> {
             try {
-                if (!isStopped()) {
-                    playMp3(mp3, volume, rate);
-                }
+                if (!isStopped()) playMp3(mp3, volume, rate);
             } catch (Exception ex) {
-                if (!isStopped()) {
-                    VoiceOverTranslationPatch.logError(() -> "Playback failed", ex);
-                }
+                if (!isStopped()) VoiceOverTranslationPatch.logError(() -> "Playback failed", ex);
             } finally {
-                setIsSpeaking(false);
-                if (onDone != null) {
-                    Utils.runOnMainThread(onDone);
-                }
+                setIsNotSpeaking(id);
+                if (onDone != null) Utils.runOnMainThread(onDone);
             }
         });
     }
@@ -177,8 +184,8 @@ final class TtsEngine {
             if (!stopped) {
                 Logger.printDebug(() -> "Stopping TTS");
             }
-            setStopped(true);
-            setIsSpeaking(false);
+            stopped = true;
+            speaking = false;
 
             closeSocket();
 
@@ -217,7 +224,7 @@ final class TtsEngine {
                     OutputStream out;
                     boolean needsConfig;
                     synchronized (lock) {
-                        if (isLive && isStopped()) return new byte[0];
+                        if (isLive && stopped) return new byte[0];
                         // Reconnect lazily if the socket was closed (first call, stop(), or server timeout).
                         ensureConnected();
 
@@ -244,7 +251,7 @@ final class TtsEngine {
                             + "Content-Type: application/ssml+xml\r\n\r\n" + ssml);
 
                     // Collect audio frames until the server signals turn.end.
-                    // Release main lock during network I/O so stop() remains responsive.
+                    // Release locks during network I/O so stop() remains responsive.
                     ByteArrayOutputStream audioOut = new ByteArrayOutputStream();
                     collectAudio(in, audioOut);
 
@@ -255,7 +262,7 @@ final class TtsEngine {
                         // Drop it so the next attempt reconnects cleanly.
                         closeSocket();
                         lastEx = ex;
-                        if (isLive && isStopped()) break;
+                        if (isLive && stopped) break;
                     }
                     Logger.printDebug(() -> "TTS synthesis failed, retrying... ", ex);
                 }
@@ -444,7 +451,7 @@ final class TtsEngine {
         MediaPlayer mp = new MediaPlayer();
 
         synchronized (lock) {
-            if (isStopped()) {
+            if (stopped) {
                 mp.release();
                 return;
             }
@@ -495,8 +502,11 @@ final class TtsEngine {
                 //noinspection ResultOfMethodCallIgnored
                 latch.await(60, TimeUnit.SECONDS);
             } catch (IllegalStateException e) {
-                // Ignore errors caused by concurrent stop() releasing the player.
-                if (!isStopped()) throw e;
+                // If the player was released by stop(), this is expected.
+                synchronized (lock) {
+                    if (currentPlayer != mp) return;
+                }
+                throw e;
             }
         } finally {
             synchronized (lock) {
