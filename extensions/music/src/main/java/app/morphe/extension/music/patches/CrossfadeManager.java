@@ -2401,7 +2401,7 @@ public class CrossfadeManager {
      * on every crossfade-engagement hook fire (manual skip, auto-advance,
      * monitor tick).
      */
-    @SuppressWarnings("deprecation")
+    @SuppressWarnings({"deprecation", "RedundantSuppression"})
     private static boolean isAudioRoutedToCast() {
         if (Build.VERSION.SDK_INT < 28) return false;
 
@@ -2482,7 +2482,7 @@ public class CrossfadeManager {
         return casting;
     }
 
-    @SuppressWarnings("deprecation")
+    @SuppressWarnings({"deprecation", "RedundantSuppression"})
     @SuppressLint("MissingPermission")
     private static synchronized void toggleSessionPause() {
         isCrossfadePaused = !isCrossfadePaused;

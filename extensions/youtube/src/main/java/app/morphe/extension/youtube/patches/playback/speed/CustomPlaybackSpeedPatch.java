@@ -623,7 +623,7 @@ class OutlineSymbolDrawable extends Drawable {
         paint.setColorFilter(colorFilter);
     }
 
-    @SuppressWarnings("deprecation")
+    @SuppressWarnings({"deprecation", "RedundantSuppression"})
     @Override
     public int getOpacity() {
         return PixelFormat.TRANSLUCENT;
