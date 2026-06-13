@@ -424,16 +424,4 @@ public final class VoiceOverTranslationPatch {
             return List.of(Settings.VOT_TRANSLATION_SERVICE);
         }
     }
-
-    public static final class LibreTranslateServiceAvailability implements Setting.Availability {
-        @Override
-        public boolean isAvailable() {
-            return "libretranslate".equals(Settings.VOT_TRANSLATION_SERVICE.get());
-        }
-
-        @Override
-        public List<Setting<?>> getParentSettings() {
-            return List.of(Settings.VOT_TRANSLATION_SERVICE);
-        }
-    }
 }

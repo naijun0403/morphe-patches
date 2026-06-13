@@ -31,8 +31,7 @@ import app.morphe.extension.shared.requests.Requester;
 import app.morphe.extension.youtube.settings.Settings;
 
 /**
- * Translates transcript segments via the configured translation service
- * (Google Translate or LibreTranslate).
+ * Translates transcript segments via the configured translation service.
  */
 final class TranscriptTranslator {
 
@@ -165,11 +164,9 @@ final class TranscriptTranslator {
     }
 
     private static List<String> translateBatch(List<TranscriptSegment> segments, String targetLang) throws Exception {
-        return switch (Settings.VOT_TRANSLATION_SERVICE.get()) {
-            case "libretranslate" -> translateBatchLibreTranslate(segments, targetLang);
-            case "mymemory" -> translateBatchMyMemory(segments, targetLang);
-            default -> translateBatchGoogle(segments, targetLang);
-        };
+        return "mymemory".equals(Settings.VOT_TRANSLATION_SERVICE.get())
+                ? translateBatchMyMemory(segments, targetLang)
+                : translateBatchGoogle(segments, targetLang);
     }
 
     private static List<String> translateBatchGoogle(List<TranscriptSegment> segments, String targetLang) throws Exception {
@@ -209,49 +206,6 @@ final class TranscriptTranslator {
         }
 
         return Arrays.asList(translatedJoined.toString().split("\n", -1));
-    }
-
-    private static List<String> translateBatchLibreTranslate(List<TranscriptSegment> segments, String targetLang) throws Exception {
-        Utils.verifyOffMainThread();
-
-        StringBuilder joined = new StringBuilder();
-        for (TranscriptSegment seg : segments) {
-            if (joined.length() > 0) joined.append('\n');
-            joined.append(seg.text());
-        }
-
-        String baseUrl = Settings.VOT_LIBRETRANSLATE_URL.get().replaceAll("/+$", "");
-        HttpURLConnection conn = (HttpURLConnection) new URL(baseUrl + "/translate").openConnection();
-        conn.setRequestMethod("POST");
-        conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
-        conn.setReadTimeout(READ_TIMEOUT_MS);
-        conn.setRequestProperty("Content-Type", "application/json");
-        conn.setDoOutput(true);
-
-        JSONObject body = new JSONObject();
-        body.put("q", joined.toString());
-        body.put("source", TranscriptFetcher.lastSourceLang);
-        body.put("target", targetLang);
-        body.put("format", "text");
-        String apiKey = Settings.VOT_LIBRETRANSLATE_API_KEY.get();
-        if (!apiKey.isEmpty()) body.put("api_key", apiKey);
-
-        byte[] bodyBytes = body.toString().getBytes(StandardCharsets.UTF_8);
-        conn.setFixedLengthStreamingMode(bodyBytes.length);
-        try (OutputStream os = conn.getOutputStream()) {
-            os.write(bodyBytes);
-        }
-
-        final int code = conn.getResponseCode();
-        // libretranslate.com returns 400 (not 403) when an API key is required.
-        if ((code == 400 || code == 403) && Settings.VOT_LIBRETRANSLATE_API_KEY.get().isEmpty()) {
-            throw new Exception("HTTP " + code + " - API key required. Enter your key in Settings → Video → Voice over translation.");
-        }
-        if (code != 200) throw new Exception("HTTP " + code + " from " + baseUrl);
-
-        // Response: {"translatedText": "..."} - newline separators from joined input are preserved.
-        String translated = new JSONObject(Requester.parseString(conn)).getString("translatedText");
-        return Arrays.asList(translated.split("\n", -1));
     }
 
     // MyMemory limits q to 500 bytes per request.
