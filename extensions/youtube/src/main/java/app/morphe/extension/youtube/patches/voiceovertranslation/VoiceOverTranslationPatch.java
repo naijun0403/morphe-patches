@@ -90,12 +90,15 @@ public final class VoiceOverTranslationPatch {
      */
     public static void newVideoLoaded(String videoId) {
         try {
+            // Always reset so seek detection fires correctly on the first videoTimeChanged
+            // and so the first segment at the new position is spoken even when the same
+            // video is reopened at a different timestamp (e.g. chapter links, continue watching).
+            lastVideoTimeMs = 0;
+            lastSpokenIndex = -1;
             if (videoId.equals(currentVideoId)) return;
             currentVideoId = videoId;
-            lastVideoTimeMs = 0;
             stopTts();
             segments = new ArrayList<>();
-            lastSpokenIndex = -1;
 
             if (!Settings.VOT_ENABLED.get()) return;
             if (PlayerType.getCurrent() == PlayerType.INLINE_MINIMAL) return;
