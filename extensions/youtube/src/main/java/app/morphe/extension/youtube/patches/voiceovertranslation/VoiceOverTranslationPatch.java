@@ -7,6 +7,9 @@
 
 package app.morphe.extension.youtube.patches.voiceovertranslation;
 
+import static app.morphe.extension.shared.settings.BaseSettings.DEBUG;
+import static app.morphe.extension.youtube.patches.voiceovertranslation.TranscriptTranslator.TRANSLATION_SERVICE_MY_MEMORY;
+
 import android.content.Context;
 import android.media.AudioAttributes;
 import android.media.AudioFocusRequest;
@@ -18,9 +21,6 @@ import android.speech.tts.UtteranceProgressListener;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-
-import static app.morphe.extension.shared.settings.BaseSettings.DEBUG;
-import static app.morphe.extension.youtube.patches.voiceovertranslation.TranscriptTranslator.TRANSLATION_SERVICE_MY_MEMORY;
 
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.Utils;
@@ -44,11 +44,12 @@ public final class VoiceOverTranslationPatch {
     // raises the pace gradually over a few sentences instead of jumping straight
     // from normal speed to maximum. Slowing back down is applied immediately.
     private static final float MAX_RATE_STEP_UP = 0.25f;
+
+    static final String TTS_ENGINE_SYSTEM = "system";
+    static final String VOT_TEST_ID = "vot_test_";
+
     private static volatile float lastSpeechRate = MIN_SPEECH_RATE;
     private static volatile long lastVideoTimeMs;
-
-    private static volatile TextToSpeech tts;
-    private static volatile boolean ttsReady;
 
     private static volatile List<TranscriptSegment> segments = new ArrayList<>();
     private static volatile int lastSpokenIndex = -1;
@@ -63,13 +64,15 @@ public final class VoiceOverTranslationPatch {
     private static final AudioManager.OnAudioFocusChangeListener focusChangeListener = focusChange -> { };
     private static volatile AudioFocusRequest focusRequest;
     private static volatile boolean isDucking;
+
+    private static volatile TextToSpeech tts;
+    private static volatile boolean ttsReady;
+
     private static volatile boolean isTestSpeaking;
+    private static volatile long currentTestId;
+    private static String lastTestVoiceId = "";
 
-    private static final TtsEngine edgeTtsEngine = TtsEngine.INSTANCE;
-
-    static final String TTS_ENGINE_SYSTEM = "system";
-
-    private static final String TEST_SPEAK_PHRASE = "It's a morphing time";
+    private static final TtsEngine ttsEngine = TtsEngine.INSTANCE;
 
     static {
         PlayerType.getOnChange().addObserver(playerType -> {
@@ -152,8 +155,7 @@ public final class VoiceOverTranslationPatch {
             TranscriptSegment seg = current.get(i);
             if (effectiveTimeMs >= seg.startMs() && timeMs < seg.endMs()) {
                 if (i != lastSpokenIndex) {
-                    boolean busy = edgeTtsEngine.isSpeaking() || (tts != null && tts.isSpeaking());
-                    if (!busy) {
+                    if (!ttsEngine.isSpeaking()) {
                         lastSpokenIndex = i;
                         speak(seg, i);
                     }
@@ -185,7 +187,6 @@ public final class VoiceOverTranslationPatch {
         stopTts();
         segments = new ArrayList<>();
         lastSpokenIndex = -1;
-        updateTtsLanguage();
         if (!isLoading) {
             loadTranscript(currentVideoId);
         }
@@ -255,16 +256,42 @@ public final class VoiceOverTranslationPatch {
             tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
                 @Override public void onStart(String utteranceId) { }
                 @Override public void onDone(String utteranceId) {
-                    if ("vot_test".equals(utteranceId)) abandonDuckAfterTest();
-                    else abandonDuck();
+                    if (utteranceId != null && utteranceId.startsWith(VOT_TEST_ID)) {
+                        try {
+                            long id = Long.parseLong(utteranceId.substring(9));
+                            abandonDuckAfterTest(id);
+                        } catch (Exception ex) {
+                            logError(() -> "Utterance listener onDone failure", ex);
+                        }
+                    } else {
+                        abandonDuck();
+                    }
                 }
                 @Override public void onError(String utteranceId) {
-                    if ("vot_test".equals(utteranceId)) abandonDuckAfterTest();
-                    else abandonDuck();
+                    if (utteranceId != null && utteranceId.startsWith(VOT_TEST_ID)) {
+                        try {
+                            final long id = Long.parseLong(utteranceId.substring(9));
+                            abandonDuckAfterTest(id);
+                        } catch (Exception ex) {
+                            logError(() -> "Utterance listener onError failure", ex);
+                        }
+                    } else {
+                        abandonDuck();
+                    }
                 }
             });
             ttsReady = true;
         });
+    }
+
+    private static void updateTtsLanguage() {
+        TextToSpeech t = tts;
+        if (t == null) return;
+        Locale locale = Locale.forLanguageTag(resolveTargetLang());
+        int result = t.setLanguage(locale);
+        if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+            t.setLanguage(Locale.ENGLISH);
+        }
     }
 
     private static void speak(TranscriptSegment seg, int index) {
@@ -275,63 +302,41 @@ public final class VoiceOverTranslationPatch {
         // position so a late start (busy engine, synthesis latency) raises the rate.
         final long availableMs = seg.endMs() - Math.max(lastVideoTimeMs, seg.startMs());
 
-        if (!Settings.VOT_USE_NATIVE_TTS.get()) {
-            final String voice = VoiceCatalog.resolve(lang, Settings.VOT_TTS_VOICE_TYPE.get());
+        final String voice = Settings.VOT_USE_NATIVE_TTS.get()
+                ? TTS_ENGINE_SYSTEM
+                : VoiceCatalog.resolve(lang, Settings.VOT_TTS_VOICE_TYPE.get());
 
-            if (voice != null) {
-                byte[] cached = TtsCache.get(currentVideoId, index, voice, seg.text());
-                if (cached != null) {
-                    // Cached audio was synthesized at 1.0x - apply speed at playback time.
-                    final float rate = smoothRate(calculateSpeechRate(seg.text(), availableMs));
-                    requestDuck();
-                    // markBusy before play so isSpeaking() is true for the full duration.
-                    final long playbackId = edgeTtsEngine.markBusy();
-                    edgeTtsEngine.play(cached, volume, rate, playbackId, VoiceOverTranslationPatch::abandonDuck);
-                    return;
-                }
+        if (voice == null) return;
 
-                // Edge TTS synthesizes over the network before playback starts.
-                final float rate = smoothRate(calculateSpeechRate(seg.text(), availableMs));
-                requestDuck();
-                // markBusy before the background thread so isSpeaking() returns true
-                // during the network round-trip, preventing a concurrent segment from starting.
-                final long playbackId = edgeTtsEngine.markBusy();
-                Utils.runOnBackgroundThread(() -> {
-                    try {
-                        byte[] data = edgeTtsEngine.synthesize(seg.text(), voice, rate, playbackId);
-                        if (data.length > 0) {
-                            // Only cache 1.0x audio; rate-adjusted audio has the speed baked
-                            // into SSML and cannot be reused for segments with different timing.
-                            if (rate == 1.0f) {
-                                TtsCache.put(currentVideoId, index, voice, seg.text(), data);
-                            }
-                            // Rate is already encoded in SSML; play at 1.0x.
-                            edgeTtsEngine.play(data, volume, 1.0f, playbackId, VoiceOverTranslationPatch::abandonDuck);
-                        } else {
-                            edgeTtsEngine.clearBusy(playbackId);
-                            abandonDuck();
-                        }
-                    } catch (Exception ex) {
-                        logError(() -> "Synthesis failed", ex);
-                        edgeTtsEngine.clearBusy(playbackId);
-                        abandonDuck();
-                    }
-                });
+        if (TTS_ENGINE_SYSTEM.equals(voice)) {
+            ensureTts();
+            if (!ttsReady) {
+                Logger.printDebug(() -> "Native TTS not ready, skipping segment");
                 return;
             }
-        }
-
-        ensureTts();
-        if (!ttsReady) {
-            Logger.printDebug(() -> "Native TTS not ready, skipping segment");
+            final float rate = smoothRate(calculateSpeechRate(seg.text(), availableMs));
+            requestDuck();
+            tts.setSpeechRate(rate);
+            Bundle params = new Bundle();
+            params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume);
+            tts.speak(seg.text(), TextToSpeech.QUEUE_FLUSH, params, "vot");
             return;
         }
+
+        // Check cache for Edge TTS.
+        byte[] cached = TtsCache.get(currentVideoId, index, voice, seg.text());
+        if (cached != null) {
+            final float rate = smoothRate(calculateSpeechRate(seg.text(), availableMs));
+            requestDuck();
+            final long playbackId = ttsEngine.markBusy();
+            ttsEngine.play(cached, volume, rate, playbackId, VoiceOverTranslationPatch::abandonDuck);
+            return;
+        }
+
         final float rate = smoothRate(calculateSpeechRate(seg.text(), availableMs));
         requestDuck();
-        tts.setSpeechRate(rate);
-        Bundle params = new Bundle();
-        params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume);
-        tts.speak(seg.text(), TextToSpeech.QUEUE_FLUSH, params, "vot");
+        // Use unified Edge synthesis/playback in background.
+        ttsEngine.speak(seg.text(), voice, volume, rate, VoiceOverTranslationPatch::abandonDuck);
     }
 
     /**
@@ -368,78 +373,42 @@ public final class VoiceOverTranslationPatch {
     }
 
     /**
-     * Synthesizes and plays a short test phrase with the given Edge TTS voice.
-     * If the engine is already speaking (e.g. a previous test), stops it instead.
+     * Synthesizes and plays a short test phrase with the given voice.
+     * If the engine is already speaking the same voice, stops it.
      */
-    static void testSpeak(String voiceId) {
+    static synchronized void testSpeak(String voiceId) {
+        boolean wasSameVoice = isTestSpeaking && voiceId.equals(lastTestVoiceId);
+        stopTts();
+        if (wasSameVoice) return;
+
+        final long testId = ++currentTestId;
+        isTestSpeaking = true;
+        lastTestVoiceId = voiceId;
+        requestDuck();
+
         final float volume = Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f;
+        final String phrase = "It's morphin time!";
+
         if (TTS_ENGINE_SYSTEM.equals(voiceId)) {
             ensureTts();
-            if (!ttsReady) return;
-            if (isTestSpeaking) {
+            if (!ttsReady) {
                 isTestSpeaking = false;
-                tts.stop();
                 abandonDuck();
                 return;
             }
-            isTestSpeaking = true;
-            requestDuck();
-            Utils.runOnBackgroundThread(() -> {
-                String phrase = translateTestPhrase();
-                Bundle params = new Bundle();
-                params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume);
-                tts.setSpeechRate(1.0f);
-                tts.speak(phrase, TextToSpeech.QUEUE_FLUSH, params, "vot_test");
-            });
+            Bundle params = new Bundle();
+            params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume);
+            tts.setSpeechRate(1.0f);
+            tts.speak(phrase, TextToSpeech.QUEUE_FLUSH, params, VOT_TEST_ID + testId);
             return;
         }
-        if (isTestSpeaking) {
-            isTestSpeaking = false;
-            edgeTtsEngine.stop();
-            abandonDuck();
-            return;
-        }
-        // Stop any regular segment that may be playing; its onDone will call abandonDuck()
-        // which is guarded by isTestSpeaking and will be a no-op.
-        isTestSpeaking = true;
-        edgeTtsEngine.stop();
-        requestDuck();
-        final long playbackId = edgeTtsEngine.markBusy();
-        Utils.runOnBackgroundThread(() -> {
-            try {
-                String phrase = translateTestPhrase();
-                byte[] data = edgeTtsEngine.synthesize(phrase, voiceId, 1.0f, playbackId);
-                if (data.length > 0) {
-                    edgeTtsEngine.play(data, volume, 1.0f, playbackId,
-                            VoiceOverTranslationPatch::abandonDuckAfterTest);
-                } else {
-                    edgeTtsEngine.clearBusy(playbackId);
-                    abandonDuckAfterTest();
-                }
-            } catch (Exception ex) {
-                logError(() -> "Test speak failed", ex);
-                edgeTtsEngine.clearBusy(playbackId);
-                abandonDuckAfterTest();
-            }
-        });
-    }
 
-    private static String translateTestPhrase() {
-        String targetLang = resolveTargetLang().split("-")[0];
-        if ("en".equals(targetLang)) return TEST_SPEAK_PHRASE;
-        try {
-            List<TranscriptSegment> result = TranscriptTranslator.translate(
-                    List.of(new TranscriptSegment(0, 5000, TEST_SPEAK_PHRASE)),
-                    targetLang, null, null);
-            return result.isEmpty() ? TEST_SPEAK_PHRASE : result.get(0).text();
-        } catch (Exception ex) {
-            return TEST_SPEAK_PHRASE;
-        }
+        ttsEngine.speak(phrase, voiceId, volume, 1.0f, () -> abandonDuckAfterTest(testId));
     }
 
     private static void stopTts() {
         isTestSpeaking = false;
-        edgeTtsEngine.stop();
+        ttsEngine.stop();
         TextToSpeech localTts = tts;
         if (localTts != null) localTts.stop();
         // Speech was interrupted (new video, seek, pause) - no backlog left to catch
@@ -485,21 +454,10 @@ public final class VoiceOverTranslationPatch {
         }
     }
 
-    private static void abandonDuckAfterTest() {
+    private static void abandonDuckAfterTest(long id) {
+        if (id != currentTestId) return;
         isTestSpeaking = false;
         abandonDuck();
-    }
-
-    private static void updateTtsLanguage() {
-        TextToSpeech t = tts;
-        if (t == null) return;
-        Locale locale = Settings.VOT_CAPTION_LANGUAGE.isSetToDefault() // Default is app language.
-                ? Locale.getDefault()
-                : Locale.forLanguageTag(Settings.VOT_CAPTION_LANGUAGE.get());
-        int result = t.setLanguage(locale);
-        if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-            t.setLanguage(Locale.ENGLISH);
-        }
     }
 
     private static AudioManager getAudioManager() {

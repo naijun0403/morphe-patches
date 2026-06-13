@@ -116,6 +116,29 @@ final class TtsEngine {
     }
 
     /**
+     * High-level entry point for Edge TTS speech.
+     * Handles background synthesis and playback for the given voice.
+     */
+    void speak(String text, String voiceId, float volume, float rate, Runnable onDone) {
+        final long id = markBusy();
+        Utils.runOnBackgroundThread(() -> {
+            try {
+                byte[] data = synthesize(text, voiceId, rate, id);
+                if (data.length > 0) {
+                    play(data, volume, 1.0f, id, onDone); // rate is baked into SSML
+                } else {
+                    clearBusy(id);
+                    if (onDone != null) Utils.runOnMainThread(onDone);
+                }
+            } catch (Exception ex) {
+                VoiceOverTranslationPatch.logError(() -> "Edge TTS speak failed", ex);
+                clearBusy(id);
+                if (onDone != null) Utils.runOnMainThread(onDone);
+            }
+        });
+    }
+
+    /**
      * Marks the engine as busy before synthesis or playback begins.
      * @return the unique ID for this playback session.
      */
