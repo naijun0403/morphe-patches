@@ -20,6 +20,7 @@ import android.graphics.Typeface;
 import android.util.Pair;
 import android.view.Gravity;
 import android.view.View;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.SeekBar;
@@ -40,6 +41,9 @@ import app.morphe.extension.youtube.settings.Settings;
 import app.morphe.extension.youtube.shared.PipDismissHelper;
 
 public final class VotBottomSheet {
+
+    private static final int DRAWABLE_CHEVRON_RIGHT = ResourceUtils.getIdentifier(
+            ResourceType.DRAWABLE, "ic_keyboard_arrow_right_black_24dp");
 
     public static void show(Context context) {
         SheetBottomDialog.DraggableLinearLayout root = SheetBottomDialog
@@ -116,17 +120,25 @@ public final class VotBottomSheet {
         TextView labelView = new TextView(context);
         labelView.setText(label);
         labelView.setTextColor(fg);
-        labelView.setTextSize(15);
+        labelView.setTextSize(16);
+        labelView.setTypeface(Typeface.DEFAULT_BOLD);
         labelView.setLayoutParams(new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         row.addView(labelView);
 
         TextView valueView = new TextView(context);
         valueView.setTextColor(secondaryColor(fg));
-        valueView.setTextSize(15);
+        valueView.setTextSize(14);
         valueView.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         row.addView(valueView);
+
+        ImageView chevron = new ImageView(context);
+        chevron.setImageResource(DRAWABLE_CHEVRON_RIGHT);
+        chevron.setColorFilter(new PorterDuffColorFilter(secondaryColor(fg), PorterDuff.Mode.SRC_IN));
+        chevron.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        row.addView(chevron);
 
         row.setTag(valueView);
         return row;
@@ -263,7 +275,8 @@ public final class VotBottomSheet {
         TextView labelView = new TextView(context);
         labelView.setText(label);
         labelView.setTextColor(fgColor);
-        labelView.setTextSize(15);
+        labelView.setTextSize(16);
+        labelView.setTypeface(Typeface.DEFAULT_BOLD);
         labelView.setLayoutParams(new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         row.addView(labelView);
@@ -271,10 +284,17 @@ public final class VotBottomSheet {
         TextView valueView = new TextView(context);
         valueView.setText(getLangDisplayName(Settings.VOT_CAPTION_LANGUAGE.get(), langEntries, langValues));
         valueView.setTextColor(secondaryColor(fgColor));
-        valueView.setTextSize(15);
+        valueView.setTextSize(14);
         valueView.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         row.addView(valueView);
+
+        ImageView chevron = new ImageView(context);
+        chevron.setImageResource(DRAWABLE_CHEVRON_RIGHT);
+        chevron.setColorFilter(new PorterDuffColorFilter(secondaryColor(fgColor), PorterDuff.Mode.SRC_IN));
+        chevron.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        row.addView(chevron);
 
         row.setOnClickListener(v -> showLanguagePicker(context, label, langEntries, langValues,
                 valueView, onLanguageChanged));
@@ -363,7 +383,8 @@ public final class VotBottomSheet {
         TextView labelView = new TextView(context);
         labelView.setText(label);
         labelView.setTextColor(fgColor);
-        labelView.setTextSize(15);
+        labelView.setTextSize(16);
+        labelView.setTypeface(Typeface.DEFAULT_BOLD);
         labelView.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         row.addView(labelView);
@@ -382,7 +403,7 @@ public final class VotBottomSheet {
         TextView valueView = new TextView(context);
         valueView.setText(String.format(Locale.ROOT, "%.1fx", storedValue / 10.0f));
         valueView.setTextColor(fgColor);
-        valueView.setTextSize(15);
+        valueView.setTextSize(14);
         valueView.setMinWidth(Dim.dp40);
         valueView.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
@@ -418,7 +439,8 @@ public final class VotBottomSheet {
         TextView labelView = new TextView(context);
         labelView.setText(label);
         labelView.setTextColor(fgColor);
-        labelView.setTextSize(15);
+        labelView.setTextSize(16);
+        labelView.setTypeface(Typeface.DEFAULT_BOLD);
         labelView.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         row.addView(labelView);
@@ -437,7 +459,7 @@ public final class VotBottomSheet {
         TextView valueView = new TextView(context);
         valueView.setText(String.format(Locale.ROOT, "%d%%", initialValue));
         valueView.setTextColor(fgColor);
-        valueView.setTextSize(15);
+        valueView.setTextSize(14);
         valueView.setMinWidth(Dim.dp40);
         valueView.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));

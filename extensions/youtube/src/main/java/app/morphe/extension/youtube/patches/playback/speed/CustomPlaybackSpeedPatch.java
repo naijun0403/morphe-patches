@@ -421,6 +421,9 @@ public class CustomPlaybackSpeedPatch {
                 speedButton.setText(speedFormatter.format(speed));
                 speedButton.setTextColor(Utils.getAppForegroundColor());
                 speedButton.setTextSize(12);
+                speedButton.setTypeface(Utils.appIsUsingBoldIcons()
+                        ? Typeface.DEFAULT_BOLD
+                        : Typeface.DEFAULT);
                 speedButton.setAllCaps(false);
                 speedButton.setGravity(Gravity.CENTER);
 
@@ -492,7 +495,8 @@ public class CustomPlaybackSpeedPatch {
         background.getPaint().setColor(getAdjustedBackgroundColor(false));
         button.setBackground(background);
         button.setForeground(new OutlineSymbolDrawable(isPlus)); // Plus or minus symbol.
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(Dim.dp36, Dim.dp36);
+        final int size = Utils.appIsUsingBoldIcons() ? Dim.dp40 : Dim.dp36;
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(size, size);
         params.setMargins(Dim.dp8, 0, Dim.dp8, 0); // Set margins.
         button.setLayoutParams(params);
         return button;
@@ -555,10 +559,11 @@ class OutlineSymbolDrawable extends Drawable {
 
     OutlineSymbolDrawable(boolean isPlus) {
         this.isPlus = isPlus;
-        paint = new Paint(Paint.ANTI_ALIAS_FLAG); // Enable anti-aliasing for smooth rendering.
+        paint = new Paint(Paint.ANTI_ALIAS_FLAG); // Enable antialiasing for smooth rendering.
         paint.setColor(Utils.getAppForegroundColor());
-        paint.setStyle(Paint.Style.STROKE); // Use stroke style for outline.
-        paint.setStrokeWidth(Dim.dp1); // 1dp stroke width.
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeCap(Paint.Cap.ROUND);
+        paint.setStrokeWidth(Utils.appIsUsingBoldIcons() ? Dim.dp2 : Dim.dp1);
     }
 
     @Override

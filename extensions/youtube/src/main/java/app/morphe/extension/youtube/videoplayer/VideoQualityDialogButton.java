@@ -11,6 +11,8 @@
 package app.morphe.extension.youtube.videoplayer;
 
 import static app.morphe.extension.shared.StringRef.str;
+import static app.morphe.extension.shared.settings.preference.CustomDialogListPreference.DRAWABLE_CHECKMARK;
+import static app.morphe.extension.shared.settings.preference.CustomDialogListPreference.DRAWABLE_CHECKMARK_BOLD;
 import static app.morphe.extension.shared.settings.preference.CustomDialogListPreference.ID_MORPHE_CHECK_ICON;
 import static app.morphe.extension.shared.settings.preference.CustomDialogListPreference.ID_MORPHE_CHECK_ICON_PLACEHOLDER;
 import static app.morphe.extension.shared.settings.preference.CustomDialogListPreference.ID_MORPHE_ITEM_TEXT;
@@ -22,6 +24,7 @@ import static app.morphe.extension.youtube.videoplayer.LegacyPlayerControlButton
 import static app.morphe.extension.youtube.videoplayer.LegacyPlayerControlButton.getDialogBackgroundColor;
 
 import android.content.Context;
+import android.graphics.Typeface;
 import android.text.Spannable;
 import android.text.SpannableStringBuilder;
 import android.text.style.ForegroundColorSpan;
@@ -396,9 +399,15 @@ public class VideoQualityDialogButton {
             }
 
             viewHolder.textView.setText(getItem(position));
+            viewHolder.textView.setTypeface(Utils.appIsUsingBoldIcons()
+                    ? Typeface.DEFAULT_BOLD
+                    : Typeface.DEFAULT);
             final boolean isSelected = position == selectedPosition;
             viewHolder.checkIcon.setVisibility(isSelected ? View.VISIBLE : View.GONE);
             viewHolder.placeholder.setVisibility(isSelected ? View.GONE : View.INVISIBLE);
+            viewHolder.checkIcon.setImageResource(Utils.appIsUsingBoldIcons()
+                    ? DRAWABLE_CHECKMARK_BOLD
+                    : DRAWABLE_CHECKMARK);
 
             return convertView;
         }
