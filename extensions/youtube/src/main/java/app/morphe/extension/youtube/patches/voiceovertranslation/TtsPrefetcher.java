@@ -8,6 +8,7 @@
 package app.morphe.extension.youtube.patches.voiceovertranslation;
 
 import androidx.annotation.GuardedBy;
+import androidx.annotation.Nullable;
 
 import java.util.Collections;
 import java.util.List;
@@ -16,6 +17,16 @@ import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.Utils;
 import app.morphe.extension.youtube.settings.Settings;
 
+/**
+ * <pre>
+ * Background prefetcher for Edge TTS audio segments.
+ *
+ * Uses an adaptive throttling strategy:
+ * - Segments near the current time are fetched quickly (100ms delay).
+ * - Segments further out are fetched moderately (500ms delay).
+ * - Remaining segments are fetched slowly (1500ms delay) until the video is fully cached.
+ * </pre>
+ */
 final class TtsPrefetcher {
 
     private static final Object lock = new Object();
@@ -33,13 +44,39 @@ final class TtsPrefetcher {
 
     private static final TtsEngine engine = TtsEngine.INSTANCE;
 
+    // Adaptive delay tiers based on segment distance from playhead.
+    private static final int DISTANCE_IMMEDIATE = 10;
+    private static final int DISTANCE_NEAR      = 50;
+
+    private static final int DELAY_IMMEDIATE_MS = 200;
+    private static final int DELAY_NEAR_MS      = 600;
+    private static final int DELAY_BACKGROUND_MS = 1500;
+    private static final int DELAY_IDLE_MS       = 2000;
+
+    // Backoff constants for handling server-side rate limits/errors.
+    private static final int BACKOFF_MIN_MS      = 5000;
+    private static final int BACKOFF_MAX_MS      = 60_000; // Cap at 1 minute.
+    private static final float BACKOFF_FACTOR    = 1.5f;
+
+    private static int currentBackoffMs = 0;
+
+    private static final class NextFetch {
+        final int index;
+        final int distance;
+
+        NextFetch(int index, int distance) {
+            this.index = index;
+            this.distance = distance;
+        }
+    }
+
     static void updateVideo(String videoId, List<TranscriptSegment> segments) {
         synchronized (lock) {
             currentVideoId = videoId;
-            // Wrap in an unmodifiable snapshot. The caller's list must not be mutated
-            // after this point, but we make that guarantee explicit here.
             currentSegments = Collections.unmodifiableList(segments);
             currentVideoTimeMs = 0;
+            // Reset backoff when starting a new video.
+            currentBackoffMs = 0;
             if (running) {
                 lock.notifyAll();
             } else {
@@ -51,26 +88,19 @@ final class TtsPrefetcher {
     static void updateTime(long timeMs) {
         synchronized (lock) {
             currentVideoTimeMs = timeMs;
-            // Only wake the thread if it is actually sleeping; updateTime can be called
-            // very frequently (e.g. every 200 ms) and spurious wakeups waste CPU.
             if (waiting) {
                 lock.notifyAll();
             }
         }
     }
 
-    /**
-     * Must be called with {@code lock} held.
-     */
     @GuardedBy("lock")
     private static void startBackgroundThread() {
         running = true;
-
         Utils.runOnBackgroundThread(() -> {
             try {
                 runPrefetchLoop();
             } finally {
-                // Guarantee running is cleared even if an unexpected exception escapes.
                 synchronized (lock) {
                     running = false;
                 }
@@ -80,8 +110,6 @@ final class TtsPrefetcher {
 
     private static void runPrefetchLoop() {
         while (!Thread.currentThread().isInterrupted()) {
-            // Snapshot mutable state under the lock so the rest of the iteration
-            // works on stable values without holding the lock during I/O.
             String videoId;
             List<TranscriptSegment> segments;
             final long timeMs;
@@ -94,7 +122,7 @@ final class TtsPrefetcher {
             if (videoId.isEmpty() || segments.isEmpty()
                     || !Settings.VOT_ENABLED.get()
                     || Settings.VOT_USE_NATIVE_TTS.get()) {
-                if (!waitOnLock(5000)) return;
+                if (!waitOnLock(DELAY_IDLE_MS)) return;
                 continue;
             }
 
@@ -103,26 +131,36 @@ final class TtsPrefetcher {
             String voice = VoiceCatalog.resolve(voiceLang, Settings.VOT_TTS_VOICE_TYPE.get());
 
             if (voice == null) {
-                if (!waitOnLock(2000)) return;
+                if (!waitOnLock(DELAY_IDLE_MS)) return;
                 continue;
             }
 
-            final int nextIndex = findNextToFetch(videoId, segments, timeMs, voice);
-            if (nextIndex >= 0) {
-                fetch(videoId, segments.get(nextIndex), nextIndex, voice);
+            NextFetch next = findNextToFetch(videoId, segments, timeMs, voice);
+            if (next != null) {
+                final boolean success = fetch(videoId, segments.get(next.index), next.index, voice);
+
+                final int delay;
+                if (success) {
+                    // Success: use tiered delay and gradually reduce backoff.
+                    if (next.distance <= DISTANCE_IMMEDIATE) delay = DELAY_IMMEDIATE_MS;
+                    else if (next.distance <= DISTANCE_NEAR) delay = DELAY_NEAR_MS;
+                    else delay = DELAY_BACKGROUND_MS;
+
+                    currentBackoffMs = Math.max(0, currentBackoffMs - 500);
+                } else {
+                    // Failure: Apply exponential backoff.
+                    if (currentBackoffMs == 0) currentBackoffMs = BACKOFF_MIN_MS;
+                    else currentBackoffMs = (int) Math.min(BACKOFF_MAX_MS, currentBackoffMs * BACKOFF_FACTOR);
+                    delay = currentBackoffMs;
+                }
+
+                if (!waitOnLock(delay)) return;
             } else {
-                if (!waitOnLock(2000)) return;
+                if (!waitOnLock(DELAY_IDLE_MS)) return;
             }
         }
     }
 
-    /**
-     * Waits on {@code lock} for up to {@code millis} ms.
-     *
-     * @return {@code true} if the thread should continue, {@code false} if it was
-     *         interrupted and should exit.
-     */
-    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     private static boolean waitOnLock(long millis) {
         synchronized (lock) {
             waiting = true;
@@ -139,54 +177,48 @@ final class TtsPrefetcher {
         }
     }
 
-    private static int findNextToFetch(String videoId, List<TranscriptSegment> segments,
-                                       long timeMs, String voice) {
+    @Nullable
+    private static NextFetch findNextToFetch(String videoId, List<TranscriptSegment> segments,
+                                             long timeMs, String voice) {
         final int segmentsSize = segments.size();
-        int currentIndex = segmentsSize; // index of the first future segment
+        int firstFutureIndex = segmentsSize;
 
         // Priority 1: Future segments, closest first.
-        // Track currentIndex in the same pass to avoid re-scanning for Priority 2.
         for (int i = 0; i < segmentsSize; i++) {
             final TranscriptSegment seg = segments.get(i);
             if (seg.startMs() >= timeMs) {
-                if (currentIndex == segmentsSize) {
-                    currentIndex = i; // record boundary on first encounter
+                if (firstFutureIndex == segmentsSize) {
+                    firstFutureIndex = i;
                 }
                 if (TtsCache.notCached(videoId, i, voice, seg.text())) {
-                    return i;
+                    return new NextFetch(i, i - firstFutureIndex);
                 }
             }
         }
 
-        // Priority 2: Past segments (for loops/seeks), closest to current time first.
-        for (int i = currentIndex - 1; i >= 0; i--) {
+        // Priority 2: Past segments (for loops/seeks), closest to playhead first.
+        for (int i = firstFutureIndex - 1; i >= 0; i--) {
             final TranscriptSegment seg = segments.get(i);
             if (TtsCache.notCached(videoId, i, voice, seg.text())) {
-                return i;
+                return new NextFetch(i, firstFutureIndex - i);
             }
         }
 
-        return -1;
+        return null;
     }
 
-    private static void fetch(String videoId, TranscriptSegment seg, int index, String voice) {
+    private static boolean fetch(String videoId, TranscriptSegment seg, int index, String voice) {
         try {
-            // Synthesize at 1.0x speed for the cache. Playback rate is applied at render time.
-            final byte[] data = engine.synthesize(seg.text(), voice, 1.0f, false);
+            final byte[] data = engine.prefetch(seg.text(), voice);
             if (data.length > 0) {
                 TtsCache.put(videoId, index, voice, seg.text(), data);
                 Logger.printDebug(() -> "Prefetched segment " + index + " for " + videoId);
+                return true;
             }
+            return false;
         } catch (Exception ex) {
             VoiceOverTranslationPatch.logError(() -> "Prefetch failed for segment " + index, ex);
-            // Back off before the next attempt to avoid hammering a failing endpoint.
-            try {
-                Thread.sleep(3000);
-            } catch (InterruptedException ie) {
-                // Restore the interrupt flag so the loop condition picks it up on the
-                // next iteration rather than silently swallowing the shutdown signal.
-                Thread.currentThread().interrupt();
-            }
+            return false;
         }
     }
 }

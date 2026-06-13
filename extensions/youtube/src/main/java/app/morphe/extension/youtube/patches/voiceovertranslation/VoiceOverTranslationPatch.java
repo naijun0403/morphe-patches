@@ -278,8 +278,8 @@ public final class VoiceOverTranslationPatch {
                     final float rate = smoothRate(calculateSpeechRate(seg.text(), availableMs));
                     requestDuck();
                     // markBusy before play so isSpeaking() is true for the full duration.
-                    edgeTtsEngine.markBusy();
-                    edgeTtsEngine.play(cached, volume, rate, VoiceOverTranslationPatch::abandonDuck);
+                    final long playbackId = edgeTtsEngine.markBusy();
+                    edgeTtsEngine.play(cached, volume, rate, playbackId, VoiceOverTranslationPatch::abandonDuck);
                     return;
                 }
 
@@ -288,10 +288,10 @@ public final class VoiceOverTranslationPatch {
                 requestDuck();
                 // markBusy before the background thread so isSpeaking() returns true
                 // during the network round-trip, preventing a concurrent segment from starting.
-                edgeTtsEngine.markBusy();
+                final long playbackId = edgeTtsEngine.markBusy();
                 Utils.runOnBackgroundThread(() -> {
                     try {
-                        byte[] data = edgeTtsEngine.synthesize(seg.text(), voice, rate, true);
+                        byte[] data = edgeTtsEngine.synthesize(seg.text(), voice, rate, playbackId);
                         if (data.length > 0) {
                             // Only cache 1.0x audio; rate-adjusted audio has the speed baked
                             // into SSML and cannot be reused for segments with different timing.
@@ -299,14 +299,14 @@ public final class VoiceOverTranslationPatch {
                                 TtsCache.put(currentVideoId, index, voice, seg.text(), data);
                             }
                             // Rate is already encoded in SSML; play at 1.0x.
-                            edgeTtsEngine.play(data, volume, 1.0f, VoiceOverTranslationPatch::abandonDuck);
+                            edgeTtsEngine.play(data, volume, 1.0f, playbackId, VoiceOverTranslationPatch::abandonDuck);
                         } else {
-                            edgeTtsEngine.clearBusy();
+                            edgeTtsEngine.clearBusy(playbackId);
                             abandonDuck();
                         }
                     } catch (Exception ex) {
                         logError(() -> "Synthesis failed", ex);
-                        edgeTtsEngine.clearBusy();
+                        edgeTtsEngine.clearBusy(playbackId);
                         abandonDuck();
                     }
                 });
