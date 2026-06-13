@@ -30,9 +30,6 @@ import java.util.TimeZone;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
@@ -53,6 +50,8 @@ import app.morphe.extension.shared.Utils;
  */
 final class TtsEngine {
 
+    public static final TtsEngine INSTANCE = new TtsEngine();
+
     private static final String WS_HOST            = "speech.platform.bing.com";
     private static final int    WS_PORT            = 443;
     private static final String TOKEN              = "6A5AA1D4EAFF4E9FB37E23D68491D6F4";
@@ -63,29 +62,53 @@ final class TtsEngine {
     private static final int CONNECT_TIMEOUT_MS = 10_000;
     private static final int READ_TIMEOUT_MS    = 20_000;
 
-    private final AtomicBoolean                     stopped       = new AtomicBoolean();
-    private final AtomicBoolean                     speaking      = new AtomicBoolean();
-    private final AtomicReference<MediaPlayer>      currentPlayer = new AtomicReference<>();
-    private final AtomicReference<CountDownLatch>   playLatch     = new AtomicReference<>();
-
     private final Object lock = new Object();
     @GuardedBy("lock")
-    private SSLSocket     persistentSocket;
+    private boolean stopped;
     @GuardedBy("lock")
-    private InputStream   persistentIn;
+    private boolean speaking;
     @GuardedBy("lock")
-    private OutputStream  persistentOut;
+    private MediaPlayer currentPlayer;
+    @GuardedBy("lock")
+    private CountDownLatch playLatch;
+
+    // Ensures only one synthesis turn happens on the WebSocket at a time.
+    private final Object synthesisLock = new Object();
+
+    @GuardedBy("lock")
+    private SSLSocket persistentSocket;
+    @GuardedBy("lock")
+    private InputStream persistentIn;
+    @GuardedBy("lock")
+    private OutputStream persistentOut;
     // speech.config only needs to be sent once per connection.
     @GuardedBy("lock")
-    private boolean       configSent;
+    private boolean configSent;
 
-    // Fixed estimate of synthesis latency (request to audio ready).
-    // Callers subtract it from the available time when computing speech rate, so the
-    // network round-trip does not eat into the speaking time.
-    private final AtomicLong averageSynthesisMs = new AtomicLong(600);
+    private TtsEngine() {};
+
+    private boolean isStopped() {
+        synchronized (lock) {
+            return stopped;
+        }
+    }
+
+    private void setStopped(boolean stopped) {
+        synchronized (lock) {
+            this.stopped = stopped;
+        }
+    }
 
     boolean isSpeaking() {
-        return speaking.get();
+        synchronized (lock) {
+            return speaking;
+        }
+    }
+
+    private void setIsSpeaking(boolean speaking) {
+        synchronized (lock) {
+            this.speaking = speaking;
+        }
     }
 
     /**
@@ -95,25 +118,26 @@ final class TtsEngine {
      * (if synthesis fails before play is reached).
      */
     void markBusy() {
-        stopped.set(false);
-        speaking.set(true);
+        synchronized (lock) {
+            setStopped(false);
+            setIsSpeaking(true);
+        }
     }
 
     /** Clears the busy flag without a full stop; used when synthesis fails before play. */
     void clearBusy() {
-        speaking.set(false);
-    }
-
-    long averageSynthesisMs() {
-        return averageSynthesisMs.get();
+        setIsSpeaking(false);
     }
 
     /**
      * Synthesizes {@code text} with the given Edge TTS {@code voice} on a background thread.
      * This is the underlying synthesis logic used by {@link #play} and the prefetcher.
+     *
+     * @param isLive If true, this request is for immediate playback and should be
+     *               aborted if {@link #stop()} is called.
      */
-    byte[] synthesize(String text, String voice, float rate) throws Exception {
-        return synthesizeEdge(text, voice, rate);
+    byte[] synthesize(String text, String voice, float rate, boolean isLive) throws Exception {
+        return synthesizeEdge(text, voice, rate, isLive);
     }
 
     /**
@@ -122,8 +146,8 @@ final class TtsEngine {
      */
     void play(byte[] mp3, float volume, float rate, Runnable onDone) {
         // Reject audio that completed synthesis after stop() was called (e.g. post-seek).
-        if (stopped.get()) {
-            speaking.set(false);
+        if (isStopped()) {
+            setIsSpeaking(false);
             if (onDone != null) Utils.runOnMainThread(onDone);
             return;
         }
@@ -131,95 +155,130 @@ final class TtsEngine {
 
         Utils.runOnBackgroundThread(() -> {
             try {
-                if (!stopped.get()) playMp3(mp3, volume, rate);
+                if (!isStopped()) {
+                    playMp3(mp3, volume, rate);
+                }
             } catch (Exception ex) {
-                if (!stopped.get()) VoiceOverTranslationPatch.logError(() -> "Playback failed", ex);
+                if (!isStopped()) {
+                    VoiceOverTranslationPatch.logError(() -> "Playback failed", ex);
+                }
             } finally {
-                speaking.set(false);
-                if (onDone != null) Utils.runOnMainThread(onDone);
+                setIsSpeaking(false);
+                if (onDone != null) {
+                    Utils.runOnMainThread(onDone);
+                }
             }
         });
     }
 
     /** Stops any in-progress synthesis or playback immediately. */
     void stop() {
-        stopped.set(true);
-        speaking.set(false);
-
         synchronized (lock) {
+            setStopped(true);
+            setIsSpeaking(false);
+
             closeSocket();
-        }
 
-        // Unblock latch.await() in playMp3() so the thread exits quickly.
-        CountDownLatch l = playLatch.getAndSet(null);
-        if (l != null) l.countDown();
+            // Unblock latch.await() in playMp3() so the thread exits quickly.
+            if (playLatch != null) {
+                playLatch.countDown();
+                playLatch = null;
+            }
 
-        MediaPlayer mp = currentPlayer.getAndSet(null);
-        if (mp != null) {
-            try { mp.stop(); } catch (Exception ignored) {}
-            try { mp.release(); } catch (Exception ignored) {}
+            if (currentPlayer != null) {
+                try {
+                    currentPlayer.stop();
+                } catch (Exception ex) {
+                    Logger.printDebug(() -> "MediaPlayer stop failed", ex);
+                }
+                try {
+                    currentPlayer.release();
+                } catch (Exception ex) {
+                    Logger.printDebug(() -> "MediaPlayer release failed", ex);
+                }
+                currentPlayer = null;
+            }
         }
     }
 
-    private byte[] synthesizeEdge(String text, String voice, float rate) throws Exception {
-        synchronized (lock) {
-            IOException lastEx = new IOException("Synthesis failed");
+    private byte[] synthesizeEdge(String text, String voice, float rate, boolean isLive) throws Exception {
+        synchronized (synthesisLock) {
+            IOException lastEx = null;
             for (int attempt = 1; attempt <= 2; attempt++) {
                 try {
-                    // Reconnect lazily if the socket was closed (first call, stop(), or server timeout).
-                    ensureConnected();
-
                     String timestamp = edgeTimestamp();
                     String requestId = uuidHex();
+                    String ssml = buildSsml(text, voice, rate);
 
-                    // speech.config is sent once per connection.
-                    if (!configSent) {
-                        sendText(persistentOut, "Path: speech.config\r\n"
+                    InputStream in;
+                    OutputStream out;
+                    boolean needsConfig;
+                    synchronized (lock) {
+                        if (isLive && isStopped()) return new byte[0];
+                        // Reconnect lazily if the socket was closed (first call, stop(), or server timeout).
+                        ensureConnected();
+
+                        out = persistentOut;
+                        in = persistentIn;
+                        needsConfig = !configSent;
+                        if (needsConfig) configSent = true;
+                    }
+
+                    // speech.config only needs to be sent once per connection.
+                    if (needsConfig) {
+                        sendText(out, "Path: speech.config\r\n"
                                 + "Content-Type: application/json; charset=utf-8\r\n"
                                 + "X-Timestamp: " + timestamp + "\r\n\r\n"
                                 + "{\"context\":{\"synthesis\":{\"audio\":{"
                                 + "\"metadataoptions\":{\"sentenceBoundaryEnabled\":\"false\","
                                 + "\"wordBoundaryEnabled\":\"false\"},"
                                 + "\"outputFormat\":\"" + AUDIO_FORMAT + "\"}}}}");
-                        configSent = true;
                     }
 
-                    // SSML synthesis request. Edge TTS expects rate as a percentage delta, e.g. "+30%".
-                    String inner = escapeXml(text);
-                    int ratePercent = Math.round((rate - 1.0f) * 100);
-                    if (ratePercent != 0) {
-                        inner = "<prosody rate='" + (ratePercent > 0 ? "+" : "") + ratePercent + "%'>"
-                                + inner + "</prosody>";
-                    }
-                    String ssml = "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis'"
-                            + " xml:lang='" + localePart(voice) + "'>"
-                            + "<voice name='" + voice + "'>" + inner + "</voice></speak>";
-                    sendText(persistentOut, "Path: ssml\r\n"
+                    sendText(out, "Path: ssml\r\n"
                             + "X-RequestId: " + requestId + "\r\n"
                             + "X-Timestamp: " + timestamp + "\r\n"
                             + "Content-Type: application/ssml+xml\r\n\r\n" + ssml);
 
                     // Collect audio frames until the server signals turn.end.
+                    // Release main lock during network I/O so stop() remains responsive.
                     ByteArrayOutputStream audioOut = new ByteArrayOutputStream();
-                    collectAudio(persistentIn, audioOut);
+                    collectAudio(in, audioOut);
+
                     return audioOut.toByteArray();
                 } catch (IOException ex) {
-                    // Socket died (e.g. server idle timeout, Connection reset).
-                    // Drop it so the next attempt reconnects cleanly.
-                    closeSocket();
-                    lastEx = ex;
-                    if (stopped.get()) break;
+                    synchronized (lock) {
+                        // Socket died (e.g. server idle timeout, Connection reset).
+                        // Drop it so the next attempt reconnects cleanly.
+                        closeSocket();
+                        lastEx = ex;
+                        if (isLive && isStopped()) break;
+                    }
                     Logger.printDebug(() -> "TTS synthesis failed, retrying... ", ex);
                 }
             }
-            throw lastEx;
+            if (lastEx != null) throw lastEx;
+            throw new IOException("Synthesis failed");
         }
+    }
+
+    private String buildSsml(String text, String voice, float rate) {
+        String inner = escapeXml(text);
+        int ratePercent = Math.round((rate - 1.0f) * 100);
+        if (ratePercent != 0) {
+            inner = "<prosody rate='" + (ratePercent > 0 ? "+" : "") + ratePercent + "%'>"
+                    + inner + "</prosody>";
+        }
+        return "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis'"
+                + " xml:lang='" + localePart(voice) + "'>"
+                + "<voice name='" + voice + "'>" + inner + "</voice></speak>";
     }
 
     /**
      * Opens a new TLS connection and performs the WebSocket upgrade handshake.
-     * Must be called with class lock held.
+     * Must be called with lock held.
      */
+    @GuardedBy("lock")
     private void ensureConnected() throws Exception {
         if (persistentSocket != null && !persistentSocket.isClosed()) return;
 
@@ -247,8 +306,9 @@ final class TtsEngine {
     }
 
     /**
-     * Closes and nulls the persistent socket. Must be called with class lock held.
+     * Closes and nulls the persistent socket. Must be called with lock held.
      */
+    @GuardedBy("lock")
     private void closeSocket() {
         if (persistentSocket != null) {
             try { persistentSocket.close(); } catch (Exception ignored) {}
@@ -378,9 +438,16 @@ final class TtsEngine {
 
     private void playMp3(byte[] mp3, float volume, float rate) throws Exception {
         CountDownLatch latch = new CountDownLatch(1);
-        MediaPlayer    mp    = new MediaPlayer();
-        playLatch.set(latch);
-        currentPlayer.set(mp);
+        MediaPlayer mp = new MediaPlayer();
+
+        synchronized (lock) {
+            if (isStopped()) {
+                mp.release();
+                return;
+            }
+            playLatch = latch;
+            currentPlayer = mp;
+        }
 
         try {
             mp.setAudioAttributes(new AudioAttributes.Builder()
@@ -412,20 +479,41 @@ final class TtsEngine {
                 latch.countDown();
                 return true;
             });
-            mp.prepare();
-            if (rate != 1.0f) {
-                mp.setPlaybackParams(new PlaybackParams().setSpeed(rate));
+
+            if (isStopped()) return;
+
+            try {
+                mp.prepare();
+                if (rate != 1.0f) {
+                    mp.setPlaybackParams(new PlaybackParams().setSpeed(rate));
+                }
+                if (isStopped()) return;
+                mp.start();
+                //noinspection ResultOfMethodCallIgnored
+                latch.await(60, TimeUnit.SECONDS);
+            } catch (IllegalStateException e) {
+                // Ignore errors caused by concurrent stop() releasing the player.
+                if (!isStopped()) throw e;
             }
-            if (stopped.get()) return;
-            mp.start();
-            //noinspection ResultOfMethodCallIgnored
-            latch.await(60, TimeUnit.SECONDS);
         } finally {
-            playLatch.compareAndSet(latch, null);
-            // Release only if stop() hasn't already done so.
-            if (currentPlayer.compareAndSet(mp, null)) {
-                try { mp.stop(); }    catch (Exception ignored) {}
-                try { mp.release(); } catch (Exception ignored) {}
+            synchronized (lock) {
+                if (playLatch == latch) {
+                    playLatch = null;
+                }
+                // Release only if stop() hasn't already done so.
+                if (currentPlayer == mp) {
+                    try {
+                        mp.stop();
+                    } catch (Exception ex) {
+                        Logger.printDebug(() -> "MediaPlayer stop failed", ex);
+                    }
+                    try {
+                        mp.release();
+                    } catch (Exception ex) {
+                        Logger.printDebug(() -> "MediaPlayer release failed", ex);
+                    }
+                    currentPlayer = null;
+                }
             }
         }
     }

@@ -31,7 +31,7 @@ final class TtsPrefetcher {
     @GuardedBy("lock")
     private static boolean waiting;
 
-    private static final TtsEngine engine = new TtsEngine();
+    private static final TtsEngine engine = TtsEngine.INSTANCE;
 
     static void updateVideo(String videoId, List<TranscriptSegment> segments) {
         synchronized (lock) {
@@ -172,7 +172,7 @@ final class TtsPrefetcher {
     private static void fetch(String videoId, TranscriptSegment seg, int index, String voice) {
         try {
             // Synthesize at 1.0x speed for the cache. Playback rate is applied at render time.
-            final byte[] data = engine.synthesize(seg.text(), voice, 1.0f);
+            final byte[] data = engine.synthesize(seg.text(), voice, 1.0f, false);
             if (data.length > 0) {
                 TtsCache.put(videoId, index, voice, seg.text(), data);
                 Logger.printDebug(() -> "Prefetched segment " + index + " for " + videoId);

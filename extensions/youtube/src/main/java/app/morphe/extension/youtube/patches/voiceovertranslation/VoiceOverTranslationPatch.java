@@ -64,7 +64,7 @@ public final class VoiceOverTranslationPatch {
     private static volatile AudioFocusRequest focusRequest;
     private static volatile boolean isDucking;
 
-    private static final TtsEngine edgeTtsEngine = new TtsEngine();
+    private static final TtsEngine edgeTtsEngine = TtsEngine.INSTANCE;
 
     /** Language code of the video's own caption track, detected on each transcript fetch. */
     static volatile String detectedSourceLang = "en";
@@ -274,17 +274,15 @@ public final class VoiceOverTranslationPatch {
                     return;
                 }
 
-                // Edge TTS synthesizes over the network before playback starts - subtract
-                // the typical synthesis time so the delay doesn't eat into speaking time.
-                final float rate = smoothRate(calculateSpeechRate(seg.text(),
-                        availableMs - edgeTtsEngine.averageSynthesisMs()));
+                // Edge TTS synthesizes over the network before playback starts.
+                final float rate = smoothRate(calculateSpeechRate(seg.text(), availableMs));
                 requestDuck();
                 // markBusy before the background thread so isSpeaking() returns true
                 // during the network round-trip, preventing a concurrent segment from starting.
                 edgeTtsEngine.markBusy();
                 Utils.runOnBackgroundThread(() -> {
                     try {
-                        byte[] data = edgeTtsEngine.synthesize(seg.text(), voice, rate);
+                        byte[] data = edgeTtsEngine.synthesize(seg.text(), voice, rate, true);
                         if (data.length > 0) {
                             // Only cache 1.0x audio; rate-adjusted audio has the speed baked
                             // into SSML and cannot be reused for segments with different timing.
