@@ -21,6 +21,7 @@ import java.util.Locale;
 
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.Utils;
+import app.morphe.extension.shared.settings.Setting;
 import app.morphe.extension.youtube.settings.Settings;
 import app.morphe.extension.youtube.shared.PlayerType;
 import app.morphe.extension.youtube.shared.VideoState;
@@ -409,5 +410,29 @@ public final class VoiceOverTranslationPatch {
             audioManager = (AudioManager) Utils.getContext().getSystemService(Context.AUDIO_SERVICE);
         }
         return audioManager;
+    }
+
+    public static final class MyMemoryServiceAvailability implements Setting.Availability {
+        @Override
+        public boolean isAvailable() {
+            return "mymemory".equals(Settings.VOT_TRANSLATION_SERVICE.get());
+        }
+
+        @Override
+        public List<Setting<?>> getParentSettings() {
+            return List.of(Settings.VOT_TRANSLATION_SERVICE);
+        }
+    }
+
+    public static final class LibreTranslateServiceAvailability implements Setting.Availability {
+        @Override
+        public boolean isAvailable() {
+            return "libretranslate".equals(Settings.VOT_TRANSLATION_SERVICE.get());
+        }
+
+        @Override
+        public List<Setting<?>> getParentSettings() {
+            return List.of(Settings.VOT_TRANSLATION_SERVICE);
+        }
     }
 }
