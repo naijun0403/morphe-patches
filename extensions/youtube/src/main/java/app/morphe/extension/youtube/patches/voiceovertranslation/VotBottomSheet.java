@@ -44,6 +44,8 @@ public final class VotBottomSheet {
 
     private static final int DRAWABLE_CHEVRON_RIGHT = ResourceUtils.getIdentifier(
             ResourceType.DRAWABLE, "ic_keyboard_arrow_right_black_24dp");
+    private static final int DRAWABLE_CHEVRON_RIGHT_BOLD = ResourceUtils.getIdentifier(
+            ResourceType.DRAWABLE, "yt_outline_experimental_chevron_right_vd_theme_18");
 
     public static void show(Context context) {
         SheetBottomDialog.DraggableLinearLayout root = SheetBottomDialog
@@ -134,7 +136,7 @@ public final class VotBottomSheet {
         row.addView(valueView);
 
         ImageView chevron = new ImageView(context);
-        chevron.setImageResource(DRAWABLE_CHEVRON_RIGHT);
+        chevron.setImageResource(Utils.appIsUsingBoldIcons() ? DRAWABLE_CHEVRON_RIGHT_BOLD : DRAWABLE_CHEVRON_RIGHT);
         chevron.setColorFilter(new PorterDuffColorFilter(secondaryColor(fg), PorterDuff.Mode.SRC_IN));
         chevron.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
@@ -290,7 +292,7 @@ public final class VotBottomSheet {
         row.addView(valueView);
 
         ImageView chevron = new ImageView(context);
-        chevron.setImageResource(DRAWABLE_CHEVRON_RIGHT);
+        chevron.setImageResource(Utils.appIsUsingBoldIcons() ? DRAWABLE_CHEVRON_RIGHT_BOLD : DRAWABLE_CHEVRON_RIGHT);
         chevron.setColorFilter(new PorterDuffColorFilter(secondaryColor(fgColor), PorterDuff.Mode.SRC_IN));
         chevron.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
