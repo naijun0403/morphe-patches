@@ -122,7 +122,7 @@ final class TtsPrefetcher {
             if (videoId.isEmpty() || segments.isEmpty()
                     || !Settings.VOT_ENABLED.get()
                     || Settings.VOT_USE_NATIVE_TTS.get()) {
-                if (!waitOnLock(DELAY_IDLE_MS)) return;
+                if (waitOnLock(DELAY_IDLE_MS)) return;
                 continue;
             }
 
@@ -131,13 +131,14 @@ final class TtsPrefetcher {
             String voice = VoiceCatalog.resolve(voiceLang, Settings.VOT_TTS_VOICE_TYPE.get());
 
             if (voice == null) {
-                if (!waitOnLock(DELAY_IDLE_MS)) return;
+                if (waitOnLock(DELAY_IDLE_MS)) return;
                 continue;
             }
 
             NextFetch next = findNextToFetch(videoId, segments, timeMs, voice);
             if (next != null) {
-                final boolean success = fetch(videoId, segments.get(next.index), next.index, voice);
+                final boolean success = fetch(videoId, segments.get(next.index),
+                        next.index, segments.size(), voice);
 
                 final int delay;
                 if (success) {
@@ -154,23 +155,27 @@ final class TtsPrefetcher {
                     delay = currentBackoffMs;
                 }
 
-                if (!waitOnLock(delay)) return;
+                if (waitOnLock(delay)) return;
             } else {
-                if (!waitOnLock(DELAY_IDLE_MS)) return;
+                if (waitOnLock(DELAY_IDLE_MS)) return;
             }
         }
     }
 
+
+    /**
+     * @return false, if the wait was interrupted..
+     */
     private static boolean waitOnLock(long millis) {
         synchronized (lock) {
             waiting = true;
             try {
                 lock.wait(millis);
-                return true;
-            } catch (InterruptedException ex) {
-                Logger.printDebug(() -> "Prefetch thread interrupted", ex);
-                Thread.currentThread().interrupt();
                 return false;
+            } catch (InterruptedException ex) {
+                VoiceOverTranslationPatch.logError(() -> "Prefetch thread interrupted", ex);
+                Thread.currentThread().interrupt();
+                return true;
             } finally {
                 waiting = false;
             }
@@ -207,12 +212,14 @@ final class TtsPrefetcher {
         return null;
     }
 
-    private static boolean fetch(String videoId, TranscriptSegment seg, int index, String voice) {
+    private static boolean fetch(String videoId, TranscriptSegment seg, int index,
+                                 int totalSegments, String voice) {
         try {
             final byte[] data = engine.prefetch(seg.text(), voice);
             if (data.length > 0) {
                 TtsCache.put(videoId, index, voice, seg.text(), data);
-                Logger.printDebug(() -> "Prefetched segment " + index + " for " + videoId);
+                Logger.printDebug(() -> "Prefetched video: " + videoId
+                        + " segment: " + index + "/" + totalSegments);
                 return true;
             }
             return false;
