@@ -351,7 +351,6 @@ Verify the package name is correct and the app is installed"</string>
     <string name="morphe_vot_mymemory_email_summary">Optional. Enter your MyMemory email address to increase the daily limit from 5,000 to 50,000 characters. Leave empty to use the anonymous limit</string>
     <string name="morphe_vot_tts_engine_label">Engine</string>
     <string name="morphe_vot_tts_system">System</string>
-    <string name="morphe_vot_voice_original_language">Original language</string>
     <string name="morphe_vot_voice_multilingual">Multilingual</string>
     <string name="morphe_vot_voice_gender_male">Male</string>
     <string name="morphe_vot_voice_gender_female">Female</string>

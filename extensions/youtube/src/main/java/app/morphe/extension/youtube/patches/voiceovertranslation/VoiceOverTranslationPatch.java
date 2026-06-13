@@ -23,6 +23,7 @@ import static app.morphe.extension.shared.settings.BaseSettings.DEBUG;
 
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.Utils;
+import app.morphe.extension.shared.settings.AppLanguage;
 import app.morphe.extension.shared.settings.Setting;
 import app.morphe.extension.youtube.settings.Settings;
 import app.morphe.extension.youtube.shared.PlayerType;
@@ -250,8 +251,7 @@ public final class VoiceOverTranslationPatch {
     }
 
     private static void speak(TranscriptSegment seg, int index) {
-        String rawLang = Settings.VOT_CAPTION_LANGUAGE.get();
-        String lang = "auto".equals(rawLang) ? detectedSourceLang : rawLang;
+        String lang = resolveTargetLang();
         final float volume = Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f;
 
         // Time left until the next segment starts, measured from the current playback
@@ -401,7 +401,10 @@ public final class VoiceOverTranslationPatch {
     private static void updateTtsLanguage() {
         TextToSpeech t = tts;
         if (t == null) return;
-        Locale locale = Locale.forLanguageTag(Settings.VOT_CAPTION_LANGUAGE.get());
+        String lang = Settings.VOT_CAPTION_LANGUAGE.get();
+        Locale locale = "app".equals(lang)
+                ? AppLanguage.DEFAULT.getLocale()
+                : Locale.forLanguageTag(lang);
         int result = t.setLanguage(locale);
         if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
             t.setLanguage(Locale.getDefault());
@@ -425,6 +428,11 @@ public final class VoiceOverTranslationPatch {
         public List<Setting<?>> getParentSettings() {
             return List.of(Settings.VOT_TRANSLATION_SERVICE);
         }
+    }
+
+    static String resolveTargetLang() {
+        String lang = Settings.VOT_CAPTION_LANGUAGE.get();
+        return "app".equals(lang) ? AppLanguage.DEFAULT.getLanguage() : lang;
     }
 
     static void logError(Logger.LogMessage message, Exception ex) {

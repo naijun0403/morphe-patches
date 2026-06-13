@@ -521,7 +521,7 @@ public class Settings extends SharedYouTubeSettings {
     public static final IntegerSetting VOT_MAX_SPEECH_RATE = new IntegerSetting("morphe_vot_max_speech_rate", 18, parent(VOT_ENABLED));
     public static final StringSetting VOT_TRANSLATION_SERVICE = new StringSetting("morphe_vot_translation_service", "google", parent(VOT_ENABLED));
     public static final StringSetting VOT_MYMEMORY_EMAIL = new StringSetting("morphe_vot_mymemory_email", "", new MyMemoryServiceAvailability());
-    public static final StringSetting VOT_CAPTION_LANGUAGE = new StringSetting("morphe_vot_caption_language", "en", parent(VOT_ENABLED));
+    public static final StringSetting VOT_CAPTION_LANGUAGE = new StringSetting("morphe_vot_caption_language", "app", parent(VOT_ENABLED));
     public static final StringSetting VOT_TTS_VOICE_TYPE = new StringSetting("morphe_vot_tts_voice_type", "auto", parent(VOT_ENABLED));
     public static final BooleanSetting VOT_USE_NATIVE_TTS = new BooleanSetting("morphe_vot_use_native_tts", FALSE, parent(VOT_ENABLED));
 

@@ -27,7 +27,6 @@ import app.morphe.extension.shared.Utils;
 import app.morphe.extension.shared.innertube.utils.AuthUtils;
 import app.morphe.extension.shared.requests.Requester;
 import app.morphe.extension.youtube.patches.CaptionCookiesPatch;
-import app.morphe.extension.youtube.settings.Settings;
 
 final class TranscriptFetcher {
 
@@ -51,10 +50,9 @@ final class TranscriptFetcher {
         List<TranscriptSegment> segments = fetchEnglishSegments(videoId);
 
         if (!segments.isEmpty()) {
-            String targetLang = Settings.VOT_CAPTION_LANGUAGE.get();
-            String targetLangCode = "auto".equals(targetLang) ? "" : targetLang.split("-")[0];
+            String targetLangCode = VoiceOverTranslationPatch.resolveTargetLang().split("-")[0];
             // Skip translation when the caption track is already in the target language.
-            if (!targetLangCode.isEmpty() && !targetLangCode.equals(lastSourceLang)) {
+            if (!targetLangCode.equals(lastSourceLang)) {
                 segments = TranscriptTranslator.translate(segments, targetLangCode, onUpdate, cancelled);
             }
         }

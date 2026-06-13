@@ -148,7 +148,7 @@ public final class VotBottomSheet {
     private static void refreshEngineRow(LinearLayout row) {
         TextView valueView = (TextView) row.getTag();
         String lang = Settings.VOT_CAPTION_LANGUAGE.get();
-        if ("auto".equals(lang)) lang = VoiceOverTranslationPatch.detectedSourceLang;
+        if ("app".equals(lang)) lang = VoiceOverTranslationPatch.resolveTargetLang();
 
         String voiceId = Settings.VOT_TTS_VOICE_TYPE.get();
         VoiceCatalog.Voice voice = VoiceCatalog.getVoice(voiceId);
@@ -203,7 +203,7 @@ public final class VotBottomSheet {
 
     private static void showEnginePicker(Context context, Runnable onChanged) {
         String lang = Settings.VOT_CAPTION_LANGUAGE.get();
-        if ("auto".equals(lang)) lang = VoiceOverTranslationPatch.detectedSourceLang;
+        if ("app".equals(lang)) lang = VoiceOverTranslationPatch.resolveTargetLang();
 
         List<VoiceCatalog.Voice> voices = VoiceCatalog.getVoicesForLang(lang);
         if (voices == null) {
