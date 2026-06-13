@@ -46,7 +46,7 @@ import app.morphe.extension.shared.Utils;
  * runs at a time (callers gate on {@link #isSpeaking()}).
  *
  * <p>The underlying WebSocket connection is kept alive across calls and only torn down
- * on {@link #stop()} or when the server closes it. Reconnection is transparent to callers.
+ * on an explicit error or when the server closes it.
  */
 final class TtsEngine {
 
@@ -84,7 +84,6 @@ final class TtsEngine {
     private InputStream persistentIn;
     @GuardedBy("lock")
     private OutputStream persistentOut;
-    // speech.config only needs to be sent once per connection.
     @GuardedBy("lock")
     private boolean configSent;
 
@@ -130,16 +129,15 @@ final class TtsEngine {
         }
     }
 
-    /** Clears the busy flag without a full stop; used when synthesis fails before play. */
+    /** Clears the busy flag without a full stop. */
     void clearBusy(long id) {
         setIsNotSpeaking(id);
     }
 
     /**
      * Synthesizes {@code text} with the given Edge TTS {@code voice} on a background thread.
-     * This is the underlying synthesis logic used by {@link #play} and the prefetcher.
      *
-     * @param id The playback session ID (ignored if isLive is false).
+     * @param id The playback session ID.
      */
     byte[] synthesize(String text, String voice, float rate, long id) throws Exception {
         return synthesizeEdge(text, voice, rate, true, id);
@@ -186,8 +184,6 @@ final class TtsEngine {
             stopped = true;
             speaking = false;
 
-            closeSocket();
-
             // Unblock latch.await() in playMp3() so the thread exits quickly.
             if (playLatch != null) {
                 playLatch.countDown();
@@ -211,7 +207,7 @@ final class TtsEngine {
     }
 
     private byte[] synthesizeEdge(String text, String voice, float rate,
-                                          boolean isLive, long id) throws Exception {
+                                  boolean isLive, long id) throws Exception {
         synchronized (synthesisLock) {
             IOException lastEx = null;
             for (int attempt = 1; attempt <= 2; attempt++) {
@@ -269,8 +265,7 @@ final class TtsEngine {
                 }
             }
             if (isLive && isStopped(id)) return new byte[0];
-            if (lastEx != null) throw lastEx;
-            throw new IOException("Synthesis failed");
+            throw lastEx;
         }
     }
 
