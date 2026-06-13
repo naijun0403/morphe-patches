@@ -60,15 +60,7 @@ final class TtsPrefetcher {
 
     private static int currentBackoffMs = 0;
 
-    private static final class NextFetch {
-        final int index;
-        final int distance;
-
-        NextFetch(int index, int distance) {
-            this.index = index;
-            this.distance = distance;
-        }
-    }
+    private record NextFetch(int index, int distance) {}
 
     static void updateVideo(String videoId, List<TranscriptSegment> segments) {
         synchronized (lock) {

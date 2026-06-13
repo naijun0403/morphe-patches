@@ -61,6 +61,9 @@ final class TtsEngine {
 
     private static final int CONNECT_TIMEOUT_MS = 10_000;
     private static final int READ_TIMEOUT_MS    = 20_000;
+    // Close the persistent socket if it has been idle longer than this to avoid
+    // "Connection reset" when the server drops an idle WebSocket connection.
+    private static final long SOCKET_MAX_IDLE_MS = 20_000;
 
     private final Object lock = new Object();
     @GuardedBy("lock")
@@ -77,6 +80,8 @@ final class TtsEngine {
 
     // Ensures only one synthesis turn happens on the WebSocket at a time.
     private final Object synthesisLock = new Object();
+    @GuardedBy("synthesisLock")
+    private long lastSynthesisEndMs;
 
     @GuardedBy("lock")
     private SSLSocket persistentSocket;
@@ -92,12 +97,6 @@ final class TtsEngine {
     private boolean isStopped(long id) {
         synchronized (lock) {
             return stopped || id != playbackId;
-        }
-    }
-
-    private void setStopped(boolean stopped) {
-        synchronized (lock) {
-            this.stopped = stopped;
         }
     }
 
@@ -122,7 +121,7 @@ final class TtsEngine {
      */
     long markBusy() {
         synchronized (lock) {
-            setStopped(false);
+            stopped = false;
             playbackId++;
             speaking = true;
             return playbackId;
@@ -253,6 +252,7 @@ final class TtsEngine {
                     ByteArrayOutputStream audioOut = new ByteArrayOutputStream();
                     collectAudio(in, audioOut);
 
+                    lastSynthesisEndMs = System.currentTimeMillis();
                     return audioOut.toByteArray();
                 } catch (IOException ex) {
                     synchronized (lock) {
@@ -287,7 +287,12 @@ final class TtsEngine {
     @GuardedBy("synthesisLock")
     private void ensureConnected() throws Exception {
         synchronized (lock) {
-            if (persistentSocket != null && !persistentSocket.isClosed()) return;
+            if (persistentSocket != null && !persistentSocket.isClosed()) {
+                // Proactively close the socket if it has been idle long enough for the
+                // server to have dropped it; avoids a "Connection reset" on the first send.
+                if (System.currentTimeMillis() - lastSynthesisEndMs <= SOCKET_MAX_IDLE_MS) return;
+                closeSocket();
+            }
         }
 
         String secMsGec     = genSecMsGec();
