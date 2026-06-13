@@ -44,7 +44,7 @@ final class TranscriptTranslator {
     // Batches are built by character budget rather than segment count, so request
     // sizes stay uniform regardless of how long the merged sentences are.
     private static final int MAX_BATCH_CHARS = 4_000;
-    // Concurrent requests to the translate endpoint. Keep modest to avoid rate limiting.
+    // Concurrent requests to the translation endpoint. Keep modest to avoid rate limiting.
     private static final int PARALLEL_REQUESTS = 4;
 
     // Set to true at the start of each translate() call so the first batch failure per
@@ -133,7 +133,7 @@ final class TranscriptTranslator {
         } catch (Exception ex) {
             if (reportNextTranslationError) {
                 reportNextTranslationError = false;
-                Logger.printException(() -> "Translation failed: " + ex.getMessage(), ex);
+                VoiceOverTranslationPatch.logError(() -> "Translation failed: " + ex.getMessage(), ex);
             } else {
                 Logger.printDebug(() -> "Batch failed: " + ex.getMessage());
             }

@@ -133,7 +133,7 @@ final class TtsEngine {
             try {
                 if (!stopped.get()) playMp3(mp3, volume, rate);
             } catch (Exception ex) {
-                if (!stopped.get()) Logger.printException(() -> "Playback failed", ex);
+                if (!stopped.get()) VoiceOverTranslationPatch.logError(() -> "Playback failed", ex);
             } finally {
                 speaking.set(false);
                 if (onDone != null) Utils.runOnMainThread(onDone);

@@ -43,7 +43,7 @@ import app.morphe.extension.youtube.shared.PipDismissHelper;
 public final class VotBottomSheet {
 
     private static final int DRAWABLE_CHEVRON_RIGHT = ResourceUtils.getIdentifier(
-            ResourceType.DRAWABLE, "ic_keyboard_arrow_right_black_24dp");
+            ResourceType.DRAWABLE, "yt_outline_chevron_right_black_18");
     private static final int DRAWABLE_CHEVRON_RIGHT_BOLD = ResourceUtils.getIdentifier(
             ResourceType.DRAWABLE, "yt_outline_experimental_chevron_right_vd_theme_18");
 

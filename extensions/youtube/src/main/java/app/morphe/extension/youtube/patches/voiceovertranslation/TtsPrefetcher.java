@@ -178,7 +178,7 @@ final class TtsPrefetcher {
                 Logger.printDebug(() -> "Prefetched segment " + index + " for " + videoId);
             }
         } catch (Exception e) {
-            Logger.printException(() -> "Prefetch failed for segment " + index, e);
+            VoiceOverTranslationPatch.logError(() -> "Prefetch failed for segment " + index, e);
             // Back off before the next attempt to avoid hammering a failing endpoint.
             try {
                 Thread.sleep(2000);

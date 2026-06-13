@@ -19,6 +19,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+import static app.morphe.extension.shared.settings.BaseSettings.DEBUG;
+
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.Utils;
 import app.morphe.extension.shared.settings.Setting;
@@ -106,7 +108,7 @@ public final class VoiceOverTranslationPatch {
             TtsPrefetcher.updateVideo(videoId, segments);
             loadTranscript(videoId);
         } catch (Exception ex) {
-            Logger.printException(() -> "newVideoLoaded failure", ex);
+            logError(() -> "newVideoLoaded failure", ex);
         }
     }
 
@@ -210,7 +212,7 @@ public final class VoiceOverTranslationPatch {
                     notifyStateChanged();
                 }
             } catch (Exception ex) {
-                Logger.printException(() -> "Transcript fetch failed", ex);
+                logError(() -> "Transcript fetch failed", ex);
             } finally {
                 isLoading = false;
                 // The video may have changed while this fetch was in flight - the isLoading
@@ -295,7 +297,7 @@ public final class VoiceOverTranslationPatch {
                             abandonDuck();
                         }
                     } catch (Exception ex) {
-                        Logger.printException(() -> "Synthesis failed", ex);
+                        logError(() -> "Synthesis failed", ex);
                         edgeTtsEngine.clearBusy();
                         abandonDuck();
                     }
@@ -423,5 +425,10 @@ public final class VoiceOverTranslationPatch {
         public List<Setting<?>> getParentSettings() {
             return List.of(Settings.VOT_TRANSLATION_SERVICE);
         }
+    }
+
+    static void logError(Logger.LogMessage message, Exception ex) {
+        if (DEBUG.get()) Logger.printException(message, ex);
+        else Logger.printInfo(message, ex);
     }
 }
