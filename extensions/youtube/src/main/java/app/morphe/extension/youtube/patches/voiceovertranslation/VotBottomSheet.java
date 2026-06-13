@@ -8,10 +8,16 @@
 package app.morphe.extension.youtube.patches.voiceovertranslation;
 
 import static app.morphe.extension.shared.StringRef.str;
+import static app.morphe.extension.youtube.patches.voiceovertranslation.VoiceOverTranslationPatch.TTS_ENGINE_SYSTEM;
 import static app.morphe.extension.youtube.patches.voiceovertranslation.TranscriptTranslator.TRANSLATION_SERVICE_GOOGLE;
 import static app.morphe.extension.youtube.patches.voiceovertranslation.TranscriptTranslator.TRANSLATION_SERVICE_MY_MEMORY;
 import static app.morphe.extension.youtube.videoplayer.LegacyPlayerControlButton.fadeInDuration;
 import static app.morphe.extension.youtube.videoplayer.LegacyPlayerControlButton.getDialogBackgroundColor;
+import static app.morphe.extension.shared.settings.preference.CustomDialogListPreference.DRAWABLE_CHECKMARK;
+import static app.morphe.extension.shared.settings.preference.CustomDialogListPreference.DRAWABLE_CHECKMARK_BOLD;
+import static app.morphe.extension.shared.settings.preference.CustomDialogListPreference.ID_MORPHE_CHECK_ICON;
+import static app.morphe.extension.shared.settings.preference.CustomDialogListPreference.ID_MORPHE_CHECK_ICON_PLACEHOLDER;
+import static app.morphe.extension.shared.settings.preference.CustomDialogListPreference.ID_MORPHE_ITEM_TEXT;
 import static app.morphe.extension.shared.settings.preference.CustomDialogListPreference.LAYOUT_MORPHE_CUSTOM_LIST_ITEM_CHECKED;
 
 import android.content.Context;
@@ -20,9 +26,17 @@ import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.Typeface;
 import android.util.Pair;
+import android.content.res.ColorStateList;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
+import android.graphics.drawable.ShapeDrawable;
+import android.graphics.drawable.shapes.OvalShape;
 import android.view.Gravity;
+import android.view.LayoutInflater;
 import android.view.View;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.ScrollView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.SeekBar;
@@ -48,6 +62,10 @@ public final class VotBottomSheet {
             ResourceType.DRAWABLE, "yt_outline_chevron_right_black_18");
     private static final int DRAWABLE_CHEVRON_RIGHT_BOLD = ResourceUtils.getIdentifier(
             ResourceType.DRAWABLE, "yt_outline_experimental_chevron_right_vd_theme_18");
+    private static final int DRAWABLE_SPEAKER = ResourceUtils.getIdentifier(
+            ResourceType.DRAWABLE, "yt_outline_speaker_vd_theme_24");
+    private static final int DRAWABLE_SPEAKER_BOLD = ResourceUtils.getIdentifier(
+            ResourceType.DRAWABLE, "yt_outline_experimental_speaker_vd_theme_24");
 
     public static void show(Context context) {
         SheetBottomDialog.DraggableLinearLayout root = SheetBottomDialog
@@ -229,39 +247,82 @@ public final class VotBottomSheet {
             values[i] = v.id;
         }
         entries[entryValuesSize - 1] = str("morphe_vot_tts_system");
-        values[entryValuesSize - 1] = "system";
+        values[entryValuesSize - 1] = TTS_ENGINE_SYSTEM;
 
         String selectedValue = Settings.VOT_USE_NATIVE_TTS.get()
-                ? "system"
+                ? TTS_ENGINE_SYSTEM
                 : Settings.VOT_TTS_VOICE_TYPE.get();
+
+        final int fg = Utils.getAppForegroundColor();
 
         SheetBottomDialog.DraggableLinearLayout pickerRoot =
                 SheetBottomDialog.createMainLayout(context, getDialogBackgroundColor());
         pickerRoot.setPadding(Dim.dp16, 0, Dim.dp16, Dim.dp16);
-        pickerRoot.addView(makeTitle(context, str("morphe_vot_tts_voice_type"), Utils.getAppForegroundColor()));
-
-        ListView listView = new ListView(context);
-        listView.setDivider(null);
-        CustomDialogListPreference.ListPreferenceArrayAdapter adapter =
-                new CustomDialogListPreference.ListPreferenceArrayAdapter(
-                        context, LAYOUT_MORPHE_CUSTOM_LIST_ITEM_CHECKED, entries, values, selectedValue);
-        listView.setAdapter(adapter);
+        pickerRoot.addView(makeTitle(context, str("morphe_vot_tts_voice_type"), fg));
 
         SheetBottomDialog.SlideDialog pickerDialog =
                 SheetBottomDialog.createSlideDialog(context, pickerRoot, fadeInDuration);
 
-        listView.setOnItemClickListener((parent, view, position, id) -> {
-            if ("system".equals(values[position])) {
-                Settings.VOT_USE_NATIVE_TTS.save(true);
-            } else {
-                Settings.VOT_USE_NATIVE_TTS.save(false);
-                Settings.VOT_TTS_VOICE_TYPE.save(values[position]);
-            }
-            onChanged.run();
-            pickerDialog.dismiss();
-        });
+        ScrollView scroll = new ScrollView(context);
+        LinearLayout listLayout = new LinearLayout(context);
+        listLayout.setOrientation(LinearLayout.VERTICAL);
+        scroll.addView(listLayout);
 
-        pickerRoot.addView(listView);
+        LayoutInflater inflater = LayoutInflater.from(context);
+        int checkmarkRes = Utils.appIsUsingBoldIcons() ? DRAWABLE_CHECKMARK_BOLD : DRAWABLE_CHECKMARK;
+        int speakerRes = Utils.appIsUsingBoldIcons() ? DRAWABLE_SPEAKER_BOLD : DRAWABLE_SPEAKER;
+        final int rippleColor = Color.argb(60, Color.red(fg), Color.green(fg), Color.blue(fg));
+
+        for (int i = 0; i < entryValuesSize; i++) {
+            final String value = values[i];
+            final boolean isSystem = TTS_ENGINE_SYSTEM.equals(value);
+            View row = inflater.inflate(LAYOUT_MORPHE_CUSTOM_LIST_ITEM_CHECKED, listLayout, false);
+
+            ImageView check = row.findViewById(ID_MORPHE_CHECK_ICON);
+            check.setImageResource(checkmarkRes);
+            check.setColorFilter(fg);
+            boolean isSelected = value.equals(selectedValue);
+            check.setVisibility(isSelected ? View.VISIBLE : View.GONE);
+            row.findViewById(ID_MORPHE_CHECK_ICON_PLACEHOLDER)
+                    .setVisibility(isSelected ? View.GONE : View.VISIBLE);
+            TextView itemText = row.findViewById(ID_MORPHE_ITEM_TEXT);
+            itemText.setText(entries[i]);
+            itemText.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+            FrameLayout speakerButton = new FrameLayout(context);
+            LinearLayout.LayoutParams buttonLp = new LinearLayout.LayoutParams(Dim.dp40, Dim.dp40);
+            buttonLp.setMarginStart(Dim.dp8);
+            speakerButton.setLayoutParams(buttonLp);
+
+            GradientDrawable circle = new GradientDrawable();
+            circle.setShape(GradientDrawable.OVAL);
+            circle.setColor(Color.argb(20, Color.red(fg), Color.green(fg), Color.blue(fg)));
+            speakerButton.setBackground(new RippleDrawable(
+                    ColorStateList.valueOf(rippleColor), circle, new ShapeDrawable(new OvalShape())));
+
+            ImageView speaker = new ImageView(context);
+            speaker.setImageResource(speakerRes);
+            speaker.setColorFilter(new PorterDuffColorFilter(secondaryColor(fg), PorterDuff.Mode.SRC_IN));
+            speaker.setLayoutParams(new FrameLayout.LayoutParams(Dim.dp24, Dim.dp24, Gravity.CENTER));
+            speakerButton.addView(speaker);
+            speakerButton.setOnClickListener(v -> VoiceOverTranslationPatch.testSpeak(value));
+            ((LinearLayout) row).addView(speakerButton);
+
+            row.setOnClickListener(v -> {
+                if (isSystem) {
+                    Settings.VOT_USE_NATIVE_TTS.save(true);
+                } else {
+                    Settings.VOT_USE_NATIVE_TTS.save(false);
+                    Settings.VOT_TTS_VOICE_TYPE.save(value);
+                }
+                onChanged.run();
+                pickerDialog.dismiss();
+            });
+
+            listLayout.addView(row);
+        }
+
+        pickerRoot.addView(scroll);
         pickerDialog.show();
     }
 

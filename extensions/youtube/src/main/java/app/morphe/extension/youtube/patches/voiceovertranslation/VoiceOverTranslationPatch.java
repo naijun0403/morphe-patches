@@ -63,11 +63,13 @@ public final class VoiceOverTranslationPatch {
     private static final AudioManager.OnAudioFocusChangeListener focusChangeListener = focusChange -> { };
     private static volatile AudioFocusRequest focusRequest;
     private static volatile boolean isDucking;
+    private static volatile boolean isTestSpeaking;
 
     private static final TtsEngine edgeTtsEngine = TtsEngine.INSTANCE;
 
-    /** Language code of the video's own caption track, detected on each transcript fetch. */
-    static volatile String detectedSourceLang = "en";
+    static final String TTS_ENGINE_SYSTEM = "system";
+
+    private static final String TEST_SPEAK_PHRASE = "It's a morphing time";
 
     static {
         PlayerType.getOnChange().addObserver(playerType -> {
@@ -217,7 +219,6 @@ public final class VoiceOverTranslationPatch {
                 if (videoId.equals(currentVideoId)) {
                     segments = fetched;
                     TtsPrefetcher.updateVideo(videoId, fetched);
-                    detectedSourceLang = TranscriptFetcher.lastSourceLang;
                     Logger.printDebug(() -> "Loaded: " + fetched.size()
                             + " segments for :" + videoId);
                     notifyStateChanged();
@@ -253,8 +254,14 @@ public final class VoiceOverTranslationPatch {
             // Abandon duck when an utterance finishes naturally (not when flushed by the next segment).
             tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
                 @Override public void onStart(String utteranceId) { }
-                @Override public void onDone(String utteranceId) { abandonDuck(); }
-                @Override public void onError(String utteranceId) { abandonDuck(); }
+                @Override public void onDone(String utteranceId) {
+                    if ("vot_test".equals(utteranceId)) abandonDuckAfterTest();
+                    else abandonDuck();
+                }
+                @Override public void onError(String utteranceId) {
+                    if ("vot_test".equals(utteranceId)) abandonDuckAfterTest();
+                    else abandonDuck();
+                }
             });
             ttsReady = true;
         });
@@ -360,7 +367,78 @@ public final class VoiceOverTranslationPatch {
         lastSpokenIndex = -1;
     }
 
+    /**
+     * Synthesizes and plays a short test phrase with the given Edge TTS voice.
+     * If the engine is already speaking (e.g. a previous test), stops it instead.
+     */
+    static void testSpeak(String voiceId) {
+        final float volume = Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f;
+        if (TTS_ENGINE_SYSTEM.equals(voiceId)) {
+            ensureTts();
+            if (!ttsReady) return;
+            if (isTestSpeaking) {
+                isTestSpeaking = false;
+                tts.stop();
+                abandonDuck();
+                return;
+            }
+            isTestSpeaking = true;
+            requestDuck();
+            Utils.runOnBackgroundThread(() -> {
+                String phrase = translateTestPhrase();
+                Bundle params = new Bundle();
+                params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume);
+                tts.setSpeechRate(1.0f);
+                tts.speak(phrase, TextToSpeech.QUEUE_FLUSH, params, "vot_test");
+            });
+            return;
+        }
+        if (isTestSpeaking) {
+            isTestSpeaking = false;
+            edgeTtsEngine.stop();
+            abandonDuck();
+            return;
+        }
+        // Stop any regular segment that may be playing; its onDone will call abandonDuck()
+        // which is guarded by isTestSpeaking and will be a no-op.
+        isTestSpeaking = true;
+        edgeTtsEngine.stop();
+        requestDuck();
+        final long playbackId = edgeTtsEngine.markBusy();
+        Utils.runOnBackgroundThread(() -> {
+            try {
+                String phrase = translateTestPhrase();
+                byte[] data = edgeTtsEngine.synthesize(phrase, voiceId, 1.0f, playbackId);
+                if (data.length > 0) {
+                    edgeTtsEngine.play(data, volume, 1.0f, playbackId,
+                            VoiceOverTranslationPatch::abandonDuckAfterTest);
+                } else {
+                    edgeTtsEngine.clearBusy(playbackId);
+                    abandonDuckAfterTest();
+                }
+            } catch (Exception ex) {
+                logError(() -> "Test speak failed", ex);
+                edgeTtsEngine.clearBusy(playbackId);
+                abandonDuckAfterTest();
+            }
+        });
+    }
+
+    private static String translateTestPhrase() {
+        String targetLang = resolveTargetLang().split("-")[0];
+        if ("en".equals(targetLang)) return TEST_SPEAK_PHRASE;
+        try {
+            List<TranscriptSegment> result = TranscriptTranslator.translate(
+                    List.of(new TranscriptSegment(0, 5000, TEST_SPEAK_PHRASE)),
+                    targetLang, null, null);
+            return result.isEmpty() ? TEST_SPEAK_PHRASE : result.get(0).text();
+        } catch (Exception ex) {
+            return TEST_SPEAK_PHRASE;
+        }
+    }
+
     private static void stopTts() {
+        isTestSpeaking = false;
         edgeTtsEngine.stop();
         TextToSpeech localTts = tts;
         if (localTts != null) localTts.stop();
@@ -392,9 +470,10 @@ public final class VoiceOverTranslationPatch {
 
     /**
      * Releases the transient audio focus so ExoPlayer restores its media volume.
-     * No-op if ducking is not active.
+     * No-op if ducking is not active or a test is still playing.
      */
     private static void abandonDuck() {
+        if (isTestSpeaking) return;
         if (!isDucking) return;
         isDucking = false;
         AudioManager am = audioManager;
@@ -404,6 +483,11 @@ public final class VoiceOverTranslationPatch {
             am.abandonAudioFocusRequest(req);
             focusRequest = null;
         }
+    }
+
+    private static void abandonDuckAfterTest() {
+        isTestSpeaking = false;
+        abandonDuck();
     }
 
     private static void updateTtsLanguage() {
