@@ -1,32 +1,20 @@
-/*
- * Copyright 2026 Morphe.
- * https://github.com/MorpheApp/morphe-patches
- *
- * See the included NOTICE file for GPLv3 §7(b) and §7(c) terms that apply to this code.
- */
-
 package app.morphe.extension.youtube.patches.voiceovertranslation;
 
-import java.util.LinkedHashMap;
+import java.util.Collections;
 import java.util.Map;
+
+import app.morphe.extension.shared.Utils;
 
 /**
  * In-memory LRU cache for synthesized Edge TTS MP3 segments.
  *
  * <p>Edge TTS audio at 24 kHz / 48 kbps uses ~6 KB/s. A full hour of speech is
- * ~20 MB, so keeping up to {@value #MAX_ENTRIES} segments in memory is safe.
+ * ~20 MB, so keeping a few thousand sentences in memory is safe.
  */
 final class TtsCache {
 
-    private static final int MAX_ENTRIES = 1000;
-
-    private static final LinkedHashMap<String, byte[]> cache =
-            new LinkedHashMap<>(16, 0.75f, false) {
-                @Override
-                protected boolean removeEldestEntry(Map.Entry<String, byte[]> eldest) {
-                    return size() > MAX_ENTRIES;
-                }
-            };
+    private static final Map<String, byte[]> cache = Collections.synchronizedMap(
+            Utils.createSizeRestrictedMap(1000));
 
     static synchronized boolean notCached(String videoId, int segmentIndex, String voice, String text) {
         return !cache.containsKey(key(videoId, segmentIndex, voice, text));
@@ -41,6 +29,6 @@ final class TtsCache {
     }
 
     private static String key(String videoId, int segmentIndex, String voice, String text) {
-        return videoId + ':' + segmentIndex + ':' + voice + ':' + text.hashCode();
+        return videoId + ':' + segmentIndex + ':' + voice + ':' + text;
     }
 }
