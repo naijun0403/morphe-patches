@@ -338,8 +338,8 @@ Verify the package name is correct and the app is installed"</string>
     <!-- video.voiceovertranslation.voiceOverTranslationPatch -->
     <string name="morphe_vot_enabled_title">Voice over translation</string>
     <string name="morphe_vot_enabled_summary">Read video captions aloud using on-device text-to-speech, synchronized with playback</string>
-    <string name="morphe_vot_caption_language_title">Caption language</string>
-    <string name="morphe_vot_translation_service_title">Translation</string>
+    <string name="morphe_vot_caption_language_title">Language</string>
+    <string name="morphe_vot_translation_service_title">Provider</string>
     <string name="morphe_vot_original_audio_volume_title">Voice volume</string>
     <string name="morphe_vot_original_audio_volume_summary">Adjust the dubbed voice volume relative to the original audio (0 is silent, 100 is full volume)</string>
     <string name="morphe_vot_max_speech_rate_title">Max speech rate</string>
@@ -352,6 +352,7 @@ Verify the package name is correct and the app is installed"</string>
     <string name="morphe_vot_tts_voice_type">Voice</string>
     <string name="morphe_vot_tts_system">System</string>
     <string name="morphe_vot_voice_multilingual">Multilingual</string>
+    <string name="morphe_vot_voice_expressive">Expressive</string>
     <string name="morphe_vot_voice_gender_male">Male</string>
     <string name="morphe_vot_voice_gender_female">Female</string>
 

@@ -8,6 +8,8 @@
 package app.morphe.extension.youtube.patches.voiceovertranslation;
 
 import static app.morphe.extension.shared.StringRef.str;
+import static app.morphe.extension.youtube.patches.voiceovertranslation.TranscriptTranslator.TRANSLATION_SERVICE_GOOGLE;
+import static app.morphe.extension.youtube.patches.voiceovertranslation.TranscriptTranslator.TRANSLATION_SERVICE_MY_MEMORY;
 import static app.morphe.extension.youtube.videoplayer.LegacyPlayerControlButton.fadeInDuration;
 import static app.morphe.extension.youtube.videoplayer.LegacyPlayerControlButton.getDialogBackgroundColor;
 import static app.morphe.extension.shared.settings.preference.CustomDialogListPreference.LAYOUT_MORPHE_CUSTOM_LIST_ITEM_CHECKED;
@@ -78,10 +80,10 @@ public final class VotBottomSheet {
 
         LinearLayout translationRow = makeValueRow(context, fg, str("morphe_vot_translation_service_title"));
         Runnable refreshTranslation = () -> {
-            String service = Settings.VOT_TRANSLATION_SERVICE.get();
-            String label;
-            if ("mymemory".equals(service)) label = str("morphe_vot_service_mymemory");
-            else label = str("morphe_vot_service_google");
+            String label = str(
+                    Settings.VOT_TRANSLATION_SERVICE.get().equals(TRANSLATION_SERVICE_MY_MEMORY)
+                            ? "morphe_vot_service_mymemory"
+                            : "morphe_vot_service_google");
             ((TextView) translationRow.getTag()).setText(label);
         };
         translationRow.setOnClickListener(v -> showTranslationServicePicker(context, refreshTranslation));
@@ -171,7 +173,7 @@ public final class VotBottomSheet {
 
     private static void showTranslationServicePicker(Context context, Runnable onChanged) {
         String[] entries = {str("morphe_vot_service_google"), str("morphe_vot_service_mymemory")};
-        String[] values = {"google", "mymemory"};
+        String[] values = { TRANSLATION_SERVICE_GOOGLE, TRANSLATION_SERVICE_MY_MEMORY };
 
         SheetBottomDialog.DraggableLinearLayout pickerRoot =
                 SheetBottomDialog.createMainLayout(context, getDialogBackgroundColor());

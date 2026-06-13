@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Locale;
 
 import static app.morphe.extension.shared.settings.BaseSettings.DEBUG;
+import static app.morphe.extension.youtube.patches.voiceovertranslation.TranscriptTranslator.TRANSLATION_SERVICE_MY_MEMORY;
 
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.Utils;
@@ -401,13 +402,12 @@ public final class VoiceOverTranslationPatch {
     private static void updateTtsLanguage() {
         TextToSpeech t = tts;
         if (t == null) return;
-        String lang = Settings.VOT_CAPTION_LANGUAGE.get();
-        Locale locale = "app".equals(lang)
-                ? AppLanguage.DEFAULT.getLocale()
-                : Locale.forLanguageTag(lang);
+        Locale locale = Settings.VOT_CAPTION_LANGUAGE.isSetToDefault() // Default is app language.
+                ? Locale.getDefault()
+                : Locale.forLanguageTag(Settings.VOT_CAPTION_LANGUAGE.get());
         int result = t.setLanguage(locale);
         if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-            t.setLanguage(Locale.getDefault());
+            t.setLanguage(Locale.ENGLISH);
         }
     }
 
@@ -421,7 +421,7 @@ public final class VoiceOverTranslationPatch {
     public static final class MyMemoryServiceAvailability implements Setting.Availability {
         @Override
         public boolean isAvailable() {
-            return "mymemory".equals(Settings.VOT_TRANSLATION_SERVICE.get());
+            return Settings.VOT_TRANSLATION_SERVICE.get().equals(TRANSLATION_SERVICE_MY_MEMORY);
         }
 
         @Override
@@ -431,8 +431,9 @@ public final class VoiceOverTranslationPatch {
     }
 
     static String resolveTargetLang() {
-        String lang = Settings.VOT_CAPTION_LANGUAGE.get();
-        return "app".equals(lang) ? AppLanguage.DEFAULT.getLanguage() : lang;
+        return Settings.VOT_CAPTION_LANGUAGE.isSetToDefault() // Default is app language.
+                ? AppLanguage.DEFAULT.getLanguage()
+                : Settings.VOT_CAPTION_LANGUAGE.get();
     }
 
     static void logError(Logger.LogMessage message, Exception ex) {

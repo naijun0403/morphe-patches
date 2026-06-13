@@ -46,6 +46,10 @@ final class TranscriptTranslator {
     private static final int MAX_BATCH_CHARS = 4_000;
     // Concurrent requests to the translation endpoint. Keep modest to avoid rate limiting.
     private static final int PARALLEL_REQUESTS = 4;
+    // Same as arrays.xml value
+    public static final String TRANSLATION_SERVICE_GOOGLE = "google";
+    // Same as arrays.xml value
+    public static final String TRANSLATION_SERVICE_MY_MEMORY = "mymemory";
 
     // Set to true at the start of each translate() call so the first batch failure per
     // video is reported via printException (visible to the user), while subsequent batch
@@ -147,7 +151,7 @@ final class TranscriptTranslator {
 
     private static List<List<TranscriptSegment>> splitByCharBudget(List<TranscriptSegment> segments, int maxChars) {
         List<List<TranscriptSegment>> batches = new ArrayList<>();
-        List<TranscriptSegment> batch = new ArrayList<>();
+        List<TranscriptSegment> batch = new ArrayList<>(segments.size());
         int chars = 0;
         for (TranscriptSegment seg : segments) {
             final int len = seg.text().length() + 1;
@@ -164,7 +168,7 @@ final class TranscriptTranslator {
     }
 
     private static List<String> translateBatch(List<TranscriptSegment> segments, String targetLang) throws Exception {
-        return "mymemory".equals(Settings.VOT_TRANSLATION_SERVICE.get())
+        return Settings.VOT_TRANSLATION_SERVICE.get().equals(TRANSLATION_SERVICE_MY_MEMORY)
                 ? translateBatchMyMemory(segments, targetLang)
                 : translateBatchGoogle(segments, targetLang);
     }
@@ -245,7 +249,7 @@ final class TranscriptTranslator {
         conn.setRequestProperty("User-Agent", "Mozilla/5.0");
 
         final int httpCode = conn.getResponseCode();
-        if (httpCode != 200) throw new Exception("HTTP " + httpCode + " from MyMemory");
+        if (httpCode != 200) throw new Exception("MyMemory HTTP status: " + httpCode);
 
         // Response: {"responseStatus": 200, "responseData": {"translatedText": "..."}}
         JSONObject json = new JSONObject(Requester.parseString(conn));

@@ -52,18 +52,25 @@ final class VoiceCatalog {
         }
 
         private static String buildDisplayName(String shortName, boolean isMale, String voiceId) {
-            int dash = voiceId.lastIndexOf('-');
+            String name = shortName;
+            String expressiveName = "Expressive";
+            if (name.endsWith(expressiveName)) {
+                name = name.substring(0, name.length() - expressiveName.length()) + " "
+                        + str("morphe_vot_voice_expressive");
+            }
+
+            final int dash = voiceId.lastIndexOf('-');
             String suffix = dash >= 0 ? voiceId.substring(dash + 1) : voiceId;
             final boolean multilingual = suffix.endsWith("MultilingualNeural");
-            final String gender = isMale
-                    ? str("morphe_vot_voice_gender_male")
-                    : str("morphe_vot_voice_gender_female");
-            return (multilingual ? shortName + " " + str("morphe_vot_voice_multilingual") : shortName)
+            final String gender = str(isMale
+                    ? "morphe_vot_voice_gender_male"
+                    : "morphe_vot_voice_gender_female");
+            return (multilingual ? name + " " + str("morphe_vot_voice_multilingual") : name)
                     + " (" + gender + ")";
         }
     }
 
-    // First voice for each language is used for 'auto' TTS voice type.
+    // First voice for each language is used for 'app language' TTS voice type.
     private static final Voice[] ALL_VOICES = {
             new Voice(true, "af-ZA-WillemNeural"),
             new Voice(true, "am-ET-AmehaNeural"),

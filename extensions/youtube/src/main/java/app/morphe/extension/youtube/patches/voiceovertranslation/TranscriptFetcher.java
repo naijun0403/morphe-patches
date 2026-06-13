@@ -68,7 +68,7 @@ final class TranscriptFetcher {
             captionUrl = innertubeResult[0];
             poToken    = innertubeResult[1];
         } catch (Exception ex) {
-            Logger.printDebug(() -> "Innertube player failed: " + ex.getMessage());
+            Logger.printDebug(() -> "Innertube player failed", ex);
         }
 
         if (captionUrl != null) {
