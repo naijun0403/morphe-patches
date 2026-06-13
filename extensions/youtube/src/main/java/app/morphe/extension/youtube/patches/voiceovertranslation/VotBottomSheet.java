@@ -71,7 +71,7 @@ public final class VotBottomSheet {
             }
         }
 
-        LinearLayout engineRow = makeValueRow(context, fg, str("morphe_vot_tts_engine_label"));
+        LinearLayout engineRow = makeValueRow(context, fg, str("morphe_vot_tts_voice_type"));
         Runnable refreshEngine = () -> refreshEngineRow(engineRow);
         engineRow.setOnClickListener(v -> showEnginePicker(context, refreshEngine));
         refreshEngine.run();
@@ -236,7 +236,7 @@ public final class VotBottomSheet {
         SheetBottomDialog.DraggableLinearLayout pickerRoot =
                 SheetBottomDialog.createMainLayout(context, getDialogBackgroundColor());
         pickerRoot.setPadding(Dim.dp16, 0, Dim.dp16, Dim.dp16);
-        pickerRoot.addView(makeTitle(context, str("morphe_vot_tts_engine_label"), Utils.getAppForegroundColor()));
+        pickerRoot.addView(makeTitle(context, str("morphe_vot_tts_voice_type"), Utils.getAppForegroundColor()));
 
         ListView listView = new ListView(context);
         listView.setDivider(null);
