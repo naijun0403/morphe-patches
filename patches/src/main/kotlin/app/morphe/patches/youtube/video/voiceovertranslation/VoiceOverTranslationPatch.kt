@@ -14,7 +14,6 @@ import app.morphe.patches.shared.misc.settings.preference.NonInteractivePreferen
 import app.morphe.patches.shared.misc.settings.preference.PreferenceScreenPreference
 import app.morphe.patches.shared.misc.settings.preference.SwitchPreference
 import app.morphe.patches.shared.misc.settings.preference.TextPreference
-import app.morphe.patches.shared.misc.settings.preference.noTitleUnsortedPreferenceCategory
 import app.morphe.patches.youtube.layout.player.buttons.addPlayerBottomButton
 import app.morphe.patches.youtube.layout.player.buttons.playerOverlayButtonsHookPatch
 import app.morphe.patches.youtube.misc.extension.sharedExtensionPatch
@@ -57,7 +56,7 @@ private val voiceOverTranslationResourcePatch = resourcePatch {
 @Suppress("unused")
 val voiceOverTranslationPatch = bytecodePatch(
     name = "Voice over translation",
-    description = "Reads video captions aloud using on-device text-to-speech, synchronized with video playback.",
+    description = "Adds additional voice over languages using text-to-speech synchronized to the video playback.",
 ) {
     dependsOn(
         sharedExtensionPatch,
@@ -79,13 +78,11 @@ val voiceOverTranslationPatch = bytecodePatch(
                     SwitchPreference("morphe_vot_enabled"),
                     ListPreference("morphe_vot_caption_language"),
                     ListPreference("morphe_vot_translation_service"),
-                    noTitleUnsortedPreferenceCategory(
-                        NonInteractivePreference("morphe_vot_mymemory_info",
-                            titleKey = "morphe_vot_service_mymemory",
-                            tag = "app.morphe.extension.youtube.settings.preference.VoiceOverTranslationMyMemoryInfoPreference",
-                            selectable = true),
-                        TextPreference("morphe_vot_mymemory_email"),
-                    ),
+                    NonInteractivePreference("morphe_vot_mymemory_info",
+                        titleKey = "morphe_vot_service_mymemory",
+                        tag = "app.morphe.extension.youtube.settings.preference.VoiceOverTranslationMyMemoryInfoPreference",
+                        selectable = true),
+                    TextPreference("morphe_vot_mymemory_email"),
                     NonInteractivePreference("morphe_vot_max_speech_rate",
                         tag = "app.morphe.extension.shared.settings.preference.SeekBarPreference",
                         selectable = true)
