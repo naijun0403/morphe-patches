@@ -117,6 +117,7 @@ public final class VoiceOverTranslationPatch {
         if (!Settings.VOT_ENABLED.get() || !sessionEnabled) return; // feature or session disabled
         PlayerType currentPlayerType = PlayerType.getCurrent();
         if (!currentPlayerType.isMaximizedOrFullscreen()
+                && currentPlayerType != PlayerType.WATCH_WHILE_MINIMIZED
                 && currentPlayerType != PlayerType.WATCH_WHILE_PICTURE_IN_PICTURE) return;
         if (VideoState.getCurrent() != VideoState.PLAYING) return; // paused, ended, or loading
 
