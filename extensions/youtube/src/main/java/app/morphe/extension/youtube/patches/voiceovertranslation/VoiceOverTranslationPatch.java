@@ -118,12 +118,20 @@ public final class VoiceOverTranslationPatch {
      * Injection point.
      */
     public static void videoTimeChanged(long timeMs) {
-        if (!Settings.VOT_ENABLED.get() || !sessionEnabled) return; // feature or session disabled
+        if (!Settings.VOT_ENABLED.get() || !sessionEnabled) return; // Feature or session disabled.
+
         PlayerType currentPlayerType = PlayerType.getCurrent();
         if (!currentPlayerType.isMaximizedOrFullscreen()
                 && currentPlayerType != PlayerType.WATCH_WHILE_MINIMIZED
-                && currentPlayerType != PlayerType.WATCH_WHILE_PICTURE_IN_PICTURE) return;
-        if (VideoState.getCurrent() != VideoState.PLAYING) return; // paused, ended, or loading
+                && currentPlayerType != PlayerType.WATCH_WHILE_PICTURE_IN_PICTURE) {
+            Logger.printDebug(() -> "Ignoring TTS for player type: " + currentPlayerType);
+            return;
+        }
+        VideoState state = VideoState.getCurrent();
+        if (state != VideoState.PLAYING) {
+            Logger.printDebug(() -> "Ignoring TTS for video state: " + state);
+            return; // paused, ended, or loading
+        }
 
         TtsPrefetcher.updateTime(timeMs);
 

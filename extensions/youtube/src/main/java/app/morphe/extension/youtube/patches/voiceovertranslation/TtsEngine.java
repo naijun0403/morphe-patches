@@ -174,6 +174,9 @@ final class TtsEngine {
     /** Stops any in-progress synthesis or playback immediately. */
     void stop() {
         synchronized (lock) {
+            if (!stopped) {
+                Logger.printDebug(() -> "Stopping TTS");
+            }
             setStopped(true);
             setIsSpeaking(false);
 

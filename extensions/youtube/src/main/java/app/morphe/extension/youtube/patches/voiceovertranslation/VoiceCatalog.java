@@ -24,6 +24,10 @@ import java.util.Objects;
 final class VoiceCatalog {
 
     public static final class Voice {
+        private static final String MULTILINGUAL_NEURAL_SUFFIX = "MultilingualNeural";
+        private static final String EXPRESSIVE_SUFFIX = "Expressive";
+        private static final String NEURAL_SUFFIX = "Neural";
+
         public final String id;
         /**
          * The BCP-47 primary language subtag, e.g. {@code "en"} from {@code "en-US-GuyNeural"}.
@@ -46,22 +50,24 @@ final class VoiceCatalog {
             if (voiceId == null || voiceId.isEmpty()) return "";
             int dash = voiceId.lastIndexOf('-');
             String name = dash >= 0 ? voiceId.substring(dash + 1) : voiceId;
-            if (name.endsWith("MultilingualNeural")) name = name.substring(0, name.length() - 18);
-            else if (name.endsWith("Neural")) name = name.substring(0, name.length() - 6);
+            if (name.endsWith(MULTILINGUAL_NEURAL_SUFFIX)) {
+                name = name.substring(0, name.length() - MULTILINGUAL_NEURAL_SUFFIX.length());
+            } else if (name.endsWith(NEURAL_SUFFIX)) {
+                name = name.substring(0, name.length() - NEURAL_SUFFIX.length());
+            }
             return name;
         }
 
         private static String buildDisplayName(String shortName, boolean isMale, String voiceId) {
             String name = shortName;
-            String expressiveName = "Expressive";
-            if (name.endsWith(expressiveName)) {
-                name = name.substring(0, name.length() - expressiveName.length()) + " "
+            if (name.endsWith(EXPRESSIVE_SUFFIX)) {
+                name = name.substring(0, name.length() - EXPRESSIVE_SUFFIX.length()) + " "
                         + str("morphe_vot_voice_expressive");
             }
 
             final int dash = voiceId.lastIndexOf('-');
             String suffix = dash >= 0 ? voiceId.substring(dash + 1) : voiceId;
-            final boolean multilingual = suffix.endsWith("MultilingualNeural");
+            final boolean multilingual = suffix.endsWith(MULTILINGUAL_NEURAL_SUFFIX);
             final String gender = str(isMale
                     ? "morphe_vot_voice_gender_male"
                     : "morphe_vot_voice_gender_female");
