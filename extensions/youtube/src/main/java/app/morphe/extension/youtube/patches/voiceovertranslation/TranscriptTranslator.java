@@ -143,12 +143,16 @@ final class TranscriptTranslator {
     }
 
     private static List<List<TranscriptSegment>> splitByCharBudget(List<TranscriptSegment> segments) {
+        return splitByCharBudget(segments, MAX_BATCH_CHARS);
+    }
+
+    private static List<List<TranscriptSegment>> splitByCharBudget(List<TranscriptSegment> segments, int maxChars) {
         List<List<TranscriptSegment>> batches = new ArrayList<>();
         List<TranscriptSegment> batch = new ArrayList<>();
         int chars = 0;
         for (TranscriptSegment seg : segments) {
             final int len = seg.text().length() + 1;
-            if (!batch.isEmpty() && chars + len > MAX_BATCH_CHARS) {
+            if (!batch.isEmpty() && chars + len > maxChars) {
                 batches.add(batch);
                 batch = new ArrayList<>();
                 chars = 0;
@@ -163,7 +167,7 @@ final class TranscriptTranslator {
     private static List<String> translateBatch(List<TranscriptSegment> segments, String targetLang) throws Exception {
         return switch (Settings.VOT_TRANSLATION_SERVICE.get()) {
             case "libretranslate" -> translateBatchLibreTranslate(segments, targetLang);
-            case "lingva" -> translateBatchLingva(segments, targetLang);
+            case "mymemory" -> translateBatchMyMemory(segments, targetLang);
             default -> translateBatchGoogle(segments, targetLang);
         };
     }
@@ -250,7 +254,20 @@ final class TranscriptTranslator {
         return Arrays.asList(translated.split("\n", -1));
     }
 
-    private static List<String> translateBatchLingva(List<TranscriptSegment> segments, String targetLang) throws Exception {
+    // MyMemory limits q to 500 bytes per request.
+    private static final int MYMEMORY_MAX_CHARS = 450;
+
+    private static List<String> translateBatchMyMemory(List<TranscriptSegment> segments, String targetLang) throws Exception {
+        // Re-split into sub-batches that fit within the 500-byte request limit.
+        List<List<TranscriptSegment>> subBatches = splitByCharBudget(segments, MYMEMORY_MAX_CHARS);
+        List<String> results = new ArrayList<>(segments.size());
+        for (List<TranscriptSegment> sub : subBatches) {
+            results.addAll(translateMyMemoryRequest(sub, targetLang));
+        }
+        return results;
+    }
+
+    private static List<String> translateMyMemoryRequest(List<TranscriptSegment> segments, String targetLang) throws Exception {
         Utils.verifyOffMainThread();
 
         StringBuilder joined = new StringBuilder();
@@ -259,22 +276,30 @@ final class TranscriptTranslator {
             joined.append(seg.text());
         }
 
-        String baseUrl = Settings.VOT_LINGVA_URL.get().replaceAll("/+$", "");
         String source = TranscriptFetcher.lastSourceLang;
         //noinspection CharsetObjectCanBeUsed
         String encoded = URLEncoder.encode(joined.toString(), StandardCharsets.UTF_8.name());
 
+        String email = Settings.VOT_MYMEMORY_EMAIL.get();
+        //noinspection CharsetObjectCanBeUsed
+        String emailParam = email.isEmpty() ? "" : "&de=" + URLEncoder.encode(email, StandardCharsets.UTF_8.name());
         HttpURLConnection conn = (HttpURLConnection) new URL(
-                baseUrl + "/api/v1/" + source + "/" + targetLang + "/" + encoded).openConnection();
+                "https://api.mymemory.translated.net/get?q=" + encoded + "&langpair=" + source + "|" + targetLang + emailParam)
+                .openConnection();
         conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
         conn.setReadTimeout(READ_TIMEOUT_MS);
         conn.setRequestProperty("User-Agent", "Mozilla/5.0");
 
-        final int code = conn.getResponseCode();
-        if (code != 200) throw new Exception("HTTP " + code + " from " + baseUrl);
+        final int httpCode = conn.getResponseCode();
+        if (httpCode != 200) throw new Exception("HTTP " + httpCode + " from MyMemory");
 
-        // Response: {"translation": "..."} - newline separators from joined input are preserved.
-        String translation = new JSONObject(Requester.parseString(conn)).getString("translation");
+        // Response: {"responseStatus": 200, "responseData": {"translatedText": "..."}}
+        JSONObject json = new JSONObject(Requester.parseString(conn));
+        final int responseStatus = json.optInt("responseStatus", 200);
+        if (responseStatus != 200) throw new Exception("MyMemory error " + responseStatus
+                + ": " + json.optString("responseDetails", "unknown error"));
+
+        String translation = json.getJSONObject("responseData").getString("translatedText");
         return Arrays.asList(translation.split("\n", -1));
     }
 }

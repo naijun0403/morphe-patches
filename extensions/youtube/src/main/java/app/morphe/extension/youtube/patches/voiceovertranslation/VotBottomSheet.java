@@ -74,7 +74,7 @@ public final class VotBottomSheet {
             String service = Settings.VOT_TRANSLATION_SERVICE.get();
             String label;
             if ("libretranslate".equals(service)) label = str("morphe_vot_service_libretranslate");
-            else if ("lingva".equals(service))    label = str("morphe_vot_service_lingva");
+            else if ("mymemory".equals(service))    label = str("morphe_vot_service_mymemory");
             else                                  label = str("morphe_vot_service_google");
             ((TextView) translationRow.getTag()).setText(label);
         };
@@ -161,8 +161,8 @@ public final class VotBottomSheet {
     }
 
     private static void showTranslationServicePicker(Context context, Runnable onChanged) {
-        String[] entries = {str("morphe_vot_service_google"), str("morphe_vot_service_lingva"), str("morphe_vot_service_libretranslate")};
-        String[] values = {"google", "lingva", "libretranslate"};
+        String[] entries = {str("morphe_vot_service_google"), str("morphe_vot_service_mymemory"), str("morphe_vot_service_libretranslate")};
+        String[] values = {"google", "mymemory", "libretranslate"};
 
         SheetBottomDialog.DraggableLinearLayout pickerRoot =
                 SheetBottomDialog.createMainLayout(context, getDialogBackgroundColor());
