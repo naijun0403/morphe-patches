@@ -357,8 +357,8 @@ Verify the package name is correct and the app is installed"</string>
     <string name="morphe_vot_libretranslate_api_key_summary">Required by some instances. Leave empty if the server does not require authentication</string>
     <string name="morphe_vot_service_mymemory" translatable="false">MyMemory</string>
     <string name="morphe_vot_mymemory_info_summary">Free translation API, no API key required. Up to 5,000 characters per day on the free tier, or up to 50,000 characters per day with an email address.\n\nTap here to open mymemory.translated.net</string>
-    <string name="morphe_vot_mymemory_email_title">Email</string>
-    <string name="morphe_vot_mymemory_email_summary">Optional. Enter your email address to increase the daily limit from 5,000 to 50,000 characters. Leave empty to use the anonymous limit</string>
+    <string name="morphe_vot_mymemory_email_title">MyMemory email</string>
+    <string name="morphe_vot_mymemory_email_summary">Optional. Enter your MyMemory email address to increase the daily limit from 5,000 to 50,000 characters. Leave empty to use the anonymous limit</string>
     <string name="morphe_vot_tts_engine_label">Engine</string>
     <string name="morphe_vot_tts_system">System</string>
     <string name="morphe_vot_tts_edge" translatable="false">Edge</string>
