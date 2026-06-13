@@ -128,7 +128,8 @@ public final class VoiceOverTranslationPatch {
             return;
         }
         VideoState state = VideoState.getCurrent();
-        if (state != VideoState.PLAYING) {
+        // Video state can be null until the overlay is activated the first time.
+        if (state != null && state != VideoState.PLAYING) {
             Logger.printDebug(() -> "Ignoring TTS for video state: " + state);
             return; // paused, ended, or loading
         }
