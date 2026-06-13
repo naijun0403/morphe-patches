@@ -37,6 +37,7 @@ import app.morphe.extension.shared.settings.preference.CustomDialogListPreferenc
 import app.morphe.extension.shared.ui.Dim;
 import app.morphe.extension.shared.ui.SheetBottomDialog;
 import app.morphe.extension.youtube.settings.Settings;
+import app.morphe.extension.youtube.shared.PipDismissHelper;
 
 public final class VotBottomSheet {
 
@@ -105,6 +106,7 @@ public final class VotBottomSheet {
 
         SheetBottomDialog.SlideDialog dialog =
                 SheetBottomDialog.createSlideDialog(context, root, fadeInDuration);
+        PipDismissHelper.dismissOnPip(dialog);
         dialog.show();
     }
 

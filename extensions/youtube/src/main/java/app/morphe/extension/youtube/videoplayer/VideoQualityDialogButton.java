@@ -50,9 +50,8 @@ import app.morphe.extension.youtube.patches.VideoInformation;
 import app.morphe.extension.youtube.patches.VideoInformation.VideoQualityInterface;
 import app.morphe.extension.youtube.patches.playback.quality.RememberVideoQualityPatch;
 import app.morphe.extension.youtube.settings.Settings;
-import app.morphe.extension.youtube.shared.PlayerType;
+import app.morphe.extension.youtube.shared.PipDismissHelper;
 import kotlin.Unit;
-import kotlin.jvm.functions.Function1;
 
 @SuppressWarnings("unused")
 public class VideoQualityDialogButton {
@@ -71,11 +70,6 @@ public class VideoQualityDialogButton {
             return Unit.INSTANCE;
         });
     }
-
-    /**
-     * Weak reference to the currently open dialog.
-     */
-    private static WeakReference<SheetBottomDialog.SlideDialog> currentDialog;
 
     /**
      * Injection point.
@@ -331,7 +325,6 @@ public class VideoQualityDialogButton {
 
             // Create dialog.
             SheetBottomDialog.SlideDialog dialog = SheetBottomDialog.createSlideDialog(context, mainLayout, fadeInDuration);
-            currentDialog = new WeakReference<>(dialog);
 
             listView.setOnItemClickListener((parent, view, which, id) -> {
                 try {
@@ -348,33 +341,8 @@ public class VideoQualityDialogButton {
 
             mainLayout.addView(listView);
 
-            // Create observer for PlayerType changes.
-            Function1<PlayerType, Unit> playerTypeObserver = new Function1<>() {
-                @Override
-                public Unit invoke(PlayerType type) {
-                    SheetBottomDialog.SlideDialog current = currentDialog.get();
-                    if (current == null || !current.isShowing()) {
-                        // Should never happen.
-                        PlayerType.getOnChange().removeObserver(this);
-                        Logger.printException(() -> "Removing player type listener as dialog is null or closed");
-                    } else if (type == PlayerType.WATCH_WHILE_PICTURE_IN_PICTURE) {
-                        current.dismiss();
-                        Logger.printDebug(() -> "Playback speed dialog dismissed due to PiP mode");
-                    }
-                    return Unit.INSTANCE;
-                }
-            };
-
-            // Add observer to dismiss dialog when entering PiP mode.
-            PlayerType.getOnChange().addObserver(playerTypeObserver);
-
-            // Remove observer when dialog is dismissed.
-            dialog.setOnDismissListener(d -> {
-                PlayerType.getOnChange().removeObserver(playerTypeObserver);
-                Logger.printDebug(() -> "PlayerType observer removed on dialog dismiss");
-            });
-
-            dialog.show(); // Show the dialog.
+            PipDismissHelper.dismissOnPip(dialog);
+            dialog.show();
         } catch (Exception ex) {
             Logger.printException(() -> "showVideoQualityDialog failure", ex);
         }

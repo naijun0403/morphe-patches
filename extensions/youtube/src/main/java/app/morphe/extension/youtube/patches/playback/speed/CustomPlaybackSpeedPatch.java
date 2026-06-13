@@ -39,7 +39,6 @@ import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
-import java.lang.ref.WeakReference;
 import java.util.Arrays;
 import java.util.function.Function;
 
@@ -50,9 +49,7 @@ import app.morphe.extension.shared.ui.SheetBottomDialog;
 import app.morphe.extension.youtube.patches.VideoInformation;
 import app.morphe.extension.youtube.patches.components.PlaybackSpeedMenuFilter;
 import app.morphe.extension.youtube.settings.Settings;
-import app.morphe.extension.youtube.shared.PlayerType;
-import kotlin.Unit;
-import kotlin.jvm.functions.Function1;
+import app.morphe.extension.youtube.shared.PipDismissHelper;
 
 @SuppressWarnings("unused")
 public class CustomPlaybackSpeedPatch {
@@ -105,11 +102,6 @@ public class CustomPlaybackSpeedPatch {
      * Formats speeds to UI strings.
      */
     private static final NumberFormat speedFormatter = NumberFormat.getNumberInstance();
-
-    /**
-     * Weak reference to the currently open dialog.
-     */
-    private static WeakReference<SheetBottomDialog.SlideDialog> currentDialog;
 
     static {
         // Use same 2 digit format as built in speed picker,
@@ -477,35 +469,8 @@ public class CustomPlaybackSpeedPatch {
 
             // Create dialog.
             SheetBottomDialog.SlideDialog dialog = SheetBottomDialog.createSlideDialog(context, mainLayout, fadeInDuration);
-            currentDialog = new WeakReference<>(dialog);
-
-            // Create observer for PlayerType changes.
-            Function1<PlayerType, Unit> playerTypeObserver = new Function1<>() {
-                @Override
-                public Unit invoke(PlayerType type) {
-                    SheetBottomDialog.SlideDialog current = currentDialog.get();
-                    if (current == null || !current.isShowing()) {
-                        // Should never happen.
-                        PlayerType.getOnChange().removeObserver(this);
-                        Logger.printException(() -> "Removing player type listener as dialog is null or closed");
-                    } else if (type == PlayerType.WATCH_WHILE_PICTURE_IN_PICTURE) {
-                        current.dismiss();
-                        Logger.printDebug(() -> "Playback speed dialog dismissed due to PiP mode");
-                    }
-                    return Unit.INSTANCE;
-                }
-            };
-
-            // Add observer to dismiss dialog when entering PiP mode.
-            PlayerType.getOnChange().addObserver(playerTypeObserver);
-
-            // Remove observer when dialog is dismissed.
-            dialog.setOnDismissListener(d -> {
-                PlayerType.getOnChange().removeObserver(playerTypeObserver);
-                Logger.printDebug(() -> "PlayerType observer removed on dialog dismiss");
-            });
-
-            dialog.show(); // Show the dialog.
+            PipDismissHelper.dismissOnPip(dialog);
+            dialog.show();
 
         } catch (Exception ex) {
             Logger.printException(() -> "showModernCustomPlaybackSpeedDialog failure", ex);
