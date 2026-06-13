@@ -31,7 +31,19 @@ import app.morphe.extension.youtube.shared.PlayerType;
 import app.morphe.extension.youtube.shared.VideoState;
 
 @SuppressWarnings({"unused", "deprecation", "RedundantSuppression"})
-public final class VoiceOverTranslationPatch {
+public class VoiceOverTranslationPatch {
+
+    public static class MyMemoryServiceAvailability implements Setting.Availability {
+        @Override
+        public boolean isAvailable() {
+            return Settings.VOT_TRANSLATION_SERVICE.get().equals(TRANSLATION_SERVICE_MY_MEMORY);
+        }
+
+        @Override
+        public List<Setting<?>> getParentSettings() {
+            return List.of(Settings.VOT_TRANSLATION_SERVICE);
+        }
+    }
 
     private static final long SEEK_JUMP_THRESHOLD_MS = 3_000;
     private static final long TTS_LOOKAHEAD_MS = 400;
@@ -46,7 +58,10 @@ public final class VoiceOverTranslationPatch {
     private static final float MAX_RATE_STEP_UP = 0.25f;
 
     static final String TTS_ENGINE_SYSTEM = "system";
-    static final String VOT_TEST_ID = "vot_test_";
+    private static final String VOT_TEST_ID = "vot_test_";
+    private static final String TEST_PHRASE = "It's morphin time!";
+    private static final String TEST_VIDEO_ID = "test";
+    private static final int TEST_SEGMENT_INDEX = -1;
 
     private static volatile float lastSpeechRate = MIN_SPEECH_RATE;
     private static volatile long lastVideoTimeMs;
@@ -384,26 +399,59 @@ public final class VoiceOverTranslationPatch {
         final long testId = ++currentTestId;
         isTestSpeaking = true;
         lastTestVoiceId = voiceId;
-        requestDuck();
 
         final float volume = Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f;
-        final String phrase = "It's morphin time!";
 
         if (TTS_ENGINE_SYSTEM.equals(voiceId)) {
             ensureTts();
             if (!ttsReady) {
                 isTestSpeaking = false;
-                abandonDuck();
                 return;
             }
+            requestDuck();
             Bundle params = new Bundle();
             params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume);
             tts.setSpeechRate(1.0f);
-            tts.speak(phrase, TextToSpeech.QUEUE_FLUSH, params, VOT_TEST_ID + testId);
+            tts.speak(TEST_PHRASE, TextToSpeech.QUEUE_FLUSH, params, VOT_TEST_ID + testId);
             return;
         }
 
-        ttsEngine.speak(phrase, voiceId, volume, 1.0f, () -> abandonDuckAfterTest(testId));
+        byte[] cached = TtsCache.get(TEST_VIDEO_ID, TEST_SEGMENT_INDEX, voiceId, TEST_PHRASE);
+        if (cached != null) {
+            requestDuck();
+            final long id = ttsEngine.markBusy();
+            ttsEngine.play(cached, volume, 1.0f, id, () -> abandonDuckAfterTest(testId));
+            return;
+        }
+
+        requestDuck();
+        ttsEngine.speak(TEST_PHRASE, voiceId, volume, 1.0f, () -> abandonDuckAfterTest(testId));
+    }
+
+    /**
+     * Preloads test phrases for all Edge TTS voices in the current target language.
+     */
+    static void preloadTestVoices() {
+        String lang = resolveTargetLang();
+        List<VoiceCatalog.Voice> voices = VoiceCatalog.getVoicesForLang(lang);
+        if (voices == null || voices.isEmpty()) return;
+
+        Utils.runOnBackgroundThread(() -> {
+            for (VoiceCatalog.Voice voice : voices) {
+                if (TtsCache.get(TEST_VIDEO_ID, TEST_SEGMENT_INDEX, voice.id, TEST_PHRASE) != null) {
+                    continue;
+                }
+
+                try {
+                    byte[] data = ttsEngine.prefetch(TEST_PHRASE, voice.id);
+                    if (data.length > 0) {
+                        TtsCache.put(TEST_VIDEO_ID, TEST_SEGMENT_INDEX, voice.id, TEST_PHRASE, data);
+                    }
+                } catch (Exception ex) {
+                    logError(() -> "preloadTestVoices failure: " + voice, ex);
+                }
+            }
+        });
     }
 
     private static void stopTts() {
@@ -465,18 +513,6 @@ public final class VoiceOverTranslationPatch {
             audioManager = (AudioManager) Utils.getContext().getSystemService(Context.AUDIO_SERVICE);
         }
         return audioManager;
-    }
-
-    public static final class MyMemoryServiceAvailability implements Setting.Availability {
-        @Override
-        public boolean isAvailable() {
-            return Settings.VOT_TRANSLATION_SERVICE.get().equals(TRANSLATION_SERVICE_MY_MEMORY);
-        }
-
-        @Override
-        public List<Setting<?>> getParentSettings() {
-            return List.of(Settings.VOT_TRANSLATION_SERVICE);
-        }
     }
 
     static String resolveTargetLang() {

@@ -68,6 +68,8 @@ public final class VotBottomSheet {
             ResourceType.DRAWABLE, "yt_outline_experimental_speaker_vd_theme_24");
 
     public static void show(Context context) {
+        VoiceOverTranslationPatch.preloadTestVoices();
+
         SheetBottomDialog.DraggableLinearLayout root = SheetBottomDialog
                 .createMainLayout(context, getDialogBackgroundColor());
         root.setPadding(Dim.dp16, 0, Dim.dp16, Dim.dp16);
@@ -392,6 +394,7 @@ public final class VotBottomSheet {
             adapter.setSelectedValue(selected);
             adapter.notifyDataSetChanged();
             VoiceOverTranslationPatch.reloadTranscript();
+            VoiceOverTranslationPatch.preloadTestVoices();
             onLanguageChanged.run();
             pickerDialog.dismiss();
         });
