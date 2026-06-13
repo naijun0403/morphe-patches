@@ -520,7 +520,6 @@ public class Settings extends SharedYouTubeSettings {
     public static final BooleanSetting VOT_ENABLED = new BooleanSetting("morphe_vot_enabled", TRUE);
     public static final IntegerSetting VOT_ORIGINAL_AUDIO_VOLUME = new IntegerSetting("morphe_vot_original_audio_volume", 100, parent(VOT_ENABLED));
     public static final IntegerSetting VOT_MAX_SPEECH_RATE = new IntegerSetting("morphe_vot_max_speech_rate", 18, parent(VOT_ENABLED));
-    public static final IntegerSetting VOT_PITCH = new IntegerSetting("morphe_vot_pitch", 0, parent(VOT_ENABLED));
     public static final StringSetting VOT_TRANSLATION_SERVICE = new StringSetting("morphe_vot_translation_service", "google", parent(VOT_ENABLED));
     public static final StringSetting VOT_MYMEMORY_EMAIL = new StringSetting("morphe_vot_mymemory_email", "", new MyMemoryServiceAvailability());
     public static final StringSetting VOT_LIBRETRANSLATE_URL = new StringSetting("morphe_vot_libretranslate_url", "https://libretranslate.com", new LibreTranslateServiceAvailability());
@@ -672,7 +671,5 @@ public class Settings extends SharedYouTubeSettings {
                 0, 100, 5, "%"));
         SeekBarPreference.register(new SeekBarConfig(VOT_MAX_SPEECH_RATE,
                 10, 20, 1, "x", 10));
-        SeekBarPreference.register(new SeekBarConfig(VOT_PITCH,
-                -5, 5, 1, ""));
     }
 }
