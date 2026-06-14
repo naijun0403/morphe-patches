@@ -33,43 +33,28 @@ final class VoiceCatalog {
          * The BCP-47 primary language subtag, e.g. {@code "en"} from {@code "en-US-GuyNeural"}.
          */
         public final String languageTag;
+        public final String countryTag;
         public final boolean isMale;
         public final String shortName;
         public final String dialogDisplayName;
         public final boolean isMultilingual;
 
         Voice(boolean isMale, String id) {
-            this.id = id;
-            this.isMale = isMale;
-            final int dash = id.indexOf('-');
-            this.languageTag = dash >= 0 ? id.substring(0, dash) : id;
-            this.isMultilingual = id.contains(MULTILINGUAL_NEURAL_SUFFIX);
-            this.shortName = parseShortName(id);
-            this.dialogDisplayName = buildDisplayName(shortName, isMale, id);
-        }
-
-        private static String parseShortName(String voiceId) {
-            if (voiceId == null || voiceId.isEmpty()) return "";
-            final int dash = voiceId.lastIndexOf('-');
-            String name = dash >= 0 ? voiceId.substring(dash + 1) : voiceId;
-            final int suffixLength = name.endsWith(MULTILINGUAL_NEURAL_SUFFIX)
-                    ? MULTILINGUAL_NEURAL_SUFFIX.length()
-                    : NEURAL_SUFFIX.length();
-            return name.substring(0, name.length() - suffixLength);
-        }
-
-        private static String buildDisplayName(String shortName, boolean isMale, String voiceId) {
-            String name = shortName;
-            if (name.endsWith(EXPRESSIVE_SUFFIX)) {
-                name = name.substring(0, name.length() - EXPRESSIVE_SUFFIX.length()) + " "
-                        + str("morphe_vot_voice_expressive");
-            }
-
+            final int dash1 = id.indexOf('-');
+            final int dash2 = id.indexOf('-', dash1 + 1);
             String gender = str(isMale
                     ? "morphe_vot_voice_gender_male"
                     : "morphe_vot_voice_gender_female");
-
-            return name + " (" + gender + ")";
+            this.id = id;
+            this.isMale = isMale;
+            this.languageTag = id.substring(0, dash1);
+            this.countryTag = id.substring(dash1 + 1, dash2);
+            this.isMultilingual = id.contains(MULTILINGUAL_NEURAL_SUFFIX);
+            this.shortName = id.substring(dash2 + 1)
+                    .replace(MULTILINGUAL_NEURAL_SUFFIX, "")
+                    .replace(EXPRESSIVE_SUFFIX, "")
+                    .replace(NEURAL_SUFFIX, "");
+            this.dialogDisplayName = shortName + " (" + gender + ")";
         }
     }
 
@@ -276,7 +261,7 @@ final class VoiceCatalog {
             new Voice(false, "en-HK-YanNeural"),
             new Voice(false, "en-IE-EmilyNeural"),
             new Voice(false, "en-IN-NeerjaExpressiveNeural"),
-            new Voice(false, "en-IN-NeerjaNeural"),
+            // new Voice(false, "en-IN-NeerjaNeural"),
             new Voice(false, "en-KE-AsiliaNeural"),
             new Voice(false, "en-NG-EzinneNeural"),
             new Voice(false, "en-NZ-MollyNeural"),

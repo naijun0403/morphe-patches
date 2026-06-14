@@ -352,7 +352,6 @@ Verify the package name is correct and the app is installed"</string>
     <string name="morphe_vot_tts_voice_type">Voice</string>
     <string name="morphe_vot_tts_system">System</string>
     <string name="morphe_vot_voice_multilingual">Multilingual</string>
-    <string name="morphe_vot_voice_expressive">Expressive</string>
     <string name="morphe_vot_voice_gender_male">Male</string>
     <string name="morphe_vot_voice_gender_female">Female</string>
     <string name="morphe_vot_tts_sample">It\'s morphing time!</string>
