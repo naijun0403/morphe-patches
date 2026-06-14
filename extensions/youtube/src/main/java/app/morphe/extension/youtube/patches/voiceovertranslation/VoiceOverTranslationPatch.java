@@ -68,6 +68,7 @@ public class VoiceOverTranslationPatch {
     private static final float MAX_RATE_STEP_UP = 0.25f;
 
     static final String TTS_ENGINE_SYSTEM = "system";
+    static final String TTS_ENGINE_PIPER  = "piper";
     private static final String VOT_ID_PREFIX = "vot_";
     private static final String VOT_TEST_ID_PREFIX = "vot_test_";
     private static final String TEST_VIDEO_ID = "test";
@@ -147,6 +148,10 @@ public class VoiceOverTranslationPatch {
             if (PlayerType.getCurrent() == PlayerType.INLINE_MINIMAL) return;
             TtsPrefetcher.updateVideo(videoId, segments);
             loadTranscript(videoId);
+            if (!Settings.VOT_USE_NATIVE_TTS.get()
+                    && TTS_ENGINE_PIPER.equals(Settings.VOT_TTS_VOICE_TYPE.get())) {
+                PiperTtsEngine.warmUp(resolveTargetLang());
+            }
         } catch (Exception ex) {
             logError(() -> "newVideoLoaded failure", ex);
         }
@@ -376,9 +381,14 @@ public class VoiceOverTranslationPatch {
         // position so a late start (busy engine, synthesis latency) raises the rate.
         final long availableMs = seg.endMs() - Math.max(lastVideoTimeMs, seg.startMs());
 
-        String voice = Settings.VOT_USE_NATIVE_TTS.get()
-                ? TTS_ENGINE_SYSTEM
-                : VoiceCatalog.resolve(lang, Settings.VOT_TTS_VOICE_TYPE.get());
+        String voice;
+        if (Settings.VOT_USE_NATIVE_TTS.get()) {
+            voice = TTS_ENGINE_SYSTEM;
+        } else if (TTS_ENGINE_PIPER.equals(Settings.VOT_TTS_VOICE_TYPE.get())) {
+            voice = TTS_ENGINE_PIPER;
+        } else {
+            voice = VoiceCatalog.resolve(lang, Settings.VOT_TTS_VOICE_TYPE.get());
+        }
         if (voice == null) return;
 
         // Calculate if we should seek into the audio (e.g. after a short seek within segment).
@@ -411,6 +421,41 @@ public class VoiceOverTranslationPatch {
             final long id = ttsEngine.markBusy();
             // System TTS doesn't support seekTo, so it will always play from the start.
             tts.speak(seg.text(), TextToSpeech.QUEUE_FLUSH, params, VOT_ID_PREFIX + id);
+            return;
+        }
+
+        if (TTS_ENGINE_PIPER.equals(voice)) {
+            if (!PiperTtsEngine.isDownloaded(lang)) {
+                Logger.printDebug(() -> "Piper model not downloaded, skipping segment");
+                return;
+            }
+            byte[] piperCached = TtsCache.get(currentVideoId, index, TTS_ENGINE_PIPER, seg.text());
+            final float piperRate = smoothRate(calculateSpeechRate(seg.text(), availableMs));
+            final long startTimePiper = startTimeMs;
+            requestDuck();
+            final long piperPlaybackId = ttsEngine.markBusy();
+            if (piperCached != null) {
+                ttsEngine.play(piperCached, volume, piperRate, startTimePiper, piperPlaybackId,
+                        VoiceOverTranslationPatch::abandonDuck);
+                return;
+            }
+            final String piperText = seg.text();
+            final String piperLang = lang;
+            Utils.runOnBackgroundThread(() -> {
+                byte[] wav = PiperTtsEngine.synthesize(piperText, piperLang);
+                if (wav != null && wav.length > 0) {
+                    TtsCache.put(currentVideoId, index, TTS_ENGINE_PIPER, piperText, wav);
+                }
+                Utils.runOnMainThread(() -> {
+                    if (wav != null && wav.length > 0) {
+                        ttsEngine.play(wav, volume, piperRate, startTimePiper,
+                                piperPlaybackId, VoiceOverTranslationPatch::abandonDuck);
+                    } else {
+                        ttsEngine.clearBusy(piperPlaybackId);
+                        abandonDuck();
+                    }
+                });
+            });
             return;
         }
 
@@ -503,6 +548,40 @@ public class VoiceOverTranslationPatch {
         lastTestVoiceId = voiceId;
 
         final float volume = Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f;
+
+        if (TTS_ENGINE_PIPER.equals(voiceId)) {
+            String lang = resolveTargetLang();
+            if (!PiperTtsEngine.isDownloaded(lang)) {
+                isTestSpeaking = false;
+                return;
+            }
+            byte[] piperCached = TtsCache.get(TEST_VIDEO_ID, TEST_SEGMENT_INDEX, TTS_ENGINE_PIPER, getTestString());
+            if (piperCached != null) {
+                requestDuck();
+                final long pId = ttsEngine.markBusy();
+                ttsEngine.play(piperCached, volume, 1.0f, pId, () -> abandonDuckAfterTest(testId));
+                return;
+            }
+            requestDuck();
+            final String testText = getTestString();
+            final String testLang = lang;
+            Utils.runOnBackgroundThread(() -> {
+                byte[] wav = PiperTtsEngine.synthesize(testText, testLang);
+                if (wav != null && wav.length > 0) {
+                    TtsCache.put(TEST_VIDEO_ID, TEST_SEGMENT_INDEX, TTS_ENGINE_PIPER, testText, wav);
+                }
+                Utils.runOnMainThread(() -> {
+                    if (wav != null && wav.length > 0) {
+                        final long pId = ttsEngine.markBusy();
+                        ttsEngine.play(wav, volume, 1.0f, pId, () -> abandonDuckAfterTest(testId));
+                    } else {
+                        isTestSpeaking = false;
+                        abandonDuck();
+                    }
+                });
+            });
+            return;
+        }
 
         if (TTS_ENGINE_SYSTEM.equals(voiceId)) {
             ensureTts();
