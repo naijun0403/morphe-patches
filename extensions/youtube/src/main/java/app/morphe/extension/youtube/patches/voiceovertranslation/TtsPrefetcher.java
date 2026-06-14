@@ -215,7 +215,7 @@ final class TtsPrefetcher {
             if (data.length > 0) {
                 TtsCache.put(videoId, index, voice, seg.text(), data);
                 Logger.printDebug(() -> "Prefetched video: " + videoId
-                        + " segment: " + index + "/" + totalSegments);
+                        + " segment: " + index + "/" + totalSegments + " segment: " + seg);
                 return true;
             }
             return false;
