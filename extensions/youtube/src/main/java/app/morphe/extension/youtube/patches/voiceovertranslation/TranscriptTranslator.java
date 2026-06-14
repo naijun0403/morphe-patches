@@ -7,6 +7,9 @@
 
 package app.morphe.extension.youtube.patches.voiceovertranslation;
 
+import android.os.Handler;
+import android.os.Looper;
+
 import androidx.annotation.Nullable;
 
 import org.json.JSONArray;
@@ -20,8 +23,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.FutureTask;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
@@ -91,11 +96,21 @@ final class TranscriptTranslator {
         //noinspection resource
         ExecutorService pool = Executors.newFixedThreadPool(
                 Math.min(PARALLEL_REQUESTS, batches.size() - 1));
+        Handler mainHandler = new Handler(Looper.getMainLooper());
         for (int b = 1, batchCount = batches.size(); b < batchCount; b++) {
             final int batchIndex = b;
             pool.execute(() -> {
                 // Skip remaining work when the result is no longer needed (video changed).
-                if (cancelled != null && cancelled.getAsBoolean()) return;
+                if (cancelled != null) {
+                    mainHandler.post(new FutureTask<>(cancelled::getAsBoolean));
+                    try {
+                        if (!new FutureTask<>(cancelled::getAsBoolean).get()) {
+                            return;
+                        }
+                    } catch (ExecutionException | InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
                 List<String> translated = translateBatchSafe(batches.get(batchIndex), targetLang);
                 List<TranscriptSegment> snapshot;
                 synchronized (working) {
