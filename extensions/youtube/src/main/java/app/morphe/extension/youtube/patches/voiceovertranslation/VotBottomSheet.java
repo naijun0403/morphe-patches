@@ -72,7 +72,6 @@ public final class VotBottomSheet {
 
         SheetBottomDialog.DraggableLinearLayout root = SheetBottomDialog
                 .createMainLayout(context, getDialogBackgroundColor());
-        root.setPadding(Dim.dp16, 0, Dim.dp16, Dim.dp16);
 
         final int fg = Utils.getAppForegroundColor();
 
@@ -109,22 +108,33 @@ public final class VotBottomSheet {
         translationRow.setOnClickListener(v -> showTranslationServicePicker(context, refreshTranslation));
         refreshTranslation.run();
 
-        root.addView(makeTitle(context, str("morphe_vot_enabled_title"), fg));
-        root.addView(makeLanguageRow(context, str("morphe_vot_caption_language_title"), fg,
+        TextView title = makeTitle(context, str("morphe_vot_enabled_title"), fg);
+        ((LinearLayout.LayoutParams) title.getLayoutParams()).setMargins(Dim.dp16, Dim.dp8, Dim.dp16, Dim.dp16);
+        root.addView(title);
+
+        ScrollView scroll = new ScrollView(context);
+        LinearLayout content = new LinearLayout(context);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(Dim.dp16, 0, Dim.dp16, Dim.dp16);
+        scroll.addView(content);
+
+        content.addView(makeLanguageRow(context, str("morphe_vot_caption_language_title"), fg,
                 langEntries, langValues, refreshEngine));
-        root.addView(translationRow);
-        root.addView(engineRow);
-        root.addView(makeDivider(context, fg));
-        root.addView(makeSliderRow(context,
+        content.addView(translationRow);
+        content.addView(engineRow);
+        content.addView(makeDivider(context, fg));
+        content.addView(makeSliderRow(context,
                 str("morphe_vot_original_audio_volume_title"),
                 Settings.VOT_ORIGINAL_AUDIO_VOLUME.get(),
                 fg,
                 Settings.VOT_ORIGINAL_AUDIO_VOLUME::save));
-        root.addView(makeRateSliderRow(context,
+        content.addView(makeRateSliderRow(context,
                 str("morphe_vot_max_speech_rate_title"),
                 Settings.VOT_MAX_SPEECH_RATE.get(),
                 fg,
                 Settings.VOT_MAX_SPEECH_RATE::save));
+
+        root.addView(scroll);
         SheetBottomDialog.SlideDialog dialog =
                 SheetBottomDialog.createSlideDialog(context, root, fadeInDuration);
         PipDismissHelper.dismissOnPip(dialog);
