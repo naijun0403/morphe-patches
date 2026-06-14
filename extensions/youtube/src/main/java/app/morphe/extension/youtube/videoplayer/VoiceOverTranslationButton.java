@@ -86,7 +86,7 @@ public final class VoiceOverTranslationButton {
     private static void refreshActivatedState() {
         Utils.verifyOnMainThread();
         try {
-            int alpha = VoiceOverTranslationPatch.isSessionEnabled() ? 255 : 128;
+            final int alpha = VoiceOverTranslationPatch.isSessionEnabled() ? 255 : 128;
             WeakReference<ImageView> ref = overlayButtonRef;
             ImageView overlay = ref != null ? ref.get() : null;
             if (overlay != null) {

@@ -54,6 +54,10 @@ public class VoiceOverTranslationPatch {
     private static final long SEEK_JUMP_THRESHOLD_MS = 2_900;
     private static final long TTS_LOOKAHEAD_MS = 400;
 
+    // Minimum time into a segment to justify seeking within the audio instead of
+    // playing from the start. Prevents tiny pops on small adjustments.
+    private static final long SEEK_INTO_THRESHOLD_MS = 1_000;
+
     // Rough estimate of natural speech duration (~15 chars per second) used to
     // decide how much the TTS rate must be raised to fit the segment time slot.
     private static final long ESTIMATED_MS_PER_CHAR = 65;
@@ -77,6 +81,7 @@ public class VoiceOverTranslationPatch {
     private static String currentVideoId = "";
     private static boolean isLoading;
     private static boolean sessionEnabled = Settings.VOT_ENABLED.get();
+    private static boolean wasExplicitSeek;
 
     private static Runnable onStateChangeCallback;
 
@@ -97,7 +102,6 @@ public class VoiceOverTranslationPatch {
 
     static {
         PlayerType.getOnChange().addObserver(playerType -> {
-            Utils.verifyOnMainThread();
             if (!playerType.isMaximizedOrFullscreen()
                     && playerType != PlayerType.WATCH_WHILE_MINIMIZED
                     && playerType != PlayerType.WATCH_WHILE_PICTURE_IN_PICTURE
@@ -109,7 +113,6 @@ public class VoiceOverTranslationPatch {
         });
 
         VideoState.getOnChange().addObserver(state -> {
-            Utils.verifyOnMainThread();
             if (state == VideoState.PAUSED) {
                 Logger.printDebug(() -> "Stopping TTS for video state: " + state);
                 stopTts();
@@ -124,11 +127,13 @@ public class VoiceOverTranslationPatch {
     public static void newVideoLoaded(String videoId) {
         try {
             Utils.verifyOnMainThread();
+
             // Always reset so seek detection fires correctly on the first videoTimeChanged
             // and so the first segment at the new position is spoken even when the same
             // video is reopened at a different timestamp (e.g. chapter links, continue watching).
             lastVideoTimeMs = 0;
             lastSpokenIndex = -1;
+            wasExplicitSeek = false;
             if (videoId.equals(currentVideoId)) return;
 
             Logger.printDebug(() -> "newVideoLoaded");
@@ -172,6 +177,9 @@ public class VoiceOverTranslationPatch {
         if (current.isEmpty()) return;
 
         if (lastVideoTimeMs > 0 && Math.abs(timeMs - lastVideoTimeMs) > SEEK_JUMP_THRESHOLD_MS) {
+            // Large jump outside current segment area - stop everything.
+            // Small jumps within the same segment are handled by speak()'s startTime logic.
+            Logger.printDebug(() -> "videoTimeChanged seek causing TTS stop");
             stopTts();
             lastSpokenIndex = -1;
         }
@@ -201,7 +209,7 @@ public class VoiceOverTranslationPatch {
         return sessionEnabled;
     }
 
-    public static synchronized void toggleTranslation() {
+    public static void toggleTranslation() {
         Utils.verifyOnMainThread();
         sessionEnabled = !sessionEnabled;
         if (!sessionEnabled) {
@@ -211,7 +219,7 @@ public class VoiceOverTranslationPatch {
         notifyStateChanged();
     }
 
-    public static synchronized void reloadTranscript() {
+    public static void reloadTranscript() {
         Utils.verifyOnMainThread();
         if (currentVideoId.isEmpty()) return;
         stopTts();
@@ -223,17 +231,20 @@ public class VoiceOverTranslationPatch {
     }
 
     public static void setOnTranslationStateChangeCallback(Runnable callback) {
+        Utils.verifyOnMainThread();
         onStateChangeCallback = callback;
     }
 
     private static void notifyStateChanged() {
+        Logger.printDebug(() -> "notifyStateChanged");
+        Utils.verifyOnMainThread();
         Runnable callback = onStateChangeCallback;
-        if (callback != null) Utils.runOnMainThreadNowOrLater(callback);
+        if (callback != null) callback.run();
     }
 
-    private static synchronized void loadTranscript(String videoId) {
-        Utils.verifyOnMainThread();
+    private static void loadTranscript(String videoId) {
         Logger.printDebug(() -> "loadTranscript: " + videoId);
+        Utils.verifyOnMainThread();
         if (isLoading) return;
         isLoading = true;
 
@@ -242,25 +253,23 @@ public class VoiceOverTranslationPatch {
                 // Later translation batches arrive asynchronously; swap the list in only
                 // while the same video is still playing. Timings and size are identical
                 // across updates, so lastSpokenIndex stays valid.
-                List<TranscriptSegment> fetched = TranscriptFetcher.fetch(videoId,
+                List<TranscriptSegment> fetched = TranscriptFetcher.fetch(
+                        videoId,
                         updated -> {
-                            Utils.runOnMainThread(() -> {
-                                if (videoId.equals(currentVideoId)) {
-                                    segments = updated;
-                                }
-                            });
+                            Utils.verifyOnMainThread();
+                            if (videoId.equals(currentVideoId)) {
+                                segments = updated;
+                            }
                         },
                         () -> {
-                            // Fetcher needs to check if it should abort.
-                            // currentVideoId access is technically a race, but benign.
+                            Utils.verifyOnMainThread();
                             return !videoId.equals(currentVideoId);
                         });
                 Utils.runOnMainThread(() -> {
                     if (videoId.equals(currentVideoId)) {
                         segments = fetched;
                         TtsPrefetcher.updateVideo(videoId, fetched);
-                        Logger.printDebug(() -> "Loaded: " + fetched.size()
-                                + " segments for :" + videoId);
+                        Logger.printDebug(() -> "Loaded: " + fetched.size() + " segments for :" + videoId);
                         notifyStateChanged();
                     }
                 });
@@ -362,6 +371,19 @@ public class VoiceOverTranslationPatch {
 
         if (voice == null) return;
 
+        // Calculate if we should seek into the audio (e.g. after a short seek within segment).
+        long startTimeMs = 0;
+        if (wasExplicitSeek) {
+            final long timeIntoSegment = lastVideoTimeMs - seg.startMs();
+            if (timeIntoSegment > SEEK_INTO_THRESHOLD_MS) {
+                // Approximate audio position. Ideally we'd use the speech rate, but since
+                // rate is baked into SSML for Edge, we assume normal speed for simplicity.
+                startTimeMs = timeIntoSegment;
+            }
+            // Reset the flag so future segments at normal playback start from the beginning.
+            wasExplicitSeek = false;
+        }
+
         if (TTS_ENGINE_SYSTEM.equals(voice)) {
             ensureTts();
             if (!ttsReady) {
@@ -374,6 +396,7 @@ public class VoiceOverTranslationPatch {
             Bundle params = new Bundle();
             params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume);
             final long id = ttsEngine.markBusy();
+            // System TTS doesn't support seekTo, so it will always play from the start.
             tts.speak(seg.text(), TextToSpeech.QUEUE_FLUSH, params, VOT_ID_PREFIX + id);
             return;
         }
@@ -384,14 +407,15 @@ public class VoiceOverTranslationPatch {
             final float rate = smoothRate(calculateSpeechRate(seg.text(), availableMs));
             requestDuck();
             final long playbackId = ttsEngine.markBusy();
-            ttsEngine.play(cached, volume, rate, playbackId, VoiceOverTranslationPatch::abandonDuck);
+            ttsEngine.play(cached, volume, rate, startTimeMs, playbackId, VoiceOverTranslationPatch::abandonDuck);
             return;
         }
 
         final float rate = smoothRate(calculateSpeechRate(seg.text(), availableMs));
         requestDuck();
         // Use unified Edge synthesis/playback in background.
-        ttsEngine.speak(seg.text(), voice, volume, rate, VoiceOverTranslationPatch::abandonDuck);
+        // Edge synthesis doesn't support seeking during synthesis, but play() will seek the result.
+        ttsEngine.speak(seg.text(), voice, volume, rate, startTimeMs, VoiceOverTranslationPatch::abandonDuck);
     }
 
     /**
@@ -425,8 +449,22 @@ public class VoiceOverTranslationPatch {
     public static void onVideoSeeked() {
         Logger.printDebug(() -> "onVideoSeeked");
         Utils.verifyOnMainThread();
-        stopTts();
-        lastSpokenIndex = -1;
+        wasExplicitSeek = true;
+        // Check if the seek was within the current segment. If so, let videoTimeChanged
+        // handle the restart/seek-into logic to avoid a jarring stop and restart.
+        boolean insideSameSegment = false;
+        List<TranscriptSegment> current = segments;
+        if (lastSpokenIndex >= 0 && lastSpokenIndex < current.size()) {
+            TranscriptSegment seg = current.get(lastSpokenIndex);
+            if (lastVideoTimeMs >= seg.startMs() && lastVideoTimeMs < seg.endMs()) {
+                insideSameSegment = true;
+            }
+        }
+
+        if (!insideSameSegment) {
+            stopTts();
+            lastSpokenIndex = -1;
+        }
     }
 
     public static String getTestString() {
@@ -441,6 +479,7 @@ public class VoiceOverTranslationPatch {
     static void testSpeak(String voiceId) {
         Logger.printDebug(() -> "testSpeak: " + voiceId);
         Utils.verifyOnMainThread();
+
         final boolean wasSameVoice = isTestSpeaking && voiceId.equals(lastTestVoiceId);
         stopTts();
         if (wasSameVoice) return;

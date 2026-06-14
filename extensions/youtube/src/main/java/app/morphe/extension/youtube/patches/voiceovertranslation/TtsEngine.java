@@ -100,6 +100,13 @@ final class TtsEngine {
      * Handles background synthesis and playback for the given voice.
      */
     void speak(String text, String voiceId, float volume, float rate, Runnable onDone) {
+        speak(text, voiceId, volume, rate, 0, onDone);
+    }
+
+    /**
+     * High-level entry point for Edge TTS speech starting at {@code startTimeMs}.
+     */
+    void speak(String text, String voiceId, float volume, float rate, long startTimeMs, Runnable onDone) {
         Utils.verifyOnMainThread();
         final long id = markBusy();
 
@@ -108,7 +115,7 @@ final class TtsEngine {
                 byte[] data = synthesize(text, voiceId, rate);
                 Utils.runOnMainThread(() -> {
                     if (data.length > 0 && !stopped && id == playbackId) {
-                        play(data, volume, 1.0f, id, onDone); // rate is baked into SSML
+                        play(data, volume, 1.0f, startTimeMs, id, onDone); // rate is baked into SSML
                     } else if (id == playbackId) {
                         speaking = false;
                         if (onDone != null) onDone.run();
@@ -169,7 +176,15 @@ final class TtsEngine {
      * Use rate 1.0f when the rate is already encoded in the audio (e.g. via SSML prosody).
      */
     void play(byte[] mp3, float volume, float rate, long id, Runnable onDone) {
+        play(mp3, volume, rate, 0, id, onDone);
+    }
+
+    /**
+     * Plays the MP3 result through Android's MediaPlayer starting at {@code startTimeMs}.
+     */
+    void play(byte[] mp3, float volume, float rate, long startTimeMs, long id, Runnable onDone) {
         Utils.verifyOnMainThread();
+
         // Reject audio that completed synthesis after stop() was called (e.g. post-seek).
         if (stopped || id != playbackId) {
             if (id == playbackId) {
@@ -182,7 +197,7 @@ final class TtsEngine {
         Utils.runOnBackgroundThread(() -> {
             try {
                 // playMp3 blocks until completion or error.
-                playMp3(mp3, volume, rate, id);
+                playMp3(mp3, volume, rate, startTimeMs, id);
             } catch (Exception ex) {
                 Utils.runOnMainThread(() -> {
                     if (!stopped && id == playbackId) {
@@ -459,7 +474,7 @@ final class TtsEngine {
         }
     }
 
-    private void playMp3(byte[] mp3, float volume, float rate, long id) throws Exception {
+    private void playMp3(byte[] mp3, float volume, float rate, long startTimeMs, long id) throws Exception {
         Utils.verifyOffMainThread();
         CountDownLatch latch = new CountDownLatch(1);
         MediaPlayer mp = new MediaPlayer();
@@ -511,6 +526,9 @@ final class TtsEngine {
                 if (stopped || id != playbackId) {
                     latch.countDown();
                     return;
+                }
+                if (startTimeMs > 0) {
+                    mp.seekTo((int) startTimeMs);
                 }
                 mp.start();
             } catch (Exception ex) {
