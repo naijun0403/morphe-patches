@@ -519,7 +519,7 @@ public class Settings extends SharedYouTubeSettings {
             parentsAny(SWIPE_BRIGHTNESS, SWIPE_VOLUME));
 
     // VoiceOverTranslation
-    public static final BooleanSetting VOT_ENABLED = new BooleanSetting("morphe_vot_enabled", TRUE);
+    public static final BooleanSetting VOT_ENABLED = new BooleanSetting("morphe_vot_enabled", FALSE);
     public static final IntegerSetting VOT_ORIGINAL_AUDIO_VOLUME = new IntegerSetting("morphe_vot_original_audio_volume", 100, parent(VOT_ENABLED));
     public static final IntegerSetting VOT_MAX_SPEECH_RATE = new IntegerSetting("morphe_vot_max_speech_rate", 18, parent(VOT_ENABLED));
     public static final StringSetting VOT_TRANSLATION_SERVICE = new StringSetting("morphe_vot_translation_service", "google", parent(VOT_ENABLED));
