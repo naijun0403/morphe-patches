@@ -72,7 +72,7 @@ public class VoiceOverTranslationPatch {
     private static final String VOT_TEST_ID_PREFIX = "vot_test_";
     private static final String TEST_VIDEO_ID = "test";
     private static final int TEST_SEGMENT_INDEX = -1;
-    private static final long TEST_PREFETCH_WAIT = 2_000;
+    private static final long TEST_PREFETCH_WAIT = 500;
 
     private static float lastSpeechRate = MIN_SPEECH_RATE;
     private static long lastVideoTimeMs;
