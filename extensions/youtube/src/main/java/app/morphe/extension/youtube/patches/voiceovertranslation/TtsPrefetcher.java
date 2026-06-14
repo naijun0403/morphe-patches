@@ -79,12 +79,8 @@ final class TtsPrefetcher {
 
     static void updateTime(long timeMs) {
         synchronized (lock) {
-            if (currentVideoTimeMs != timeMs) {
-                Logger.printDebug(() -> "updateTime: " + timeMs + " isSpeaking: " + engine.isSpeaking());
-            }
             currentVideoTimeMs = timeMs;
             if (waiting) {
-                Logger.printDebug(() -> "updateTime notifyAll");
                 lock.notifyAll();
             }
         }
@@ -214,8 +210,8 @@ final class TtsPrefetcher {
             final byte[] data = engine.prefetch(seg.text(), voice);
             if (data.length > 0) {
                 TtsCache.put(videoId, index, voice, seg.text(), data);
-                Logger.printDebug(() -> "Prefetched video: " + videoId
-                        + " segment: " + index + "/" + totalSegments + " segment: " + seg);
+                Logger.printDebug(() -> "Prefetched TTS: " + videoId
+                        + " segment: " + index + "/" + totalSegments + " text: " + seg.text());
                 return true;
             }
             return false;

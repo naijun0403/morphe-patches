@@ -105,6 +105,7 @@ final class TranscriptTranslator {
                     mainHandler.post(new FutureTask<>(cancelled::getAsBoolean));
                     try {
                         if (!new FutureTask<>(cancelled::getAsBoolean).get()) {
+                            Logger.printDebug(() -> "translate batch canceled for: " + targetLang);
                             return;
                         }
                     } catch (ExecutionException | InterruptedException e) {
@@ -189,8 +190,10 @@ final class TranscriptTranslator {
                 : translateBatchGoogle(segments, targetLang);
     }
 
-    private static List<String> translateBatchGoogle(List<TranscriptSegment> segments, String targetLang) throws Exception {
+    private static List<String> translateBatchGoogle(
+            List<TranscriptSegment> segments, String targetLang) throws Exception {
         Utils.verifyOffMainThread();
+        Logger.printDebug(() -> "Google translation starting: " + targetLang);
 
         StringBuilder joined = new StringBuilder();
         for (TranscriptSegment seg : segments) {
@@ -221,27 +224,38 @@ final class TranscriptTranslator {
         // Concatenate sentence translations; newline separators from joined input are preserved.
         JSONArray sentences = new JSONArray(Requester.parseString(conn)).getJSONArray(0);
         StringBuilder translatedJoined = new StringBuilder();
-        for (int i = 0; i < sentences.length(); i++) {
+        for (int i = 0, length = sentences.length(); i < length; i++) {
+            final int iFinal = i;
+            Logger.printDebug(() -> "Translating batch: " + (iFinal + 1) + "/" + length);
             translatedJoined.append(sentences.getJSONArray(i).getString(0));
         }
-
+        Logger.printDebug(() -> "Google translation complete: " + targetLang);
         return Arrays.asList(translatedJoined.toString().split("\n", -1));
     }
 
     // MyMemory limits q to 500 bytes per request.
     private static final int MYMEMORY_MAX_CHARS = 450;
 
-    private static List<String> translateBatchMyMemory(List<TranscriptSegment> segments, String targetLang) throws Exception {
+    private static List<String> translateBatchMyMemory(
+            List<TranscriptSegment> segments, String targetLang) throws Exception {
+        Logger.printDebug(() -> "MyMemory translation starting: " + targetLang);
+
         // Re-split into sub-batches that fit within the 500-byte request limit.
         List<List<TranscriptSegment>> subBatches = splitByCharBudget(segments, MYMEMORY_MAX_CHARS);
         List<String> results = new ArrayList<>(segments.size());
+        int i = 0;
+        final int subBatchesSize = subBatches.size();
         for (List<TranscriptSegment> sub : subBatches) {
+            final int iFinal = i++;
+            Logger.printDebug(() -> "Translating batch: " + iFinal + "/" + subBatchesSize);
             results.addAll(translateMyMemoryRequest(sub, targetLang));
         }
+        Logger.printDebug(() -> "MyMemory translation complete: " + targetLang);
         return results;
     }
 
-    private static List<String> translateMyMemoryRequest(List<TranscriptSegment> segments, String targetLang) throws Exception {
+    private static List<String> translateMyMemoryRequest(
+            List<TranscriptSegment> segments, String targetLang) throws Exception {
         Utils.verifyOffMainThread();
 
         StringBuilder joined = new StringBuilder();
