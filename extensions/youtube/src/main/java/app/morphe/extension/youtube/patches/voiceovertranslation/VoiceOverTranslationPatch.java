@@ -64,7 +64,8 @@ public class VoiceOverTranslationPatch {
     private static final float MAX_RATE_STEP_UP = 0.25f;
 
     static final String TTS_ENGINE_SYSTEM = "system";
-    private static final String VOT_TEST_ID = "vot_test_";
+    private static final String VOT_ID_PREFIX = "vot_";
+    private static final String VOT_TEST_ID_PREFIX = "vot_test_";
     private static final String TEST_VIDEO_ID = "test";
     private static final int TEST_SEGMENT_INDEX = -1;
 
@@ -300,32 +301,33 @@ public class VoiceOverTranslationPatch {
                 tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
                     @Override public void onStart(String utteranceId) { }
                     @Override public void onDone(String utteranceId) {
-                        Utils.runOnMainThreadNowOrLater(() -> {
-                            if (utteranceId != null && utteranceId.startsWith(VOT_TEST_ID)) {
-                                try {
-                                    long id = Long.parseLong(utteranceId.substring(9));
-                                    abandonDuckAfterTest(id);
-                                } catch (Exception ex) {
-                                    logError(() -> "Utterance listener onDone failure", ex);
-                                }
-                            } else {
-                                abandonDuck();
+                        Utils.verifyOnMainThread();
+                        if (utteranceId == null) return;
+                        if (utteranceId.startsWith(VOT_TEST_ID_PREFIX)) {
+                            try {
+                                String suffix = utteranceId.substring(VOT_TEST_ID_PREFIX.length());
+                                String[] parts = suffix.split("_");
+                                long tId = Long.parseLong(parts[0]);
+                                long pId = Long.parseLong(parts[1]);
+                                ttsEngine.clearBusy(pId);
+                                abandonDuckAfterTest(tId);
+                            } catch (Exception ex) {
+                                logError(() -> "Utterance listener onDone failure", ex);
                             }
-                        });
+                        } else if (utteranceId.startsWith(VOT_ID_PREFIX)) {
+                            try {
+                                long id = Long.parseLong(utteranceId.substring(VOT_ID_PREFIX.length()));
+                                if (id == ttsEngine.getPlaybackId()) {
+                                    ttsEngine.clearBusy(id);
+                                    abandonDuck();
+                                }
+                            } catch (Exception ex) {
+                                logError(() -> "Utterance listener onDone failure", ex);
+                            }
+                        }
                     }
                     @Override public void onError(String utteranceId) {
-                        Utils.runOnMainThreadNowOrLater(() -> {
-                            if (utteranceId != null && utteranceId.startsWith(VOT_TEST_ID)) {
-                                try {
-                                    final long id = Long.parseLong(utteranceId.substring(9));
-                                    abandonDuckAfterTest(id);
-                                } catch (Exception ex) {
-                                    logError(() -> "Utterance listener onError failure", ex);
-                                }
-                            } else {
-                                abandonDuck();
-                            }
-                        });
+                        onDone(utteranceId);
                     }
                 });
                 ttsReady = true;
@@ -371,7 +373,8 @@ public class VoiceOverTranslationPatch {
             tts.setSpeechRate(rate);
             Bundle params = new Bundle();
             params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume);
-            tts.speak(seg.text(), TextToSpeech.QUEUE_FLUSH, params, "vot");
+            final long id = ttsEngine.markBusy();
+            tts.speak(seg.text(), TextToSpeech.QUEUE_FLUSH, params, VOT_ID_PREFIX + id);
             return;
         }
 
@@ -458,7 +461,9 @@ public class VoiceOverTranslationPatch {
             Bundle params = new Bundle();
             params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume);
             tts.setSpeechRate(1.0f);
-            tts.speak(getTestString(), TextToSpeech.QUEUE_FLUSH, params, VOT_TEST_ID + testId);
+            final long pId = ttsEngine.markBusy();
+            tts.speak(getTestString(), TextToSpeech.QUEUE_FLUSH, params,
+                    VOT_TEST_ID_PREFIX + testId + "_" + pId);
             return;
         }
 

@@ -109,16 +109,18 @@ final class TtsEngine {
                 Utils.runOnMainThread(() -> {
                     if (data.length > 0 && !stopped && id == playbackId) {
                         play(data, volume, 1.0f, id, onDone); // rate is baked into SSML
-                    } else {
-                        if (id == playbackId) speaking = false;
+                    } else if (id == playbackId) {
+                        speaking = false;
                         if (onDone != null) onDone.run();
                     }
                 });
             } catch (Exception ex) {
                 VoiceOverTranslationPatch.logError(() -> "Edge TTS speak failed", ex);
                 Utils.runOnMainThread(() -> {
-                    if (id == playbackId) speaking = false;
-                    if (onDone != null) onDone.run();
+                    if (id == playbackId) {
+                        speaking = false;
+                        if (onDone != null) onDone.run();
+                    }
                 });
             }
         });
@@ -133,6 +135,20 @@ final class TtsEngine {
         stopped = false;
         playbackId++;
         speaking = true;
+        return playbackId;
+    }
+
+    /** Clears the busy flag for a specific playback ID if it's still current. */
+    void clearBusy(long id) {
+        Utils.verifyOnMainThread();
+        if (id == playbackId) {
+            speaking = false;
+        }
+    }
+
+    /** Returns the current active playback session ID. */
+    long getPlaybackId() {
+        Utils.verifyOnMainThread();
         return playbackId;
     }
 
@@ -156,8 +172,10 @@ final class TtsEngine {
         Utils.verifyOnMainThread();
         // Reject audio that completed synthesis after stop() was called (e.g. post-seek).
         if (stopped || id != playbackId) {
-            if (id == playbackId) speaking = false;
-            if (onDone != null) onDone.run();
+            if (id == playbackId) {
+                speaking = false;
+                if (onDone != null) onDone.run();
+            }
             return;
         }
 
@@ -173,8 +191,10 @@ final class TtsEngine {
                 });
             } finally {
                 Utils.runOnMainThread(() -> {
-                    if (id == playbackId) speaking = false;
-                    if (onDone != null) onDone.run();
+                    if (id == playbackId) {
+                        speaking = false;
+                        if (onDone != null) onDone.run();
+                    }
                 });
             }
         });
