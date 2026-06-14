@@ -273,6 +273,9 @@ public final class VotBottomSheet {
                     selectedValue, fg, rippleColor, checkmarkRes, speakerRes, onChanged, pickerDialog);
         }
 
+        addVoiceRow(context, inflater, listLayout, TTS_ENGINE_SYSTEM, str("morphe_vot_tts_system"), true,
+                selectedValue, fg, rippleColor, checkmarkRes, speakerRes, onChanged, pickerDialog);
+
         if (!multilingualVoices.isEmpty()) {
             listLayout.addView(makeSectionHeader(context, str("morphe_vot_voice_multilingual"), fg));
             for (VoiceCatalog.Voice voice : multilingualVoices) {
@@ -280,9 +283,6 @@ public final class VotBottomSheet {
                         selectedValue, fg, rippleColor, checkmarkRes, speakerRes, onChanged, pickerDialog);
             }
         }
-
-        addVoiceRow(context, inflater, listLayout, TTS_ENGINE_SYSTEM, str("morphe_vot_tts_system"), true,
-                selectedValue, fg, rippleColor, checkmarkRes, speakerRes, onChanged, pickerDialog);
 
         pickerRoot.addView(scroll);
         pickerDialog.show();
