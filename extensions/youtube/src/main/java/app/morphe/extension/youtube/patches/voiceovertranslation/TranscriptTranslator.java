@@ -10,6 +10,8 @@ package app.morphe.extension.youtube.patches.voiceovertranslation;
 import android.os.Handler;
 import android.os.Looper;
 
+import androidx.annotation.Nullable;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -22,8 +24,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
@@ -46,7 +49,8 @@ final class TranscriptTranslator {
     // Batches are built by character budget rather than segment count, so request
     // sizes stay uniform regardless of how long the merged sentences are.
     private static final int MAX_BATCH_CHARS = 4_000;
-
+    // Concurrent requests to the translation endpoint. Keep modest to avoid rate limiting.
+    private static final int PARALLEL_REQUESTS = 1;
     // Same as arrays.xml value
     public static final String TRANSLATION_SERVICE_GOOGLE = "google";
     // Same as arrays.xml value
@@ -56,8 +60,6 @@ final class TranscriptTranslator {
     // video is reported via printException (visible to the user), while subsequent batch
     // failures in the same session are downgraded to debug to avoid toast spam.
     private static volatile boolean reportNextTranslationError;
-
-    private static final AtomicLong currentSessionId = new AtomicLong();
 
     /**
      * Progressive translation. The first batch is translated synchronously so the returned
@@ -72,61 +74,96 @@ final class TranscriptTranslator {
                                              String targetLang,
                                              Consumer<List<TranscriptSegment>> onUpdate,
                                              BooleanSupplier cancelled) {
-        Utils.verifyOffMainThread();
         if (segments.isEmpty()) return segments;
-        final long sessionId = currentSessionId.incrementAndGet();
+
+        List<List<TranscriptSegment>> batches = splitByCharBudget(segments);
         reportNextTranslationError = true;
 
+        // Working copy that accumulates translated batches over the original text.
         List<TranscriptSegment> working = new ArrayList<>(segments);
-        Handler mainHandler = new Handler(Looper.getMainLooper());
 
-        int i = 0;
-        while (i < segments.size()) {
-            if (sessionId != currentSessionId.get()) return working;
-
-            if (cancelled != null) {
-                FutureTask<Boolean> task = new FutureTask<>(cancelled::getAsBoolean);
-                mainHandler.post(task);
-                try {
-                    if (!task.get()) return working;
-                } catch (ExecutionException | InterruptedException e) {
-                    return working;
-                }
-            }
-
-            List<TranscriptSegment> batch = new ArrayList<>();
-            int batchChars = 0;
-            int batchStart = i;
-            while (i < segments.size()) {
-                TranscriptSegment s = segments.get(i);
-                final int len = s.text().length() + 1;
-                if (!batch.isEmpty() && batchChars + len > MAX_BATCH_CHARS) break;
-                batch.add(s);
-                batchChars += len;
-                i++;
-            }
-
-            try {
-                List<String> translated = translateBatch(batch, targetLang);
-                if (translated != null) {
-                    for (int j = 0, limit = Math.min(batch.size(), translated.size()); j < limit; j++) {
-                        TranscriptSegment orig = batch.get(j);
-                        working.set(batchStart + j, new TranscriptSegment(
-                                orig.startMs(), orig.endMs(), translated.get(j)));
-                    }
-                    if (onUpdate != null) {
-                        List<TranscriptSegment> snapshot = new ArrayList<>(working);
-                        mainHandler.post(() -> onUpdate.accept(snapshot));
-                    }
-                }
-            } catch (Exception ex) {
-                if (reportNextTranslationError) {
-                    reportNextTranslationError = false;
-                    VoiceOverTranslationPatch.logError(() -> "Translation failed", ex);
-                }
-            }
+        int[] offsets = new int[batches.size()];
+        for (int b = 1, batchCount = batches.size(); b < batchCount; b++) {
+            offsets[b] = offsets[b - 1] + batches.get(b - 1).size();
         }
-        return working;
+
+        applyBatch(working, batches.get(0), 0, translateBatchSafe(batches.get(0), targetLang));
+        if (batches.size() == 1) return working;
+
+        // Snapshot to return before background batches start mutating the working copy.
+        List<TranscriptSegment> initial = new ArrayList<>(working);
+
+        //noinspection resource
+        ExecutorService pool = Executors.newFixedThreadPool(
+                Math.min(PARALLEL_REQUESTS, batches.size() - 1));
+        Handler mainHandler = new Handler(Looper.getMainLooper());
+        for (int b = 1, batchCount = batches.size(); b < batchCount; b++) {
+            final int batchIndex = b;
+            pool.execute(() -> {
+                // Skip remaining work when the result is no longer needed (video changed).
+                if (cancelled != null) {
+                    mainHandler.post(new FutureTask<>(cancelled::getAsBoolean));
+                    try {
+                        if (!new FutureTask<>(cancelled::getAsBoolean).get()) {
+                            Logger.printDebug(() -> "translate batch canceled for: " + targetLang);
+                            return;
+                        }
+                    } catch (ExecutionException | InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+                List<String> translated = translateBatchSafe(batches.get(batchIndex), targetLang);
+                List<TranscriptSegment> snapshot;
+                synchronized (working) {
+                    applyBatch(working, batches.get(batchIndex), offsets[batchIndex], translated);
+                    snapshot = new ArrayList<>(working);
+                }
+                if (onUpdate != null) onUpdate.accept(snapshot);
+            });
+        }
+        // Graceful shutdown - queued batches still run, the pool exits when they finish.
+        pool.shutdown();
+
+        return initial;
+    }
+
+    /**
+     * Writes translated text over the batch's slots in {@code target}, preserving timings.
+     * A {@code null} translation (failed batch) leaves the original text in place.
+     */
+    private static void applyBatch(List<TranscriptSegment> target, List<TranscriptSegment> batch,
+                                   int offset, @Nullable List<String> translated) {
+        if (translated == null) return;
+        final int limit = Math.min(batch.size(), translated.size());
+        if (translated.size() != batch.size()) {
+            Logger.printDebug(() -> "Line count mismatch - expected "
+                    + batch.size() + ", got " + translated.size() + "; last "
+                    + (batch.size() - limit) + " segment(s) keep original text");
+        }
+        for (int j = 0; j < limit; j++) {
+            TranscriptSegment orig = batch.get(j);
+            target.set(offset + j,
+                    new TranscriptSegment(orig.startMs(), orig.endMs(), translated.get(j)));
+        }
+    }
+
+    @Nullable
+    private static List<String> translateBatchSafe(List<TranscriptSegment> batch, String targetLang) {
+        try {
+            return translateBatch(batch, targetLang);
+        } catch (Exception ex) {
+            if (reportNextTranslationError) {
+                reportNextTranslationError = false;
+                VoiceOverTranslationPatch.logError(() -> "Translation failed: " + ex.getMessage(), ex);
+            } else {
+                Logger.printDebug(() -> "Batch failed: " + ex.getMessage());
+            }
+            return null;
+        }
+    }
+
+    private static List<List<TranscriptSegment>> splitByCharBudget(List<TranscriptSegment> segments) {
+        return splitByCharBudget(segments, MAX_BATCH_CHARS);
     }
 
     private static List<List<TranscriptSegment>> splitByCharBudget(List<TranscriptSegment> segments, int maxChars) {

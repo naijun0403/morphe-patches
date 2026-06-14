@@ -61,8 +61,6 @@ final class TranscriptFetcher {
     }
 
     private static List<TranscriptSegment> fetchEnglishSegments(String videoId) {
-        Utils.verifyOffMainThread();
-
         String captionUrl = null;
         String poToken    = null;
         try {
