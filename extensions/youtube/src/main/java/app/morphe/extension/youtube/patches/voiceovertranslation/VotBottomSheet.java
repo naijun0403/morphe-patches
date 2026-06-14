@@ -296,10 +296,10 @@ public final class VotBottomSheet {
                 selectedValue, fg, rippleColor, checkmarkRes, speakerRes, pickerDialog);
 
         for (VoiceCatalog.Voice voice : nativeVoices) {
-            if (voice.isMale && maleCount > 1 && !maleHeaderAdded) {
+            if (!maleHeaderAdded && voice.isMale && maleCount > 1) {
                 listLayout.addView(makeSectionHeader(context, str("morphe_vot_voice_gender_male"), fg));
                 maleHeaderAdded = true;
-            } else if (!voice.isMale && femaleCount > 1 && !femaleHeaderAdded) {
+            } else if (!femaleHeaderAdded && !voice.isMale && femaleCount > 1) {
                 listLayout.addView(makeSectionHeader(context, str("morphe_vot_voice_gender_female"), fg));
                 femaleHeaderAdded = true;
             }
@@ -312,11 +312,13 @@ public final class VotBottomSheet {
             boolean multiFemaleHeaderAdded = false;
 
             for (VoiceCatalog.Voice voice : multilingualVoices) {
-                if (voice.isMale && !multiMaleHeaderAdded) {
-                    listLayout.addView(makeSectionHeader(context, str("morphe_vot_voice_gender_male_multilingual"), fg));
+                if (!multiMaleHeaderAdded && voice.isMale) {
+                    listLayout.addView(makeSectionHeader(context,
+                            str("morphe_vot_voice_gender_male_multilingual"), fg));
                     multiMaleHeaderAdded = true;
-                } else if (!voice.isMale && !multiFemaleHeaderAdded) {
-                    listLayout.addView(makeSectionHeader(context, str("morphe_vot_voice_gender_female_multilingual"), fg));
+                } else if (!multiFemaleHeaderAdded && !voice.isMale) {
+                    listLayout.addView(makeSectionHeader(context,
+                            str("morphe_vot_voice_gender_female_multilingual"), fg));
                     multiFemaleHeaderAdded = true;
                 }
                 addVoiceRow(context, inflater, listLayout, voice.id, voice.dialogDisplayName, false,

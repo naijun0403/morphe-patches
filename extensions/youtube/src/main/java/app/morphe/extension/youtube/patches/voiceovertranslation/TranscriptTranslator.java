@@ -65,7 +65,8 @@ final class TranscriptTranslator {
      * <p>Timings and list size never change between updates - only segment text - so callers
      * may keep indexing into the list across snapshots.
      */
-    static List<TranscriptSegment> translate(List<TranscriptSegment> segments, String targetLang,
+    static List<TranscriptSegment> translate(List<TranscriptSegment> segments,
+                                             String targetLang,
                                              Consumer<List<TranscriptSegment>> onUpdate,
                                              BooleanSupplier cancelled) {
         if (segments.isEmpty()) return segments;

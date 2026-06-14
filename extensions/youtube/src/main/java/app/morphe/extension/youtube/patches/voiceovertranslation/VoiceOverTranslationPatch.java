@@ -46,7 +46,7 @@ public class VoiceOverTranslationPatch {
         }
     }
 
-    private static final long SEEK_JUMP_THRESHOLD_MS = 3_000;
+    private static final long SEEK_JUMP_THRESHOLD_MS = 2_900;
     private static final long TTS_LOOKAHEAD_MS = 400;
 
     // Rough estimate of natural speech duration (~15 chars per second) used to
@@ -121,8 +121,10 @@ public class VoiceOverTranslationPatch {
             lastVideoTimeMs = 0;
             lastSpokenIndex = -1;
             if (videoId.equals(currentVideoId)) return;
-            currentVideoId = videoId;
+
+            Logger.printDebug(() -> "newVideoLoaded");
             stopTts();
+            currentVideoId = videoId;
             segments = new ArrayList<>();
 
             if (!Settings.VOT_ENABLED.get()) return;
@@ -166,7 +168,7 @@ public class VoiceOverTranslationPatch {
         lastVideoTimeMs = timeMs;
 
         long effectiveTimeMs = timeMs + TTS_LOOKAHEAD_MS;
-        for (int i = 0; i < current.size(); i++) {
+        for (int i = 0, size = current.size(); i < size; i++) {
             TranscriptSegment seg = current.get(i);
             if (effectiveTimeMs >= seg.startMs() && timeMs < seg.endMs()) {
                 if (i != lastSpokenIndex) {
@@ -213,10 +215,11 @@ public class VoiceOverTranslationPatch {
 
     private static void notifyStateChanged() {
         Runnable callback = onStateChangeCallback;
-        if (callback != null) Utils.runOnMainThread(callback);
+        if (callback != null) Utils.runOnMainThreadNowOrLater(callback);
     }
 
     private static synchronized void loadTranscript(String videoId) {
+        Logger.printDebug(() -> "loadTranscript: " + videoId);
         if (isLoading) return;
         isLoading = true;
 
@@ -255,6 +258,7 @@ public class VoiceOverTranslationPatch {
 
     private static synchronized void ensureTts() {
         if (tts != null) return;
+        Logger.printDebug(() -> "sensureTts creating tts");
         tts = new TextToSpeech(Utils.getContext(), status -> {
             if (status != TextToSpeech.SUCCESS) {
                 Logger.printDebug(() -> "TTS initialization failed");
@@ -310,6 +314,7 @@ public class VoiceOverTranslationPatch {
     }
 
     private static void speak(TranscriptSegment seg, int index) {
+        Logger.printDebug(() -> "speak: " + seg);
         String lang = resolveTargetLang();
         final float volume = Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f;
 
@@ -383,6 +388,7 @@ public class VoiceOverTranslationPatch {
      * so stale audio never plays over the new video position.
      */
     public static void onVideoSeeked() {
+        Logger.printDebug(() -> "onVideoSeeked");
         stopTts();
         lastSpokenIndex = -1;
     }
@@ -397,7 +403,8 @@ public class VoiceOverTranslationPatch {
      * If the engine is already speaking the same voice, stops it.
      */
     static synchronized void testSpeak(String voiceId) {
-        boolean wasSameVoice = isTestSpeaking && voiceId.equals(lastTestVoiceId);
+        Logger.printDebug(() -> "testSpeak: " + voiceId);
+        final boolean wasSameVoice = isTestSpeaking && voiceId.equals(lastTestVoiceId);
         stopTts();
         if (wasSameVoice) return;
 
@@ -463,6 +470,7 @@ public class VoiceOverTranslationPatch {
     }
 
     private static void stopTts() {
+        Logger.printDebug(() -> "stopTts");
         isTestSpeaking = false;
         ttsEngine.stop();
         TextToSpeech localTts = tts;
@@ -480,6 +488,7 @@ public class VoiceOverTranslationPatch {
      * No-op if ducking is already active.
      */
     private static void requestDuck() {
+        Logger.printDebug(() -> "requestDuck");
         if (isDucking) return;
         isDucking = true;
         AudioFocusRequest req = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
@@ -499,6 +508,7 @@ public class VoiceOverTranslationPatch {
      * No-op if ducking is not active or a test is still playing.
      */
     private static void abandonDuck() {
+        Logger.printDebug(() -> "abandonDuck");
         if (isTestSpeaking) return;
         if (!isDucking) return;
         isDucking = false;
@@ -512,6 +522,7 @@ public class VoiceOverTranslationPatch {
     }
 
     private static void abandonDuckAfterTest(long id) {
+        Logger.printDebug(() -> "abandonDuckAfterTest: " + id);
         if (id != currentTestId) return;
         isTestSpeaking = false;
         abandonDuck();

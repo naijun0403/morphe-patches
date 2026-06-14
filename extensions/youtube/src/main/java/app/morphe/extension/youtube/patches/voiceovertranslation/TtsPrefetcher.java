@@ -79,8 +79,12 @@ final class TtsPrefetcher {
 
     static void updateTime(long timeMs) {
         synchronized (lock) {
+            if (currentVideoTimeMs != timeMs) {
+                Logger.printDebug(() -> "updateTime: " + timeMs + " isSpeaking: " + engine.isSpeaking());
+            }
             currentVideoTimeMs = timeMs;
             if (waiting) {
+                Logger.printDebug(() -> "updateTime notifyAll");
                 lock.notifyAll();
             }
         }
