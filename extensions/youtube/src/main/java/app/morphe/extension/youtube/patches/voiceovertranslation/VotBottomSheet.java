@@ -8,37 +8,37 @@
 package app.morphe.extension.youtube.patches.voiceovertranslation;
 
 import static app.morphe.extension.shared.StringRef.str;
-import static app.morphe.extension.youtube.patches.voiceovertranslation.VoiceOverTranslationPatch.TTS_ENGINE_SYSTEM;
-import static app.morphe.extension.youtube.patches.voiceovertranslation.TranscriptTranslator.TRANSLATION_SERVICE_GOOGLE;
-import static app.morphe.extension.youtube.patches.voiceovertranslation.TranscriptTranslator.TRANSLATION_SERVICE_MY_MEMORY;
-import static app.morphe.extension.youtube.videoplayer.LegacyPlayerControlButton.fadeInDuration;
-import static app.morphe.extension.youtube.videoplayer.LegacyPlayerControlButton.getDialogBackgroundColor;
 import static app.morphe.extension.shared.settings.preference.CustomDialogListPreference.DRAWABLE_CHECKMARK;
 import static app.morphe.extension.shared.settings.preference.CustomDialogListPreference.DRAWABLE_CHECKMARK_BOLD;
 import static app.morphe.extension.shared.settings.preference.CustomDialogListPreference.ID_MORPHE_CHECK_ICON;
 import static app.morphe.extension.shared.settings.preference.CustomDialogListPreference.ID_MORPHE_CHECK_ICON_PLACEHOLDER;
 import static app.morphe.extension.shared.settings.preference.CustomDialogListPreference.ID_MORPHE_ITEM_TEXT;
 import static app.morphe.extension.shared.settings.preference.CustomDialogListPreference.LAYOUT_MORPHE_CUSTOM_LIST_ITEM_CHECKED;
+import static app.morphe.extension.youtube.patches.voiceovertranslation.TranscriptTranslator.TRANSLATION_SERVICE_GOOGLE;
+import static app.morphe.extension.youtube.patches.voiceovertranslation.TranscriptTranslator.TRANSLATION_SERVICE_MY_MEMORY;
+import static app.morphe.extension.youtube.patches.voiceovertranslation.VoiceOverTranslationPatch.TTS_ENGINE_SYSTEM;
+import static app.morphe.extension.youtube.videoplayer.LegacyPlayerControlButton.fadeInDuration;
+import static app.morphe.extension.youtube.videoplayer.LegacyPlayerControlButton.getDialogBackgroundColor;
 
 import android.content.Context;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.Typeface;
-import android.util.Pair;
-import android.content.res.ColorStateList;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.graphics.drawable.ShapeDrawable;
 import android.graphics.drawable.shapes.OvalShape;
+import android.util.Pair;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
-import android.widget.ScrollView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
+import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
@@ -278,17 +278,42 @@ public final class VotBottomSheet {
         int speakerRes = Utils.appIsUsingBoldIcons() ? DRAWABLE_SPEAKER_BOLD : DRAWABLE_SPEAKER;
         final int rippleColor = Color.argb(60, Color.red(fg), Color.green(fg), Color.blue(fg));
 
-        for (VoiceCatalog.Voice voice : nativeVoices) {
-            addVoiceRow(context, inflater, listLayout, voice.id, voice.dialogDisplayName, false,
-                    selectedValue, fg, rippleColor, checkmarkRes, speakerRes, onChanged, pickerDialog);
+        int maleCount = 0;
+        int femaleCount = 0;
+        for (VoiceCatalog.Voice v : nativeVoices) {
+            if (v.isMale) maleCount++; else femaleCount++;
         }
+
+        boolean maleHeaderAdded = false;
+        boolean femaleHeaderAdded = false;
 
         addVoiceRow(context, inflater, listLayout, TTS_ENGINE_SYSTEM, str("morphe_vot_tts_system"), true,
                 selectedValue, fg, rippleColor, checkmarkRes, speakerRes, onChanged, pickerDialog);
 
+        for (VoiceCatalog.Voice voice : nativeVoices) {
+            if (voice.isMale && maleCount > 1 && !maleHeaderAdded) {
+                listLayout.addView(makeSectionHeader(context, str("morphe_vot_voice_gender_male"), fg));
+                maleHeaderAdded = true;
+            } else if (!voice.isMale && femaleCount > 1 && !femaleHeaderAdded) {
+                listLayout.addView(makeSectionHeader(context, str("morphe_vot_voice_gender_female"), fg));
+                femaleHeaderAdded = true;
+            }
+            addVoiceRow(context, inflater, listLayout, voice.id, voice.dialogDisplayName, false,
+                    selectedValue, fg, rippleColor, checkmarkRes, speakerRes, onChanged, pickerDialog);
+        }
+
         if (!multilingualVoices.isEmpty()) {
-            listLayout.addView(makeSectionHeader(context, str("morphe_vot_voice_multilingual"), fg));
+            boolean multiMaleHeaderAdded = false;
+            boolean multiFemaleHeaderAdded = false;
+
             for (VoiceCatalog.Voice voice : multilingualVoices) {
+                if (voice.isMale && !multiMaleHeaderAdded) {
+                    listLayout.addView(makeSectionHeader(context, str("morphe_vot_voice_gender_male_multilingual"), fg));
+                    multiMaleHeaderAdded = true;
+                } else if (!voice.isMale && !multiFemaleHeaderAdded) {
+                    listLayout.addView(makeSectionHeader(context, str("morphe_vot_voice_gender_female_multilingual"), fg));
+                    multiFemaleHeaderAdded = true;
+                }
                 addVoiceRow(context, inflater, listLayout, voice.id, voice.dialogDisplayName, false,
                         selectedValue, fg, rippleColor, checkmarkRes, speakerRes, onChanged, pickerDialog);
             }
@@ -367,20 +392,22 @@ public final class VotBottomSheet {
         lineStart.setLayoutParams(lineStartParams);
         container.addView(lineStart);
 
-        TextView tv = new TextView(context);
-        tv.setText(label);
-        tv.setTextSize(11);
-        tv.setTextColor(secondaryColor(fg));
-        tv.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-        container.addView(tv);
+        if (!label.isEmpty()) {
+            TextView tv = new TextView(context);
+            tv.setText(label);
+            tv.setTextSize(11);
+            tv.setTextColor(secondaryColor(fg));
+            tv.setLayoutParams(new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+            container.addView(tv);
 
-        View lineEnd = new View(context);
-        lineEnd.setBackgroundColor(lineColor);
-        LinearLayout.LayoutParams lineEndParams = new LinearLayout.LayoutParams(0, Dim.dp1, 1f);
-        lineEndParams.setMarginStart(Dim.dp8);
-        lineEnd.setLayoutParams(lineEndParams);
-        container.addView(lineEnd);
+            View lineEnd = new View(context);
+            lineEnd.setBackgroundColor(lineColor);
+            LinearLayout.LayoutParams lineEndParams = new LinearLayout.LayoutParams(0, Dim.dp1, 1f);
+            lineEndParams.setMarginStart(Dim.dp8);
+            lineEnd.setLayoutParams(lineEndParams);
+            container.addView(lineEnd);
+        }
 
         return container;
     }

@@ -71,11 +71,7 @@ final class VoiceCatalog {
                     .replace(MULTILINGUAL_NEURAL_SUFFIX, "")
                     .replace(EXPRESSIVE_SUFFIX, "")
                     .replace(NEURAL_SUFFIX, "");
-
-            String gender = str(isMale
-                    ? "morphe_vot_voice_gender_male"
-                    : "morphe_vot_voice_gender_female");
-            this.dialogDisplayName = shortName + " (" + gender + " " + flag + ")";
+            this.dialogDisplayName = flag + " " + shortName;
         }
 
         private static String countryToFlag(String countryCode) {
