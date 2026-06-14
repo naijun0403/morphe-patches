@@ -72,7 +72,7 @@ val voiceOverTranslationPatch = bytecodePatch(
     execute {
         PreferenceScreen.VIDEO.addPreferences(
             PreferenceScreenPreference(
-                key = "morphe_vot",
+                key = "morphe_vot_screen",
                 sorting = PreferenceScreenPreference.Sorting.UNSORTED,
                 preferences = setOf(
                     SwitchPreference("morphe_vot_enabled"),
