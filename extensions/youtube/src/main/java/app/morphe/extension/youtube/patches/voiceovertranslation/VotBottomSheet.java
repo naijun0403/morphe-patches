@@ -43,7 +43,7 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
@@ -227,29 +227,22 @@ public final class VotBottomSheet {
         String lang = Settings.VOT_CAPTION_LANGUAGE.get();
         if ("app".equals(lang)) lang = VoiceOverTranslationPatch.resolveTargetLang();
 
-        List<VoiceCatalog.Voice> voices = VoiceCatalog.getVoicesForLang(lang);
-        if (voices == null) {
-            voices = Collections.emptyList();
-        } else {
-            voices = new ArrayList<>(voices);
-            voices.sort((v1, v2) -> {
-                if (v1.isMale != v2.isMale) return v1.isMale ? -1 : 1;
-                return v1.shortName.compareToIgnoreCase(v2.shortName);
-            });
+        List<VoiceCatalog.Voice> allVoices = VoiceCatalog.getVoicesForLang(lang);
+        List<VoiceCatalog.Voice> nativeVoices = new ArrayList<>();
+        List<VoiceCatalog.Voice> multilingualVoices = new ArrayList<>();
+
+        if (allVoices != null) {
+            for (VoiceCatalog.Voice v : allVoices) {
+                (v.isMultilingual ? multilingualVoices : nativeVoices).add(v);
+            }
         }
 
-        int voicesSize = voices.size();
-        final int entryValuesSize = voicesSize + 1;
-        String[] entries = new String[entryValuesSize];
-        String[] values = new String[entryValuesSize];
-
-        for (int i = 0; i < voicesSize; i++) {
-            VoiceCatalog.Voice v = voices.get(i);
-            entries[i] = v.dialogDisplayName;
-            values[i] = v.id;
-        }
-        entries[entryValuesSize - 1] = str("morphe_vot_tts_system");
-        values[entryValuesSize - 1] = TTS_ENGINE_SYSTEM;
+        Comparator<VoiceCatalog.Voice> voiceOrder = (v1, v2) -> {
+            if (v1.isMale != v2.isMale) return v1.isMale ? -1 : 1;
+            return v1.shortName.compareToIgnoreCase(v2.shortName);
+        };
+        nativeVoices.sort(voiceOrder);
+        multilingualVoices.sort(voiceOrder);
 
         String selectedValue = Settings.VOT_USE_NATIVE_TTS.get()
                 ? TTS_ENGINE_SYSTEM
@@ -275,57 +268,111 @@ public final class VotBottomSheet {
         int speakerRes = Utils.appIsUsingBoldIcons() ? DRAWABLE_SPEAKER_BOLD : DRAWABLE_SPEAKER;
         final int rippleColor = Color.argb(60, Color.red(fg), Color.green(fg), Color.blue(fg));
 
-        for (int i = 0; i < entryValuesSize; i++) {
-            final String value = values[i];
-            final boolean isSystem = TTS_ENGINE_SYSTEM.equals(value);
-            View row = inflater.inflate(LAYOUT_MORPHE_CUSTOM_LIST_ITEM_CHECKED, listLayout, false);
-
-            ImageView check = row.findViewById(ID_MORPHE_CHECK_ICON);
-            check.setImageResource(checkmarkRes);
-            check.setColorFilter(fg);
-            boolean isSelected = value.equals(selectedValue);
-            check.setVisibility(isSelected ? View.VISIBLE : View.GONE);
-            row.findViewById(ID_MORPHE_CHECK_ICON_PLACEHOLDER)
-                    .setVisibility(isSelected ? View.GONE : View.VISIBLE);
-            TextView itemText = row.findViewById(ID_MORPHE_ITEM_TEXT);
-            itemText.setText(entries[i]);
-            itemText.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-
-            FrameLayout speakerButton = new FrameLayout(context);
-            LinearLayout.LayoutParams buttonLp = new LinearLayout.LayoutParams(Dim.dp40, Dim.dp40);
-            buttonLp.setMarginStart(Dim.dp8);
-            speakerButton.setLayoutParams(buttonLp);
-
-            GradientDrawable circle = new GradientDrawable();
-            circle.setShape(GradientDrawable.OVAL);
-            circle.setColor(Color.argb(20, Color.red(fg), Color.green(fg), Color.blue(fg)));
-            speakerButton.setBackground(new RippleDrawable(
-                    ColorStateList.valueOf(rippleColor), circle, new ShapeDrawable(new OvalShape())));
-
-            ImageView speaker = new ImageView(context);
-            speaker.setImageResource(speakerRes);
-            speaker.setColorFilter(new PorterDuffColorFilter(secondaryColor(fg), PorterDuff.Mode.SRC_IN));
-            speaker.setLayoutParams(new FrameLayout.LayoutParams(Dim.dp24, Dim.dp24, Gravity.CENTER));
-            speakerButton.addView(speaker);
-            speakerButton.setOnClickListener(v -> VoiceOverTranslationPatch.testSpeak(value));
-            ((LinearLayout) row).addView(speakerButton);
-
-            row.setOnClickListener(v -> {
-                if (isSystem) {
-                    Settings.VOT_USE_NATIVE_TTS.save(true);
-                } else {
-                    Settings.VOT_USE_NATIVE_TTS.save(false);
-                    Settings.VOT_TTS_VOICE_TYPE.save(value);
-                }
-                onChanged.run();
-                pickerDialog.dismiss();
-            });
-
-            listLayout.addView(row);
+        for (VoiceCatalog.Voice voice : nativeVoices) {
+            addVoiceRow(context, inflater, listLayout, voice.id, voice.dialogDisplayName, false,
+                    selectedValue, fg, rippleColor, checkmarkRes, speakerRes, onChanged, pickerDialog);
         }
+
+        if (!multilingualVoices.isEmpty()) {
+            listLayout.addView(makeSectionHeader(context, str("morphe_vot_voice_multilingual"), fg));
+            for (VoiceCatalog.Voice voice : multilingualVoices) {
+                addVoiceRow(context, inflater, listLayout, voice.id, voice.dialogDisplayName, false,
+                        selectedValue, fg, rippleColor, checkmarkRes, speakerRes, onChanged, pickerDialog);
+            }
+        }
+
+        addVoiceRow(context, inflater, listLayout, TTS_ENGINE_SYSTEM, str("morphe_vot_tts_system"), true,
+                selectedValue, fg, rippleColor, checkmarkRes, speakerRes, onChanged, pickerDialog);
 
         pickerRoot.addView(scroll);
         pickerDialog.show();
+    }
+
+    private static void addVoiceRow(Context context, LayoutInflater inflater, LinearLayout listLayout,
+                                    String value, String label, boolean isSystem,
+                                    String selectedValue, int fg, int rippleColor,
+                                    int checkmarkRes, int speakerRes,
+                                    Runnable onChanged, SheetBottomDialog.SlideDialog pickerDialog) {
+        View row = inflater.inflate(LAYOUT_MORPHE_CUSTOM_LIST_ITEM_CHECKED, listLayout, false);
+
+        ImageView check = row.findViewById(ID_MORPHE_CHECK_ICON);
+        check.setImageResource(checkmarkRes);
+        check.setColorFilter(fg);
+        boolean isSelected = value.equals(selectedValue);
+        check.setVisibility(isSelected ? View.VISIBLE : View.GONE);
+        row.findViewById(ID_MORPHE_CHECK_ICON_PLACEHOLDER)
+                .setVisibility(isSelected ? View.GONE : View.VISIBLE);
+        TextView itemText = row.findViewById(ID_MORPHE_ITEM_TEXT);
+        itemText.setText(label);
+        itemText.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        FrameLayout speakerButton = new FrameLayout(context);
+        LinearLayout.LayoutParams buttonLp = new LinearLayout.LayoutParams(Dim.dp40, Dim.dp40);
+        buttonLp.setMarginStart(Dim.dp8);
+        speakerButton.setLayoutParams(buttonLp);
+
+        GradientDrawable circle = new GradientDrawable();
+        circle.setShape(GradientDrawable.OVAL);
+        circle.setColor(Color.argb(20, Color.red(fg), Color.green(fg), Color.blue(fg)));
+        speakerButton.setBackground(new RippleDrawable(
+                ColorStateList.valueOf(rippleColor), circle, new ShapeDrawable(new OvalShape())));
+
+        ImageView speaker = new ImageView(context);
+        speaker.setImageResource(speakerRes);
+        speaker.setColorFilter(new PorterDuffColorFilter(secondaryColor(fg), PorterDuff.Mode.SRC_IN));
+        speaker.setLayoutParams(new FrameLayout.LayoutParams(Dim.dp24, Dim.dp24, Gravity.CENTER));
+        speakerButton.addView(speaker);
+        speakerButton.setOnClickListener(v -> VoiceOverTranslationPatch.testSpeak(value));
+        ((LinearLayout) row).addView(speakerButton);
+
+        row.setOnClickListener(v -> {
+            if (isSystem) {
+                Settings.VOT_USE_NATIVE_TTS.save(true);
+            } else {
+                Settings.VOT_USE_NATIVE_TTS.save(false);
+                Settings.VOT_TTS_VOICE_TYPE.save(value);
+            }
+            onChanged.run();
+            pickerDialog.dismiss();
+        });
+
+        listLayout.addView(row);
+    }
+
+    private static View makeSectionHeader(Context context, String label, int fg) {
+        LinearLayout container = new LinearLayout(context);
+        container.setOrientation(LinearLayout.HORIZONTAL);
+        container.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams containerParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        containerParams.setMargins(0, Dim.dp8, 0, 0);
+        container.setLayoutParams(containerParams);
+
+        int lineColor = Color.argb(30, Color.red(fg), Color.green(fg), Color.blue(fg));
+
+        View lineStart = new View(context);
+        lineStart.setBackgroundColor(lineColor);
+        LinearLayout.LayoutParams lineStartParams = new LinearLayout.LayoutParams(0, Dim.dp1, 1f);
+        lineStartParams.setMarginEnd(Dim.dp8);
+        lineStart.setLayoutParams(lineStartParams);
+        container.addView(lineStart);
+
+        TextView tv = new TextView(context);
+        tv.setText(label);
+        tv.setTextSize(11);
+        tv.setTextColor(secondaryColor(fg));
+        tv.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        container.addView(tv);
+
+        View lineEnd = new View(context);
+        lineEnd.setBackgroundColor(lineColor);
+        LinearLayout.LayoutParams lineEndParams = new LinearLayout.LayoutParams(0, Dim.dp1, 1f);
+        lineEndParams.setMarginStart(Dim.dp8);
+        lineEnd.setLayoutParams(lineEndParams);
+        container.addView(lineEnd);
+
+        return container;
     }
 
     private static LinearLayout makeLanguageRow(Context context, String label, int fgColor,
