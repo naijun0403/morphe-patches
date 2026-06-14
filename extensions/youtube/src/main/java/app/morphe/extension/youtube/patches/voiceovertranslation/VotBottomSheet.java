@@ -233,7 +233,11 @@ public final class VotBottomSheet {
 
         if (allVoices != null) {
             for (VoiceCatalog.Voice v : allVoices) {
-                (v.isMultilingual ? multilingualVoices : nativeVoices).add(v);
+                if (v.isMultilingual && !v.languageTag.equals(lang)) {
+                    multilingualVoices.add(v);
+                } else {
+                    nativeVoices.add(v);
+                }
             }
         }
 
