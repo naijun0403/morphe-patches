@@ -34,6 +34,7 @@ final class VoiceCatalog {
          */
         public final String languageTag;
         public final String countryTag;
+        public final String flag;
         public final boolean isMale;
         public final String shortName;
         public final String dialogDisplayName;
@@ -41,20 +42,43 @@ final class VoiceCatalog {
 
         Voice(boolean isMale, String id) {
             final int dash1 = id.indexOf('-');
-            final int dash2 = id.indexOf('-', dash1 + 1);
-            String gender = str(isMale
-                    ? "morphe_vot_voice_gender_male"
-                    : "morphe_vot_voice_gender_female");
+            int dash2 = id.indexOf('-', dash1 + 1);
             this.id = id;
             this.isMale = isMale;
             this.languageTag = id.substring(0, dash1);
-            this.countryTag = id.substring(dash1 + 1, dash2);
+
+            String country = id.substring(dash1 + 1, dash2);
+            if (country.length() > 2) {
+                int nextDash = id.indexOf('-', dash2 + 1);
+                if (nextDash != -1) {
+                    String part = id.substring(dash2 + 1, nextDash);
+                    if (part.length() == 2) {
+                        country = part;
+                        dash2 = nextDash;
+                    }
+                }
+            }
+            this.countryTag = country;
+            this.flag = countryToFlag(country);
+
             this.isMultilingual = id.contains(MULTILINGUAL_NEURAL_SUFFIX);
             this.shortName = id.substring(dash2 + 1)
                     .replace(MULTILINGUAL_NEURAL_SUFFIX, "")
                     .replace(EXPRESSIVE_SUFFIX, "")
                     .replace(NEURAL_SUFFIX, "");
-            this.dialogDisplayName = shortName + " (" + gender + ")";
+
+            String gender = str(isMale
+                    ? "morphe_vot_voice_gender_male"
+                    : "morphe_vot_voice_gender_female");
+            this.dialogDisplayName = shortName + " (" + gender + " " + flag + ")";
+        }
+
+        private static String countryToFlag(String countryCode) {
+            if (countryCode == null || countryCode.length() != 2) return "";
+            String code = countryCode.toUpperCase();
+            final int firstChar = code.charAt(0) - 'A' + 0x1F1E6;
+            final int secondChar = code.charAt(1) - 'A' + 0x1F1E6;
+            return new String(Character.toChars(firstChar)) + new String(Character.toChars(secondChar));
         }
     }
 
