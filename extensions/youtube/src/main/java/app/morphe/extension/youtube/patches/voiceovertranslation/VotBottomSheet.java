@@ -43,7 +43,7 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 
 import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 
@@ -241,12 +241,8 @@ public final class VotBottomSheet {
             }
         }
 
-        Comparator<VoiceCatalog.Voice> voiceOrder = (v1, v2) -> {
-            if (v1.isMale != v2.isMale) return v1.isMale ? -1 : 1;
-            return v1.shortName.compareToIgnoreCase(v2.shortName);
-        };
-        nativeVoices.sort(voiceOrder);
-        multilingualVoices.sort(voiceOrder);
+        Collections.sort(nativeVoices);
+        Collections.sort(multilingualVoices);
 
         String selectedValue = Settings.VOT_USE_NATIVE_TTS.get()
                 ? TTS_ENGINE_SYSTEM

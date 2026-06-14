@@ -9,13 +9,18 @@ package app.morphe.extension.youtube.patches.voiceovertranslation;
 
 import static app.morphe.extension.shared.StringRef.str;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+
+import app.morphe.extension.youtube.settings.Settings;
 
 /**
  * Maps language codes (same values as {@code morphe_vot_caption_language_entry_values})
@@ -23,7 +28,7 @@ import java.util.Objects;
  */
 final class VoiceCatalog {
 
-    public static final class Voice {
+    public static final class Voice implements Comparable<Voice> {
         private static final String MULTILINGUAL_NEURAL_SUFFIX = "MultilingualNeural";
         private static final String EXPRESSIVE_SUFFIX = "Expressive";
         private static final String NEURAL_SUFFIX = "Neural";
@@ -79,6 +84,31 @@ final class VoiceCatalog {
             final int firstChar = code.charAt(0) - 'A' + 0x1F1E6;
             final int secondChar = code.charAt(1) - 'A' + 0x1F1E6;
             return new String(Character.toChars(firstChar)) + new String(Character.toChars(secondChar));
+        }
+
+        @Override
+        public int compareTo(@NonNull Voice other) {
+            if (this.isMale != other.isMale) return this.isMale ? -1 : 1;
+
+            Locale deviceLocale = Locale.getDefault();
+            String userLang = deviceLocale.getLanguage();
+            String userCountry = deviceLocale.getCountry();
+
+            // Prioritize native language match
+            final boolean thisLangMatch = this.languageTag.equalsIgnoreCase(userLang);
+            final boolean otherLangMatch = other.languageTag.equalsIgnoreCase(userLang);
+            if (thisLangMatch != otherLangMatch) return thisLangMatch ? -1 : 1;
+
+            // Prioritize country match
+            if (!userCountry.isEmpty()) {
+                final boolean thisCountryMatch = this.countryTag.equalsIgnoreCase(userCountry);
+                final boolean otherCountryMatch = other.countryTag.equalsIgnoreCase(userCountry);
+                if (thisCountryMatch != otherCountryMatch) return thisCountryMatch ? -1 : 1;
+            }
+
+            final int countryComp = this.countryTag.compareToIgnoreCase(other.countryTag);
+            if (countryComp != 0) return countryComp;
+            return this.shortName.compareToIgnoreCase(other.shortName);
         }
     }
 
