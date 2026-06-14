@@ -7,7 +7,6 @@
 
 package app.morphe.extension.youtube.patches.voiceovertranslation;
 
-import static app.morphe.extension.shared.StringRef.str;
 import static app.morphe.extension.shared.settings.BaseSettings.DEBUG;
 import static app.morphe.extension.youtube.patches.voiceovertranslation.TranscriptTranslator.TRANSLATION_SERVICE_MY_MEMORY;
 
@@ -471,6 +470,7 @@ public class VoiceOverTranslationPatch {
         // Speech was interrupted (new video, seek, pause) - no backlog left to catch
         // up on, so the next utterance starts from normal speed again.
         lastSpeechRate = MIN_SPEECH_RATE;
+        lastSpokenIndex = -1;
         abandonDuck();
     }
 

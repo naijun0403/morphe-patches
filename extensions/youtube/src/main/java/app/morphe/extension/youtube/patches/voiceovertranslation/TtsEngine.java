@@ -214,6 +214,7 @@ final class TtsEngine {
 
             if (currentPlayer != null) {
                 try {
+                    currentPlayer.setVolume(0, 0);
                     currentPlayer.stop();
                 } catch (Exception ex) {
                     Logger.printDebug(() -> "MediaPlayer stop failed", ex);
