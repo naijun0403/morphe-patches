@@ -31,6 +31,11 @@ import app.morphe.extension.youtube.settings.Settings;
 import app.morphe.extension.youtube.shared.PlayerType;
 import app.morphe.extension.youtube.shared.VideoState;
 
+/**
+ * Patch that provides voice-over translation for YouTube videos.
+ *
+ * <p>State management is performed on the main thread to avoid complex synchronization.
+ */
 @SuppressWarnings({"unused", "deprecation", "RedundantSuppression"})
 public class VoiceOverTranslationPatch {
 
@@ -63,34 +68,35 @@ public class VoiceOverTranslationPatch {
     private static final String TEST_VIDEO_ID = "test";
     private static final int TEST_SEGMENT_INDEX = -1;
 
-    private static volatile float lastSpeechRate = MIN_SPEECH_RATE;
-    private static volatile long lastVideoTimeMs;
+    private static float lastSpeechRate = MIN_SPEECH_RATE;
+    private static long lastVideoTimeMs;
 
-    private static volatile List<TranscriptSegment> segments = new ArrayList<>();
-    private static volatile int lastSpokenIndex = -1;
-    private static volatile String currentVideoId = "";
-    private static volatile boolean isLoading;
-    private static volatile boolean sessionEnabled = Settings.VOT_ENABLED.get();
+    private static List<TranscriptSegment> segments = new ArrayList<>();
+    private static int lastSpokenIndex = -1;
+    private static String currentVideoId = "";
+    private static boolean isLoading;
+    private static boolean sessionEnabled = Settings.VOT_ENABLED.get();
 
-    private static volatile Runnable onStateChangeCallback;
+    private static Runnable onStateChangeCallback;
 
-    private static volatile AudioManager audioManager;
+    private static AudioManager audioManager;
     // Kept as a field so abandonAudioFocus() uses the same listener instance as requestAudioFocus().
     private static final AudioManager.OnAudioFocusChangeListener focusChangeListener = focusChange -> { };
-    private static volatile AudioFocusRequest focusRequest;
-    private static volatile boolean isDucking;
+    private static AudioFocusRequest focusRequest;
+    private static boolean isDucking;
 
-    private static volatile TextToSpeech tts;
-    private static volatile boolean ttsReady;
+    private static TextToSpeech tts;
+    private static boolean ttsReady;
 
-    private static volatile boolean isTestSpeaking;
-    private static volatile long currentTestId;
+    private static boolean isTestSpeaking;
+    private static long currentTestId;
     private static String lastTestVoiceId = "";
 
     private static final TtsEngine ttsEngine = TtsEngine.INSTANCE;
 
     static {
         PlayerType.getOnChange().addObserver(playerType -> {
+            Utils.verifyOnMainThread();
             if (!playerType.isMaximizedOrFullscreen()
                     && playerType != PlayerType.WATCH_WHILE_MINIMIZED
                     && playerType != PlayerType.WATCH_WHILE_PICTURE_IN_PICTURE
@@ -102,6 +108,7 @@ public class VoiceOverTranslationPatch {
         });
 
         VideoState.getOnChange().addObserver(state -> {
+            Utils.verifyOnMainThread();
             if (state == VideoState.PAUSED) {
                 Logger.printDebug(() -> "Stopping TTS for video state: " + state);
                 stopTts();
@@ -115,6 +122,7 @@ public class VoiceOverTranslationPatch {
      */
     public static void newVideoLoaded(String videoId) {
         try {
+            Utils.verifyOnMainThread();
             // Always reset so seek detection fires correctly on the first videoTimeChanged
             // and so the first segment at the new position is spoken even when the same
             // video is reopened at a different timestamp (e.g. chapter links, continue watching).
@@ -141,6 +149,7 @@ public class VoiceOverTranslationPatch {
      */
     public static void videoTimeChanged(long timeMs) {
         if (!Settings.VOT_ENABLED.get() || !sessionEnabled) return; // Feature or session disabled.
+        Utils.verifyOnMainThread();
 
         PlayerType currentPlayerType = PlayerType.getCurrent();
         if (!currentPlayerType.isMaximizedOrFullscreen()
@@ -183,6 +192,7 @@ public class VoiceOverTranslationPatch {
     }
 
     public static boolean isTranslationActive() {
+        Utils.verifyOnMainThread();
         return Settings.VOT_ENABLED.get() && sessionEnabled && !segments.isEmpty();
     }
 
@@ -191,6 +201,7 @@ public class VoiceOverTranslationPatch {
     }
 
     public static synchronized void toggleTranslation() {
+        Utils.verifyOnMainThread();
         sessionEnabled = !sessionEnabled;
         if (!sessionEnabled) {
             stopTts();
@@ -200,6 +211,7 @@ public class VoiceOverTranslationPatch {
     }
 
     public static synchronized void reloadTranscript() {
+        Utils.verifyOnMainThread();
         if (currentVideoId.isEmpty()) return;
         stopTts();
         segments = new ArrayList<>();
@@ -219,6 +231,7 @@ public class VoiceOverTranslationPatch {
     }
 
     private static synchronized void loadTranscript(String videoId) {
+        Utils.verifyOnMainThread();
         Logger.printDebug(() -> "loadTranscript: " + videoId);
         if (isLoading) return;
         isLoading = true;
@@ -230,80 +243,98 @@ public class VoiceOverTranslationPatch {
                 // across updates, so lastSpokenIndex stays valid.
                 List<TranscriptSegment> fetched = TranscriptFetcher.fetch(videoId,
                         updated -> {
-                            if (videoId.equals(currentVideoId)) {
-                                segments = updated;
-                            }
+                            Utils.runOnMainThread(() -> {
+                                if (videoId.equals(currentVideoId)) {
+                                    segments = updated;
+                                }
+                            });
                         },
-                        () -> !videoId.equals(currentVideoId));
-                if (videoId.equals(currentVideoId)) {
-                    segments = fetched;
-                    TtsPrefetcher.updateVideo(videoId, fetched);
-                    Logger.printDebug(() -> "Loaded: " + fetched.size()
-                            + " segments for :" + videoId);
-                    notifyStateChanged();
-                }
+                        () -> {
+                            // Fetcher needs to check if it should abort.
+                            // currentVideoId access is technically a race, but benign.
+                            return !videoId.equals(currentVideoId);
+                        });
+                Utils.runOnMainThread(() -> {
+                    if (videoId.equals(currentVideoId)) {
+                        segments = fetched;
+                        TtsPrefetcher.updateVideo(videoId, fetched);
+                        Logger.printDebug(() -> "Loaded: " + fetched.size()
+                                + " segments for :" + videoId);
+                        notifyStateChanged();
+                    }
+                });
             } catch (Exception ex) {
                 logError(() -> "Transcript fetch failed", ex);
             } finally {
-                isLoading = false;
-                // The video may have changed while this fetch was in flight - the isLoading
-                // gate blocked that load, so restart it for the current video.
-                String latest = currentVideoId;
-                if (!latest.isEmpty() && !latest.equals(videoId) && Settings.VOT_ENABLED.get()) {
-                    loadTranscript(latest);
-                }
+                Utils.runOnMainThread(() -> {
+                    isLoading = false;
+                    // The video may have changed while this fetch was in flight - the isLoading
+                    // gate blocked that load, so restart it for the current video.
+                    String latest = currentVideoId;
+                    if (!latest.isEmpty() && !latest.equals(videoId) && Settings.VOT_ENABLED.get()) {
+                        loadTranscript(latest);
+                    }
+                });
             }
         });
     }
 
-    private static synchronized void ensureTts() {
+    private static void ensureTts() {
+        Utils.verifyOnMainThread();
         if (tts != null) return;
-        Logger.printDebug(() -> "sensureTts creating tts");
+        Logger.printDebug(() -> "ensureTts creating tts");
         tts = new TextToSpeech(Utils.getContext(), status -> {
-            if (status != TextToSpeech.SUCCESS) {
-                Logger.printDebug(() -> "TTS initialization failed");
-                return;
-            }
-            updateTtsLanguage();
-            // USAGE_ASSISTANCE_NAVIGATION_GUIDANCE plays TTS on a dedicated audio usage
-            // so its volume is controlled independently of YouTube's media stream.
-            tts.setAudioAttributes(new AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                    .build());
-            // Abandon duck when an utterance finishes naturally (not when flushed by the next segment).
-            tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
-                @Override public void onStart(String utteranceId) { }
-                @Override public void onDone(String utteranceId) {
-                    if (utteranceId != null && utteranceId.startsWith(VOT_TEST_ID)) {
-                        try {
-                            long id = Long.parseLong(utteranceId.substring(9));
-                            abandonDuckAfterTest(id);
-                        } catch (Exception ex) {
-                            logError(() -> "Utterance listener onDone failure", ex);
-                        }
-                    } else {
-                        abandonDuck();
-                    }
+            Utils.runOnMainThreadNowOrLater(() -> {
+                if (status != TextToSpeech.SUCCESS) {
+                    Logger.printDebug(() -> "TTS initialization failed");
+                    return;
                 }
-                @Override public void onError(String utteranceId) {
-                    if (utteranceId != null && utteranceId.startsWith(VOT_TEST_ID)) {
-                        try {
-                            final long id = Long.parseLong(utteranceId.substring(9));
-                            abandonDuckAfterTest(id);
-                        } catch (Exception ex) {
-                            logError(() -> "Utterance listener onError failure", ex);
-                        }
-                    } else {
-                        abandonDuck();
+                updateTtsLanguage();
+                // USAGE_ASSISTANCE_NAVIGATION_GUIDANCE plays TTS on a dedicated audio usage
+                // so its volume is controlled independently of YouTube's media stream.
+                tts.setAudioAttributes(new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build());
+                // Abandon duck when an utterance finishes naturally (not when flushed by the next segment).
+                tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                    @Override public void onStart(String utteranceId) { }
+                    @Override public void onDone(String utteranceId) {
+                        Utils.runOnMainThreadNowOrLater(() -> {
+                            if (utteranceId != null && utteranceId.startsWith(VOT_TEST_ID)) {
+                                try {
+                                    long id = Long.parseLong(utteranceId.substring(9));
+                                    abandonDuckAfterTest(id);
+                                } catch (Exception ex) {
+                                    logError(() -> "Utterance listener onDone failure", ex);
+                                }
+                            } else {
+                                abandonDuck();
+                            }
+                        });
                     }
-                }
+                    @Override public void onError(String utteranceId) {
+                        Utils.runOnMainThreadNowOrLater(() -> {
+                            if (utteranceId != null && utteranceId.startsWith(VOT_TEST_ID)) {
+                                try {
+                                    final long id = Long.parseLong(utteranceId.substring(9));
+                                    abandonDuckAfterTest(id);
+                                } catch (Exception ex) {
+                                    logError(() -> "Utterance listener onError failure", ex);
+                                }
+                            } else {
+                                abandonDuck();
+                            }
+                        });
+                    }
+                });
+                ttsReady = true;
             });
-            ttsReady = true;
         });
     }
 
     private static void updateTtsLanguage() {
+        Utils.verifyOnMainThread();
         TextToSpeech t = tts;
         if (t == null) return;
         Locale locale = Locale.forLanguageTag(resolveTargetLang());
@@ -314,6 +345,7 @@ public class VoiceOverTranslationPatch {
     }
 
     private static void speak(TranscriptSegment seg, int index) {
+        Utils.verifyOnMainThread();
         Logger.printDebug(() -> "speak: " + seg);
         String lang = resolveTargetLang();
         final float volume = Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f;
@@ -389,6 +421,7 @@ public class VoiceOverTranslationPatch {
      */
     public static void onVideoSeeked() {
         Logger.printDebug(() -> "onVideoSeeked");
+        Utils.verifyOnMainThread();
         stopTts();
         lastSpokenIndex = -1;
     }
@@ -402,8 +435,9 @@ public class VoiceOverTranslationPatch {
      * Synthesizes and plays a short test phrase with the given voice.
      * If the engine is already speaking the same voice, stops it.
      */
-    static synchronized void testSpeak(String voiceId) {
+    static void testSpeak(String voiceId) {
         Logger.printDebug(() -> "testSpeak: " + voiceId);
+        Utils.verifyOnMainThread();
         final boolean wasSameVoice = isTestSpeaking && voiceId.equals(lastTestVoiceId);
         stopTts();
         if (wasSameVoice) return;
@@ -470,6 +504,7 @@ public class VoiceOverTranslationPatch {
     }
 
     private static void stopTts() {
+        Utils.verifyOnMainThread();
         Logger.printDebug(() -> "stopTts");
         isTestSpeaking = false;
         ttsEngine.stop();
@@ -488,6 +523,7 @@ public class VoiceOverTranslationPatch {
      * No-op if ducking is already active.
      */
     private static void requestDuck() {
+        Utils.verifyOnMainThread();
         Logger.printDebug(() -> "requestDuck");
         if (isDucking) return;
         isDucking = true;
@@ -508,6 +544,7 @@ public class VoiceOverTranslationPatch {
      * No-op if ducking is not active or a test is still playing.
      */
     private static void abandonDuck() {
+        Utils.verifyOnMainThread();
         Logger.printDebug(() -> "abandonDuck");
         if (isTestSpeaking) return;
         if (!isDucking) return;
@@ -522,6 +559,7 @@ public class VoiceOverTranslationPatch {
     }
 
     private static void abandonDuckAfterTest(long id) {
+        Utils.verifyOnMainThread();
         Logger.printDebug(() -> "abandonDuckAfterTest: " + id);
         if (id != currentTestId) return;
         isTestSpeaking = false;
@@ -529,6 +567,7 @@ public class VoiceOverTranslationPatch {
     }
 
     private static AudioManager getAudioManager() {
+        Utils.verifyOnMainThread();
         if (audioManager == null) {
             audioManager = (AudioManager) Utils.getContext().getSystemService(Context.AUDIO_SERVICE);
         }

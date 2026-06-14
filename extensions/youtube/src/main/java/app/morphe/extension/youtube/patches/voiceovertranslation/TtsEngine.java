@@ -47,6 +47,8 @@ import app.morphe.extension.shared.Utils;
  *
  * <p>The underlying WebSocket connection is kept alive across calls and only torn down
  * on an explicit error or when the server closes it.
+ *
+ * <p>State management is performed on the main thread to avoid complex synchronization.
  */
 final class TtsEngine {
 
@@ -65,54 +67,32 @@ final class TtsEngine {
     // "Connection reset" when the server drops an idle WebSocket connection.
     private static final long SOCKET_MAX_IDLE_MS = 20_000;
 
-    private final Object lock = new Object();
-    @GuardedBy("lock")
+    // All fields below (except synthesisLock related) must be accessed ONLY on the main thread.
     private boolean stopped;
-    @GuardedBy("lock")
     private boolean speaking;
-    @GuardedBy("lock")
     private MediaPlayer currentPlayer;
-    @GuardedBy("lock")
     private CountDownLatch playLatch;
     /** Tracks the active synthesis/playback session to prevent overlapping segments. */
-    @GuardedBy("lock")
     private long playbackId;
 
     // Ensures only one synthesis turn happens on the WebSocket at a time.
     private final Object synthesisLock = new Object();
     @GuardedBy("synthesisLock")
     private long lastSynthesisEndMs;
-
-    @GuardedBy("lock")
+    @GuardedBy("synthesisLock")
     private SSLSocket persistentSocket;
-    @GuardedBy("lock")
+    @GuardedBy("synthesisLock")
     private InputStream persistentIn;
-    @GuardedBy("lock")
+    @GuardedBy("synthesisLock")
     private OutputStream persistentOut;
-    @GuardedBy("lock")
+    @GuardedBy("synthesisLock")
     private boolean configSent;
 
     private TtsEngine() {}
 
-    private boolean isStopped(long id) {
-        synchronized (lock) {
-            return stopped || id != playbackId;
-        }
-    }
-
     boolean isSpeaking() {
-        synchronized (lock) {
-            return speaking;
-        }
-    }
-
-    private void setIsNotSpeaking(long id) {
-        synchronized (lock) {
-            // Only clear the flag if we are the session that set it.
-            if (id == playbackId) {
-                this.speaking = false;
-            }
-        }
+        Utils.verifyOnMainThread();
+        return speaking;
     }
 
     /**
@@ -120,20 +100,26 @@ final class TtsEngine {
      * Handles background synthesis and playback for the given voice.
      */
     void speak(String text, String voiceId, float volume, float rate, Runnable onDone) {
+        Utils.verifyOnMainThread();
         final long id = markBusy();
+
         Utils.runOnBackgroundThread(() -> {
             try {
-                byte[] data = synthesize(text, voiceId, rate, id);
-                if (data.length > 0) {
-                    play(data, volume, 1.0f, id, onDone); // rate is baked into SSML
-                } else {
-                    clearBusy(id);
-                    if (onDone != null) Utils.runOnMainThread(onDone);
-                }
+                byte[] data = synthesize(text, voiceId, rate);
+                Utils.runOnMainThread(() -> {
+                    if (data.length > 0 && !stopped && id == playbackId) {
+                        play(data, volume, 1.0f, id, onDone); // rate is baked into SSML
+                    } else {
+                        if (id == playbackId) speaking = false;
+                        if (onDone != null) onDone.run();
+                    }
+                });
             } catch (Exception ex) {
                 VoiceOverTranslationPatch.logError(() -> "Edge TTS speak failed", ex);
-                clearBusy(id);
-                if (onDone != null) Utils.runOnMainThread(onDone);
+                Utils.runOnMainThread(() -> {
+                    if (id == playbackId) speaking = false;
+                    if (onDone != null) onDone.run();
+                });
             }
         });
     }
@@ -143,31 +129,23 @@ final class TtsEngine {
      * @return the unique ID for this playback session.
      */
     long markBusy() {
-        synchronized (lock) {
-            stopped = false;
-            playbackId++;
-            speaking = true;
-            return playbackId;
-        }
-    }
-
-    /** Clears the busy flag without a full stop. */
-    void clearBusy(long id) {
-        setIsNotSpeaking(id);
+        Utils.verifyOnMainThread();
+        stopped = false;
+        playbackId++;
+        speaking = true;
+        return playbackId;
     }
 
     /**
      * Synthesizes {@code text} with the given Edge TTS {@code voice} on a background thread.
-     *
-     * @param id The playback session ID.
      */
-    byte[] synthesize(String text, String voice, float rate, long id) throws Exception {
-        return synthesizeEdge(text, voice, rate, true, id);
+    byte[] synthesize(String text, String voice, float rate) throws Exception {
+        return synthesizeEdge(text, voice, rate);
     }
 
     /** Overload for background synthesis (prefetching). */
     byte[] prefetch(String text, String voice) throws Exception {
-        return synthesizeEdge(text, voice, 1.0f, false, 0);
+        return synthesizeEdge(text, voice, 1.0f);
     }
 
     /**
@@ -175,62 +153,66 @@ final class TtsEngine {
      * Use rate 1.0f when the rate is already encoded in the audio (e.g. via SSML prosody).
      */
     void play(byte[] mp3, float volume, float rate, long id, Runnable onDone) {
-        synchronized (lock) {
-            // Reject audio that completed synthesis after stop() was called (e.g. post-seek).
-            if (stopped || id != playbackId) {
-                if (id == playbackId) speaking = false;
-                if (onDone != null) Utils.runOnMainThread(onDone);
-                return;
-            }
+        Utils.verifyOnMainThread();
+        // Reject audio that completed synthesis after stop() was called (e.g. post-seek).
+        if (stopped || id != playbackId) {
+            if (id == playbackId) speaking = false;
+            if (onDone != null) onDone.run();
+            return;
         }
-        // speaking is already true from markBusy(); keep it for the playback lifetime.
 
         Utils.runOnBackgroundThread(() -> {
             try {
-                if (!isStopped(id)) playMp3(mp3, volume, rate, id);
+                // playMp3 blocks until completion or error.
+                playMp3(mp3, volume, rate, id);
             } catch (Exception ex) {
-                if (!isStopped(id)) VoiceOverTranslationPatch.logError(() -> "Playback failed", ex);
+                Utils.runOnMainThread(() -> {
+                    if (!stopped && id == playbackId) {
+                        VoiceOverTranslationPatch.logError(() -> "Playback failed", ex);
+                    }
+                });
             } finally {
-                setIsNotSpeaking(id);
-                if (onDone != null) Utils.runOnMainThread(onDone);
+                Utils.runOnMainThread(() -> {
+                    if (id == playbackId) speaking = false;
+                    if (onDone != null) onDone.run();
+                });
             }
         });
     }
 
     /** Stops any in-progress synthesis or playback immediately. */
     void stop() {
-        synchronized (lock) {
-            if (!stopped) {
-                Logger.printDebug(() -> "Stopping TTS");
-            }
-            stopped = true;
-            speaking = false;
+        Utils.verifyOnMainThread();
+        if (!stopped) {
+            Logger.printDebug(() -> "Stopping TTS");
+        }
+        stopped = true;
+        speaking = false;
 
-            // Unblock latch.await() in playMp3() so the thread exits quickly.
-            if (playLatch != null) {
-                playLatch.countDown();
-                playLatch = null;
-            }
+        // Unblock latch.await() in playMp3() so the thread exits quickly.
+        if (playLatch != null) {
+            playLatch.countDown();
+            playLatch = null;
+        }
 
-            if (currentPlayer != null) {
-                try {
-                    currentPlayer.setVolume(0, 0);
-                    currentPlayer.stop();
-                } catch (Exception ex) {
-                    Logger.printDebug(() -> "MediaPlayer stop failed", ex);
-                }
-                try {
-                    currentPlayer.release();
-                } catch (Exception ex) {
-                    Logger.printDebug(() -> "MediaPlayer release failed", ex);
-                }
-                currentPlayer = null;
+        if (currentPlayer != null) {
+            try {
+                currentPlayer.setVolume(0, 0);
+                currentPlayer.stop();
+            } catch (Exception ex) {
+                Logger.printDebug(() -> "MediaPlayer stop failed", ex);
             }
+            try {
+                currentPlayer.release();
+            } catch (Exception ex) {
+                Logger.printDebug(() -> "MediaPlayer release failed", ex);
+            }
+            currentPlayer = null;
         }
     }
 
-    private byte[] synthesizeEdge(String text, String voice, float rate,
-                                  boolean isLive, long id) throws Exception {
+    private byte[] synthesizeEdge(String text, String voice, float rate) throws Exception {
+        Utils.verifyOffMainThread();
         synchronized (synthesisLock) {
             IOException lastEx = null;
             for (int attempt = 1; attempt <= 2; attempt++) {
@@ -239,25 +221,15 @@ final class TtsEngine {
                     String requestId = uuidHex();
                     String ssml = buildSsml(text, voice, rate);
 
-                    InputStream in;
-                    OutputStream out;
-                    boolean needsConfig;
-
-                    // Ensure we have a valid connection without holding the main 'lock'
-                    // during the network handshake to prevent UI thread contention.
+                    // Ensure we have a valid connection.
                     ensureConnected();
 
-                    synchronized (lock) {
-                        if (isLive && (stopped || id != playbackId)) return new byte[0];
-                        out = persistentOut;
-                        in = persistentIn;
-                        needsConfig = !configSent;
-                        if (needsConfig) configSent = true;
-                    }
+                    boolean needsConfig = !configSent;
+                    if (needsConfig) configSent = true;
 
                     // speech.config only needs to be sent once per connection.
                     if (needsConfig) {
-                        sendText(out, "Path: speech.config\r\n"
+                        sendText(persistentOut, "Path: speech.config\r\n"
                                 + "Content-Type: application/json; charset=utf-8\r\n"
                                 + "X-Timestamp: " + timestamp + "\r\n\r\n"
                                 + "{\"context\":{\"synthesis\":{\"audio\":{"
@@ -266,29 +238,23 @@ final class TtsEngine {
                                 + "\"outputFormat\":\"" + AUDIO_FORMAT + "\"}}}}");
                     }
 
-                    sendText(out, "Path: ssml\r\n"
+                    sendText(persistentOut, "Path: ssml\r\n"
                             + "X-RequestId: " + requestId + "\r\n"
                             + "X-Timestamp: " + timestamp + "\r\n"
                             + "Content-Type: application/ssml+xml\r\n\r\n" + ssml);
 
                     // Collect audio frames until the server signals turn.end.
-                    // Release main lock during network I/O so stop() remains responsive.
                     ByteArrayOutputStream audioOut = new ByteArrayOutputStream();
-                    collectAudio(in, audioOut);
+                    collectAudio(persistentIn, audioOut);
 
                     lastSynthesisEndMs = System.currentTimeMillis();
                     return audioOut.toByteArray();
                 } catch (IOException ex) {
-                    synchronized (lock) {
-                        closeSocket();
-                        lastEx = ex;
-                        // If we were intentionally stopped (e.g. seek), abort quietly.
-                        if (isLive && (stopped || id != playbackId)) return new byte[0];
-                    }
+                    closeSocket();
+                    lastEx = ex;
                     Logger.printDebug(() -> "TTS synthesis failed, retrying... ", ex);
                 }
             }
-            if (isLive && isStopped(id)) return new byte[0];
             throw lastEx;
         }
     }
@@ -310,13 +276,12 @@ final class TtsEngine {
      */
     @GuardedBy("synthesisLock")
     private void ensureConnected() throws Exception {
-        synchronized (lock) {
-            if (persistentSocket != null && !persistentSocket.isClosed()) {
-                // Proactively close the socket if it has been idle long enough for the
-                // server to have dropped it; avoids a "Connection reset" on the first send.
-                if (System.currentTimeMillis() - lastSynthesisEndMs <= SOCKET_MAX_IDLE_MS) return;
-                closeSocket();
-            }
+        Utils.verifyOffMainThread();
+        if (persistentSocket != null && !persistentSocket.isClosed()) {
+            // Proactively close the socket if it has been idle long enough for the
+            // server to have dropped it; avoids a "Connection reset" on the first send.
+            if (System.currentTimeMillis() - lastSynthesisEndMs <= SOCKET_MAX_IDLE_MS) return;
+            closeSocket();
         }
 
         String secMsGec     = genSecMsGec();
@@ -336,19 +301,18 @@ final class TtsEngine {
         sendHttpUpgrade(socket, path);
         readHttpUpgrade(in);
 
-        synchronized (lock) {
-            persistentSocket = socket;
-            persistentOut    = socket.getOutputStream();
-            persistentIn     = in;
-            configSent       = false;
-        }
+        persistentSocket = socket;
+        persistentOut    = socket.getOutputStream();
+        persistentIn     = in;
+        configSent       = false;
     }
 
     /**
-     * Closes and nulls the persistent socket. Must be called with lock held.
+     * Closes and nulls the persistent socket. Must be called with synthesisLock held.
      */
-    @GuardedBy("lock")
+    @GuardedBy("synthesisLock")
     private void closeSocket() {
+        Utils.verifyOffMainThread();
         if (persistentSocket != null) {
             try { persistentSocket.close(); } catch (Exception ignored) {}
             persistentSocket = null;
@@ -476,88 +440,89 @@ final class TtsEngine {
     }
 
     private void playMp3(byte[] mp3, float volume, float rate, long id) throws Exception {
+        Utils.verifyOffMainThread();
         CountDownLatch latch = new CountDownLatch(1);
         MediaPlayer mp = new MediaPlayer();
 
-        synchronized (lock) {
+        Utils.runOnMainThreadNowOrLater(() -> {
             if (stopped || id != playbackId) {
                 mp.release();
+                latch.countDown(); // Prevent await block
                 return;
             }
             playLatch = latch;
             currentPlayer = mp;
-        }
-
-        try {
-            mp.setAudioAttributes(new AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                    .build());
-            mp.setVolume(volume, volume);
-            mp.setDataSource(new MediaDataSource() {
-                @Override
-                public int readAt(long position, byte[] buffer, int offset, int size) {
-                    if (position >= mp3.length) return -1;
-                    int pos   = (int) position;
-                    int count = Math.min(size, mp3.length - pos);
-                    System.arraycopy(mp3, pos, buffer, offset, count);
-                    return count;
-                }
-
-                @Override
-                public long getSize() {
-                    return mp3.length;
-                }
-
-                @Override
-                public void close() {}
-            });
-            mp.setOnCompletionListener(m -> latch.countDown());
-            mp.setOnErrorListener((m, what, extra) -> {
-                Logger.printDebug(() -> "MediaPlayer error what: " + what + " extra: " + extra);
-                latch.countDown();
-                return true;
-            });
-
-            if (isStopped(id)) return;
 
             try {
+                mp.setAudioAttributes(new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build());
+                mp.setVolume(volume, volume);
+                mp.setDataSource(new MediaDataSource() {
+                    @Override
+                    public int readAt(long position, byte[] buffer, int offset, int size) {
+                        if (position >= mp3.length) return -1;
+                        int pos   = (int) position;
+                        int count = Math.min(size, mp3.length - pos);
+                        System.arraycopy(mp3, pos, buffer, offset, count);
+                        return count;
+                    }
+
+                    @Override
+                    public long getSize() {
+                        return mp3.length;
+                    }
+
+                    @Override
+                    public void close() {}
+                });
+                mp.setOnCompletionListener(m -> latch.countDown());
+                mp.setOnErrorListener((m, what, extra) -> {
+                    Logger.printDebug(() -> "MediaPlayer error what: " + what + " extra: " + extra);
+                    latch.countDown();
+                    return true;
+                });
+
                 mp.prepare();
                 if (rate != 1.0f) {
                     mp.setPlaybackParams(new PlaybackParams().setSpeed(rate));
                 }
-                if (isStopped(id)) return;
+                if (stopped || id != playbackId) {
+                    latch.countDown();
+                    return;
+                }
                 mp.start();
-                //noinspection ResultOfMethodCallIgnored
-                latch.await(60, TimeUnit.SECONDS);
-            } catch (IllegalStateException e) {
-                // If the player was released by stop(), this is expected.
-                synchronized (lock) {
-                    if (id != playbackId || currentPlayer != mp) return;
-                }
-                throw e;
+            } catch (Exception ex) {
+                Logger.printDebug(() -> "MediaPlayer setup failed", ex);
+                latch.countDown();
             }
-        } finally {
-            synchronized (lock) {
-                if (playLatch == latch) {
-                    playLatch = null;
-                }
-                // Release only if stop() hasn't already done so.
-                if (currentPlayer == mp) {
-                    try {
-                        mp.stop();
-                    } catch (Exception ex) {
-                        Logger.printDebug(() -> "MediaPlayer stop failed", ex);
-                    }
-                    try {
-                        mp.release();
-                    } catch (Exception ex) {
-                        Logger.printDebug(() -> "MediaPlayer release failed", ex);
-                    }
-                    currentPlayer = null;
-                }
+        });
+
+        // Block background thread until playback finishes or is cancelled.
+        // If play() was cancelled before reaching runOnMainThread above, latch will already be 0.
+        //noinspection ResultOfMethodCallIgnored
+        latch.await(60, TimeUnit.SECONDS);
+
+        Utils.runOnMainThreadNowOrLater(() -> {
+            if (playLatch == latch) {
+                playLatch = null;
             }
-        }
+            // Release only if stop() hasn't already done so.
+            if (currentPlayer == mp) {
+                try {
+                    mp.stop();
+                } catch (Exception ex) {
+                    Logger.printDebug(() -> "MediaPlayer stop failed", ex);
+                }
+                try {
+                    mp.release();
+                } catch (Exception ex) {
+                    Logger.printDebug(() -> "MediaPlayer release failed", ex);
+                }
+                currentPlayer = null;
+            }
+        });
     }
 
     /**
