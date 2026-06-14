@@ -234,6 +234,7 @@ public final class VotBottomSheet {
 
         pickerRoot.addView(listView);
         mainDialog.dismiss();
+        pickerDialog.setOnCancelListener(d -> VotBottomSheet.show(context));
         pickerDialog.show();
     }
 
@@ -325,6 +326,7 @@ public final class VotBottomSheet {
 
         pickerRoot.addView(scroll);
         mainDialog.dismiss();
+        pickerDialog.setOnCancelListener(d -> VotBottomSheet.show(context));
         pickerDialog.show();
     }
 
@@ -486,6 +488,7 @@ public final class VotBottomSheet {
 
         pickerRoot.addView(listView);
         mainDialog.dismiss();
+        pickerDialog.setOnCancelListener(d -> VotBottomSheet.show(context));
         pickerDialog.show();
     }
 
