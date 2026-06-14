@@ -336,8 +336,9 @@ Verify the package name is correct and the app is installed"</string>
     <string name="morphe_external_downloader_empty_warning">The package name cannot be empty</string>
 
     <!-- video.voiceovertranslation.voiceOverTranslationPatch -->
-    <string name="morphe_vot_enabled_title">Voice over translation</string>
-    <string name="morphe_vot_enabled_summary">Read video captions aloud using on-device text-to-speech, synchronized with playback</string>
+    <string name="morphe_vot_title">Voice over translation</string>
+    <string name="morphe_vot_summary">Read video captions aloud using on-device text-to-speech, synchronized with playback</string>
+    <string name="morphe_vot_enabled_title">Enabled</string>
     <string name="morphe_vot_caption_language_title">Language</string>
     <string name="morphe_vot_translation_service_title">Provider</string>
     <string name="morphe_vot_original_audio_volume_title">Voice volume</string>
