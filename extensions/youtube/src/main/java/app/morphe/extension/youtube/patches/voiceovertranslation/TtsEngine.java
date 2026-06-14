@@ -149,6 +149,7 @@ final class TtsEngine {
     void clearBusy(long id) {
         Utils.verifyOnMainThread();
         if (id == playbackId) {
+            Logger.printDebug((() -> "clearing busy flag"));
             speaking = false;
         }
     }
@@ -235,12 +236,12 @@ final class TtsEngine {
                 currentPlayer.setVolume(0, 0);
                 currentPlayer.stop();
             } catch (Exception ex) {
-                Logger.printDebug(() -> "MediaPlayer stop failed", ex);
+                VoiceOverTranslationPatch.logError(() -> "MediaPlayer stop failed", ex);
             }
             try {
                 currentPlayer.release();
             } catch (Exception ex) {
-                Logger.printDebug(() -> "MediaPlayer release failed", ex);
+                VoiceOverTranslationPatch.logError(() -> "MediaPlayer release failed", ex);
             }
             currentPlayer = null;
         }
@@ -479,7 +480,7 @@ final class TtsEngine {
         CountDownLatch latch = new CountDownLatch(1);
         MediaPlayer mp = new MediaPlayer();
 
-        Utils.runOnMainThreadNowOrLater(() -> {
+        Utils.runOnMainThread(() -> {
             if (stopped || id != playbackId) {
                 mp.release();
                 latch.countDown(); // Prevent await block
@@ -539,10 +540,12 @@ final class TtsEngine {
 
         // Block background thread until playback finishes or is cancelled.
         // If play() was cancelled before reaching runOnMainThread above, latch will already be 0.
-        //noinspection ResultOfMethodCallIgnored
-        latch.await(60, TimeUnit.SECONDS);
+        final boolean awaitSuccessful = latch.await(60, TimeUnit.SECONDS);
+        if (!awaitSuccessful) {
+            VoiceOverTranslationPatch.logError(() -> "Waited for latch but was not successful", null);
+        }
 
-        Utils.runOnMainThreadNowOrLater(() -> {
+        Utils.runOnMainThread(() -> {
             if (playLatch == latch) {
                 playLatch = null;
             }

@@ -173,21 +173,24 @@ public class VoiceOverTranslationPatch {
 
         TtsPrefetcher.updateTime(timeMs);
 
-        List<TranscriptSegment> current = segments;
-        if (current.isEmpty()) return;
+        if (segments.isEmpty()) return;
 
-        if (lastVideoTimeMs > 0 && Math.abs(timeMs - lastVideoTimeMs) > SEEK_JUMP_THRESHOLD_MS) {
-            // Large jump outside current segment area - stop everything.
-            // Small jumps within the same segment are handled by speak()'s startTime logic.
-            Logger.printDebug(() -> "videoTimeChanged seek causing TTS stop");
-            stopTts();
-            lastSpokenIndex = -1;
+        if (lastVideoTimeMs > 0) {
+            final long timeSinceLastUpdate = Math.abs(timeMs - lastVideoTimeMs);
+            if (timeSinceLastUpdate > SEEK_JUMP_THRESHOLD_MS) {
+                // Large jump outside current segment area - stop everything.
+                // Small jumps within the same segment are handled by speak()'s startTime logic.
+                Logger.printDebug(() -> "videoTimeChanged jump detected: " + timeSinceLastUpdate + "ms");
+                wasExplicitSeek = true;
+                stopTts();
+                lastSpokenIndex = -1;
+            }
         }
         lastVideoTimeMs = timeMs;
 
-        long effectiveTimeMs = timeMs + TTS_LOOKAHEAD_MS;
-        for (int i = 0, size = current.size(); i < size; i++) {
-            TranscriptSegment seg = current.get(i);
+        final long effectiveTimeMs = timeMs + TTS_LOOKAHEAD_MS;
+        for (int i = 0, size = segments.size(); i < size; i++) {
+            TranscriptSegment seg = segments.get(i);
             if (effectiveTimeMs >= seg.startMs() && timeMs < seg.endMs()) {
                 if (i != lastSpokenIndex) {
                     if (!ttsEngine.isSpeaking()) {
@@ -238,8 +241,7 @@ public class VoiceOverTranslationPatch {
     private static void notifyStateChanged() {
         Logger.printDebug(() -> "notifyStateChanged");
         Utils.verifyOnMainThread();
-        Runnable callback = onStateChangeCallback;
-        if (callback != null) callback.run();
+        if (onStateChangeCallback != null) onStateChangeCallback.run();
     }
 
     private static void loadTranscript(String videoId) {
@@ -265,6 +267,7 @@ public class VoiceOverTranslationPatch {
                             Utils.verifyOnMainThread();
                             return !videoId.equals(currentVideoId);
                         });
+
                 Utils.runOnMainThread(() -> {
                     if (videoId.equals(currentVideoId)) {
                         segments = fetched;
@@ -280,9 +283,9 @@ public class VoiceOverTranslationPatch {
                     isLoading = false;
                     // The video may have changed while this fetch was in flight - the isLoading
                     // gate blocked that load, so restart it for the current video.
-                    String latest = currentVideoId;
-                    if (!latest.isEmpty() && !latest.equals(videoId) && Settings.VOT_ENABLED.get()) {
-                        loadTranscript(latest);
+                    if (!currentVideoId.isEmpty() && !currentVideoId.equals(videoId)
+                            && Settings.VOT_ENABLED.get()) {
+                        loadTranscript(currentVideoId);
                     }
                 });
             }
@@ -293,65 +296,71 @@ public class VoiceOverTranslationPatch {
         Utils.verifyOnMainThread();
         if (tts != null) return;
         Logger.printDebug(() -> "ensureTts creating tts");
+
         tts = new TextToSpeech(Utils.getContext(), status -> {
-            Utils.runOnMainThreadNowOrLater(() -> {
-                if (status != TextToSpeech.SUCCESS) {
-                    Logger.printDebug(() -> "TTS initialization failed");
-                    return;
+            Utils.verifyOnMainThread();
+            if (status != TextToSpeech.SUCCESS) {
+                Logger.printDebug(() -> "TTS initialization failed: " + status);
+                return;
+            }
+            updateTtsLanguage();
+
+            // USAGE_ASSISTANCE_NAVIGATION_GUIDANCE plays TTS on a dedicated audio usage
+            // so its volume is controlled independently of YouTube's media stream.
+            tts.setAudioAttributes(new AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build());
+            // Abandon duck when an utterance finishes naturally (not when flushed by the next segment).
+            tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                @Override
+                public void onStart(String utteranceId) {
                 }
-                updateTtsLanguage();
-                // USAGE_ASSISTANCE_NAVIGATION_GUIDANCE plays TTS on a dedicated audio usage
-                // so its volume is controlled independently of YouTube's media stream.
-                tts.setAudioAttributes(new AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .build());
-                // Abandon duck when an utterance finishes naturally (not when flushed by the next segment).
-                tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
-                    @Override public void onStart(String utteranceId) { }
-                    @Override public void onDone(String utteranceId) {
-                        Utils.verifyOnMainThread();
-                        if (utteranceId == null) return;
-                        if (utteranceId.startsWith(VOT_TEST_ID_PREFIX)) {
-                            try {
-                                String suffix = utteranceId.substring(VOT_TEST_ID_PREFIX.length());
-                                String[] parts = suffix.split("_");
-                                long tId = Long.parseLong(parts[0]);
-                                long pId = Long.parseLong(parts[1]);
-                                ttsEngine.clearBusy(pId);
-                                abandonDuckAfterTest(tId);
-                            } catch (Exception ex) {
-                                logError(() -> "Utterance listener onDone failure", ex);
+
+                @Override
+                public void onDone(String utteranceId) {
+                    Utils.verifyOnMainThread();
+                    if (utteranceId == null) return;
+                    if (utteranceId.startsWith(VOT_TEST_ID_PREFIX)) {
+                        try {
+                            String suffix = utteranceId.substring(VOT_TEST_ID_PREFIX.length());
+                            String[] parts = suffix.split("_");
+                            long tId = Long.parseLong(parts[0]);
+                            long pId = Long.parseLong(parts[1]);
+                            ttsEngine.clearBusy(pId);
+                            abandonDuckAfterTest(tId);
+                        } catch (Exception ex) {
+                            logError(() -> "Utterance listener onDone failure", ex);
+                        }
+                    } else if (utteranceId.startsWith(VOT_ID_PREFIX)) {
+                        try {
+                            long id = Long.parseLong(utteranceId.substring(VOT_ID_PREFIX.length()));
+                            if (id == ttsEngine.getPlaybackId()) {
+                                ttsEngine.clearBusy(id);
+                                abandonDuck();
                             }
-                        } else if (utteranceId.startsWith(VOT_ID_PREFIX)) {
-                            try {
-                                long id = Long.parseLong(utteranceId.substring(VOT_ID_PREFIX.length()));
-                                if (id == ttsEngine.getPlaybackId()) {
-                                    ttsEngine.clearBusy(id);
-                                    abandonDuck();
-                                }
-                            } catch (Exception ex) {
-                                logError(() -> "Utterance listener onDone failure", ex);
-                            }
+                        } catch (Exception ex) {
+                            logError(() -> "Utterance listener onDone failure", ex);
                         }
                     }
-                    @Override public void onError(String utteranceId) {
-                        onDone(utteranceId);
-                    }
-                });
-                ttsReady = true;
+                }
+
+                @Override
+                public void onError(String utteranceId) {
+                    onDone(utteranceId);
+                }
             });
+            ttsReady = true;
         });
     }
 
     private static void updateTtsLanguage() {
         Utils.verifyOnMainThread();
-        TextToSpeech t = tts;
-        if (t == null) return;
+        if (tts == null) return;
         Locale locale = Locale.forLanguageTag(resolveTargetLang());
-        int result = t.setLanguage(locale);
+        final int result = tts.setLanguage(locale);
         if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-            t.setLanguage(Locale.ENGLISH);
+            tts.setLanguage(Locale.ENGLISH);
         }
     }
 
@@ -365,10 +374,9 @@ public class VoiceOverTranslationPatch {
         // position so a late start (busy engine, synthesis latency) raises the rate.
         final long availableMs = seg.endMs() - Math.max(lastVideoTimeMs, seg.startMs());
 
-        final String voice = Settings.VOT_USE_NATIVE_TTS.get()
+        String voice = Settings.VOT_USE_NATIVE_TTS.get()
                 ? TTS_ENGINE_SYSTEM
                 : VoiceCatalog.resolve(lang, Settings.VOT_TTS_VOICE_TYPE.get());
-
         if (voice == null) return;
 
         // Calculate if we should seek into the audio (e.g. after a short seek within segment).
@@ -380,6 +388,9 @@ public class VoiceOverTranslationPatch {
                 // rate is baked into SSML for Edge, we assume normal speed for simplicity.
                 startTimeMs = timeIntoSegment;
             }
+            final long startTimeMsFinal = startTimeMs;
+            Logger.printDebug(() -> "Explicit seek resume. timeIntoSegment: " + timeIntoSegment
+                    + "ms, startTimeMs: " + startTimeMsFinal + "ms");
             // Reset the flag so future segments at normal playback start from the beginning.
             wasExplicitSeek = false;
         }
@@ -436,6 +447,7 @@ public class VoiceOverTranslationPatch {
      * gradually instead. Decreases pass through unchanged.
      */
     private static float smoothRate(float targetRate) {
+        Utils.verifyOnMainThread();
         final float rate = Math.min(targetRate, lastSpeechRate + MAX_RATE_STEP_UP);
         lastSpeechRate = rate;
         return rate;
@@ -450,12 +462,12 @@ public class VoiceOverTranslationPatch {
         Logger.printDebug(() -> "onVideoSeeked");
         Utils.verifyOnMainThread();
         wasExplicitSeek = true;
+
         // Check if the seek was within the current segment. If so, let videoTimeChanged
         // handle the restart/seek-into logic to avoid a jarring stop and restart.
         boolean insideSameSegment = false;
-        List<TranscriptSegment> current = segments;
-        if (lastSpokenIndex >= 0 && lastSpokenIndex < current.size()) {
-            TranscriptSegment seg = current.get(lastSpokenIndex);
+        if (lastSpokenIndex >= 0 && lastSpokenIndex < segments.size()) {
+            TranscriptSegment seg = segments.get(lastSpokenIndex);
             if (lastVideoTimeMs >= seg.startMs() && lastVideoTimeMs < seg.endMs()) {
                 insideSameSegment = true;
             }
@@ -552,8 +564,7 @@ public class VoiceOverTranslationPatch {
         Logger.printDebug(() -> "stopTts");
         isTestSpeaking = false;
         ttsEngine.stop();
-        TextToSpeech localTts = tts;
-        if (localTts != null) localTts.stop();
+        if (tts != null) tts.stop();
         // Speech was interrupted (new video, seek, pause) - no backlog left to catch
         // up on, so the next utterance starts from normal speed again.
         lastSpeechRate = MIN_SPEECH_RATE;
@@ -571,7 +582,7 @@ public class VoiceOverTranslationPatch {
         Logger.printDebug(() -> "requestDuck");
         if (isDucking) return;
         isDucking = true;
-        AudioFocusRequest req = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+        focusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
                 .setAudioAttributes(new AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
                         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
@@ -579,8 +590,7 @@ public class VoiceOverTranslationPatch {
                 .setWillPauseWhenDucked(false)
                 .setOnAudioFocusChangeListener(focusChangeListener)
                 .build();
-        focusRequest = req;
-        getAudioManager().requestAudioFocus(req);
+        getAudioManager().requestAudioFocus(focusRequest);
     }
 
     /**
@@ -589,15 +599,16 @@ public class VoiceOverTranslationPatch {
      */
     private static void abandonDuck() {
         Utils.verifyOnMainThread();
-        Logger.printDebug(() -> "abandonDuck");
+        Logger.printDebug(() -> "abandonDuck isTestSpeaking: " + isTestSpeaking
+                + " isDucking: " + isDucking);
         if (isTestSpeaking) return;
         if (!isDucking) return;
+
         isDucking = false;
-        AudioManager am = audioManager;
-        if (am == null) return;
-        AudioFocusRequest req = focusRequest;
-        if (req != null) {
-            am.abandonAudioFocusRequest(req);
+        if (audioManager == null) return;
+        if (focusRequest != null) {
+            Logger.printDebug(() -> "abandonDuck requesting focus");
+            audioManager.abandonAudioFocusRequest(focusRequest);
             focusRequest = null;
         }
     }
