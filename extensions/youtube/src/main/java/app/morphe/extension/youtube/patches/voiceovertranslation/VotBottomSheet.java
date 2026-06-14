@@ -92,9 +92,11 @@ public final class VotBottomSheet {
             }
         }
 
+        final SheetBottomDialog.SlideDialog[] mainRef = {null};
+
         LinearLayout engineRow = makeValueRow(context, fg, str("morphe_vot_tts_voice_type"));
         Runnable refreshEngine = () -> refreshEngineRow(engineRow);
-        engineRow.setOnClickListener(v -> showEnginePicker(context, refreshEngine));
+        engineRow.setOnClickListener(v -> showEnginePicker(context, mainRef[0]));
         refreshEngine.run();
 
         LinearLayout translationRow = makeValueRow(context, fg, str("morphe_vot_translation_service_title"));
@@ -105,7 +107,7 @@ public final class VotBottomSheet {
                             : "morphe_vot_service_google");
             ((TextView) translationRow.getTag()).setText(label);
         };
-        translationRow.setOnClickListener(v -> showTranslationServicePicker(context, refreshTranslation));
+        translationRow.setOnClickListener(v -> showTranslationServicePicker(context, mainRef[0]));
         refreshTranslation.run();
 
         TextView title = makeTitle(context, str("morphe_vot_enabled_title"), fg);
@@ -119,7 +121,7 @@ public final class VotBottomSheet {
         scroll.addView(content);
 
         content.addView(makeLanguageRow(context, str("morphe_vot_caption_language_title"), fg,
-                langEntries, langValues, refreshEngine));
+                langEntries, langValues, mainRef));
         content.addView(translationRow);
         content.addView(engineRow);
         content.addView(makeDivider(context, fg));
@@ -137,6 +139,7 @@ public final class VotBottomSheet {
         root.addView(scroll);
         SheetBottomDialog.SlideDialog dialog =
                 SheetBottomDialog.createSlideDialog(context, root, fadeInDuration);
+        mainRef[0] = dialog;
         PipDismissHelper.dismissOnPip(dialog);
         dialog.show();
     }
@@ -201,7 +204,7 @@ public final class VotBottomSheet {
         row.setClickable(edgeAvailable);
     }
 
-    private static void showTranslationServicePicker(Context context, Runnable onChanged) {
+    private static void showTranslationServicePicker(Context context, SheetBottomDialog.SlideDialog mainDialog) {
         String[] entries = {str("morphe_vot_service_google"), str("morphe_vot_service_mymemory")};
         String[] values = { TRANSLATION_SERVICE_GOOGLE, TRANSLATION_SERVICE_MY_MEMORY };
 
@@ -225,15 +228,16 @@ public final class VotBottomSheet {
         listView.setOnItemClickListener((parent, view, position, id) -> {
             Settings.VOT_TRANSLATION_SERVICE.save(values[position]);
             VoiceOverTranslationPatch.reloadTranscript();
-            onChanged.run();
+            VotBottomSheet.show(context);
             pickerDialog.dismiss();
         });
 
         pickerRoot.addView(listView);
+        mainDialog.dismiss();
         pickerDialog.show();
     }
 
-    private static void showEnginePicker(Context context, Runnable onChanged) {
+    private static void showEnginePicker(Context context, SheetBottomDialog.SlideDialog mainDialog) {
         String lang = Settings.VOT_CAPTION_LANGUAGE.get();
         if ("app".equals(lang)) lang = VoiceOverTranslationPatch.resolveTargetLang();
 
@@ -288,7 +292,7 @@ public final class VotBottomSheet {
         boolean femaleHeaderAdded = false;
 
         addVoiceRow(context, inflater, listLayout, TTS_ENGINE_SYSTEM, str("morphe_vot_tts_system"), true,
-                selectedValue, fg, rippleColor, checkmarkRes, speakerRes, onChanged, pickerDialog);
+                selectedValue, fg, rippleColor, checkmarkRes, speakerRes, pickerDialog);
 
         for (VoiceCatalog.Voice voice : nativeVoices) {
             if (voice.isMale && maleCount > 1 && !maleHeaderAdded) {
@@ -299,7 +303,7 @@ public final class VotBottomSheet {
                 femaleHeaderAdded = true;
             }
             addVoiceRow(context, inflater, listLayout, voice.id, voice.dialogDisplayName, false,
-                    selectedValue, fg, rippleColor, checkmarkRes, speakerRes, onChanged, pickerDialog);
+                    selectedValue, fg, rippleColor, checkmarkRes, speakerRes, pickerDialog);
         }
 
         if (!multilingualVoices.isEmpty()) {
@@ -315,11 +319,12 @@ public final class VotBottomSheet {
                     multiFemaleHeaderAdded = true;
                 }
                 addVoiceRow(context, inflater, listLayout, voice.id, voice.dialogDisplayName, false,
-                        selectedValue, fg, rippleColor, checkmarkRes, speakerRes, onChanged, pickerDialog);
+                        selectedValue, fg, rippleColor, checkmarkRes, speakerRes, pickerDialog);
             }
         }
 
         pickerRoot.addView(scroll);
+        mainDialog.dismiss();
         pickerDialog.show();
     }
 
@@ -327,7 +332,7 @@ public final class VotBottomSheet {
                                     String value, String label, boolean isSystem,
                                     String selectedValue, int fg, int rippleColor,
                                     int checkmarkRes, int speakerRes,
-                                    Runnable onChanged, SheetBottomDialog.SlideDialog pickerDialog) {
+                                    SheetBottomDialog.SlideDialog pickerDialog) {
         View row = inflater.inflate(LAYOUT_MORPHE_CUSTOM_LIST_ITEM_CHECKED, listLayout, false);
 
         ImageView check = row.findViewById(ID_MORPHE_CHECK_ICON);
@@ -367,7 +372,7 @@ public final class VotBottomSheet {
                 Settings.VOT_USE_NATIVE_TTS.save(false);
                 Settings.VOT_TTS_VOICE_TYPE.save(value);
             }
-            onChanged.run();
+            VotBottomSheet.show(context);
             pickerDialog.dismiss();
         });
 
@@ -414,7 +419,7 @@ public final class VotBottomSheet {
 
     private static LinearLayout makeLanguageRow(Context context, String label, int fgColor,
                                                 String[] langEntries, String[] langValues,
-                                                Runnable onLanguageChanged) {
+                                                SheetBottomDialog.SlideDialog[] mainRef) {
         LinearLayout row = new LinearLayout(context);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
@@ -447,13 +452,13 @@ public final class VotBottomSheet {
         row.addView(chevron);
 
         row.setOnClickListener(v -> showLanguagePicker(context, label, langEntries, langValues,
-                valueView, onLanguageChanged));
+                mainRef[0]));
         return row;
     }
 
     private static void showLanguagePicker(Context context, String title,
                                             String[] langEntries, String[] langValues,
-                                            TextView valueView, Runnable onLanguageChanged) {
+                                            SheetBottomDialog.SlideDialog mainDialog) {
         SheetBottomDialog.DraggableLinearLayout pickerRoot =
                 SheetBottomDialog.createMainLayout(context, getDialogBackgroundColor());
         pickerRoot.setPadding(Dim.dp16, 0, Dim.dp16, Dim.dp16);
@@ -472,18 +477,15 @@ public final class VotBottomSheet {
                 SheetBottomDialog.createSlideDialog(context, pickerRoot, fadeInDuration);
 
         listView.setOnItemClickListener((parent, view, position, id) -> {
-            String selected = langValues[position];
-            Settings.VOT_CAPTION_LANGUAGE.save(selected);
-            valueView.setText(langEntries[position]);
-            adapter.setSelectedValue(selected);
-            adapter.notifyDataSetChanged();
+            Settings.VOT_CAPTION_LANGUAGE.save(langValues[position]);
             VoiceOverTranslationPatch.reloadTranscript();
             VoiceOverTranslationPatch.preloadTestVoices();
-            onLanguageChanged.run();
+            VotBottomSheet.show(context);
             pickerDialog.dismiss();
         });
 
         pickerRoot.addView(listView);
+        mainDialog.dismiss();
         pickerDialog.show();
     }
 
