@@ -51,6 +51,7 @@ public final class VoiceOverTranslationButton {
                         return true;
                     });
             overlayButtonRef = button != null ? new WeakReference<>(button) : null;
+            refreshActivatedState();
         } catch (Exception ex) {
             Logger.printException(() -> "initializeButton failure", ex);
         }
@@ -78,6 +79,7 @@ public final class VoiceOverTranslationButton {
                         VotBottomSheet.show(view.getContext());
                         return true;
                     });
+            refreshActivatedState();
         } catch (Exception ex) {
             Logger.printException(() -> "initializeLegacyButton failure", ex);
         }

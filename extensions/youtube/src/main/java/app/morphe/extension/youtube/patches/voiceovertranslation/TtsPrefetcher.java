@@ -122,6 +122,7 @@ final class TtsPrefetcher {
 
             if (videoId.isEmpty() || segments.isEmpty()
                     || !Settings.VOT_ENABLED.get()
+                    || !Settings.VOT_SESSION_ENABLED.get()
                     || Settings.VOT_USE_NATIVE_TTS.get()) {
                 if (waitOnLock(DELAY_IDLE_MS)) return;
                 continue;

@@ -81,7 +81,7 @@ public class VoiceOverTranslationPatch {
     private static int lastSpokenIndex = -1;
     private static String currentVideoId = "";
     private static boolean isLoading;
-    private static boolean sessionEnabled = Settings.VOT_ENABLED.get();
+    private static boolean sessionEnabled = Settings.VOT_SESSION_ENABLED.get();
     private static boolean wasExplicitSeek;
 
     private static Runnable onStateChangeCallback;
@@ -152,7 +152,7 @@ public class VoiceOverTranslationPatch {
             currentVideoId = videoId;
             segments = new ArrayList<>();
 
-            if (!Settings.VOT_ENABLED.get()) return;
+            if (!Settings.VOT_ENABLED.get() || !sessionEnabled) return;
             if (PlayerType.getCurrent() == PlayerType.INLINE_MINIMAL) return;
             TtsPrefetcher.updateVideo(videoId, segments);
             loadTranscript(videoId);
@@ -226,9 +226,12 @@ public class VoiceOverTranslationPatch {
     public static void toggleTranslation() {
         Utils.verifyOnMainThread();
         sessionEnabled = !sessionEnabled;
+        Settings.VOT_SESSION_ENABLED.save(sessionEnabled);
         if (!sessionEnabled) {
             stopTts();
             lastSpokenIndex = -1;
+        } else if (!currentVideoId.isEmpty() && segments.isEmpty() && !isLoading) {
+            loadTranscript(currentVideoId);
         }
         notifyStateChanged();
     }
