@@ -274,6 +274,16 @@ public class VoiceOverTranslationPatch {
                         updated -> {
                             Utils.verifyOnMainThread();
                             if (videoId.equals(currentVideoId)) {
+                                // If the segment we last started speaking had its text replaced
+                                // by a freshly-arrived translation, stop and let videoTimeChanged
+                                // re-speak it with the translated text on the next tick.
+                                if (lastSpokenIndex >= 0
+                                        && lastSpokenIndex < segments.size()
+                                        && lastSpokenIndex < updated.size()
+                                        && !segments.get(lastSpokenIndex).text()
+                                                .equals(updated.get(lastSpokenIndex).text())) {
+                                    stopTts();
+                                }
                                 segments = updated;
                             }
                         },

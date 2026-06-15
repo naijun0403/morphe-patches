@@ -102,9 +102,10 @@ final class TranscriptTranslator {
             pool.execute(() -> {
                 // Skip remaining work when the result is no longer needed (video changed).
                 if (cancelled != null) {
-                    mainHandler.post(new FutureTask<>(cancelled::getAsBoolean));
+                    FutureTask<Boolean> cancelCheck = new FutureTask<>(cancelled::getAsBoolean);
+                    mainHandler.post(cancelCheck);
                     try {
-                        if (!new FutureTask<>(cancelled::getAsBoolean).get()) {
+                        if (cancelCheck.get()) {
                             Logger.printDebug(() -> "translate batch canceled for: " + targetLang);
                             return;
                         }
@@ -118,7 +119,7 @@ final class TranscriptTranslator {
                     applyBatch(working, batches.get(batchIndex), offsets[batchIndex], translated);
                     snapshot = new ArrayList<>(working);
                 }
-                if (onUpdate != null) onUpdate.accept(snapshot);
+                if (onUpdate != null) mainHandler.post(() -> onUpdate.accept(snapshot));
             });
         }
         // Graceful shutdown - queued batches still run, the pool exits when they finish.
