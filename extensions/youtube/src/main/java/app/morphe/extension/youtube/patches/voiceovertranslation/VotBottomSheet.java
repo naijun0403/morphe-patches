@@ -16,12 +16,10 @@ import static app.morphe.extension.shared.settings.preference.CustomDialogListPr
 import static app.morphe.extension.shared.settings.preference.CustomDialogListPreference.LAYOUT_MORPHE_CUSTOM_LIST_ITEM_CHECKED;
 import static app.morphe.extension.youtube.patches.voiceovertranslation.TranscriptTranslator.TRANSLATION_SERVICE_GOOGLE;
 import static app.morphe.extension.youtube.patches.voiceovertranslation.TranscriptTranslator.TRANSLATION_SERVICE_MY_MEMORY;
-import static app.morphe.extension.youtube.patches.voiceovertranslation.VoiceOverTranslationPatch.TTS_ENGINE_PIPER;
 import static app.morphe.extension.youtube.patches.voiceovertranslation.VoiceOverTranslationPatch.TTS_ENGINE_SYSTEM;
 import static app.morphe.extension.youtube.videoplayer.LegacyPlayerControlButton.fadeInDuration;
 import static app.morphe.extension.youtube.videoplayer.LegacyPlayerControlButton.getDialogBackgroundColor;
 
-import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
@@ -40,7 +38,6 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
-import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.TextView;
@@ -69,10 +66,6 @@ public final class VotBottomSheet {
             ResourceType.DRAWABLE, "yt_outline_speaker_vd_theme_24");
     private static final int DRAWABLE_SPEAKER_BOLD = ResourceUtils.getIdentifier(
             ResourceType.DRAWABLE, "yt_outline_experimental_speaker_vd_theme_24");
-    private static final int DRAWABLE_DOWNLOAD = ResourceUtils.getIdentifier(
-            ResourceType.DRAWABLE, "yt_outline_download_vd_theme_24");
-    private static final int DRAWABLE_DOWNLOAD_BOLD = ResourceUtils.getIdentifier(
-            ResourceType.DRAWABLE, "yt_outline_experimental_download_vd_theme_24");
 
     public static void show(Context context) {
         VoiceOverTranslationPatch.preloadTestVoices();
@@ -187,7 +180,6 @@ public final class VotBottomSheet {
         return row;
     }
 
-    @SuppressLint("SetTextI18n")
     private static void refreshEngineRow(LinearLayout row) {
         TextView valueView = (TextView) row.getTag();
         String lang = Settings.VOT_CAPTION_LANGUAGE.get();
@@ -196,13 +188,7 @@ public final class VotBottomSheet {
         String voiceId = Settings.VOT_TTS_VOICE_TYPE.get();
         VoiceCatalog.Voice voice = VoiceCatalog.getVoice(voiceId);
 
-        if (Settings.VOT_USE_NATIVE_TTS.get()) {
-            valueView.setText(str("morphe_vot_tts_system"));
-        } else if (TTS_ENGINE_PIPER.equals(voiceId)) {
-            PiperVoiceCatalog.Model piperModel = PiperVoiceCatalog.forLang(lang);
-            String piperName = piperModel != null ? piperModel.displayName() : str("morphe_vot_tts_piper");
-            valueView.setText(str("morphe_vot_tts_piper") + " - " + piperName);
-        } else if (voice == null && VoiceCatalog.resolve(lang, null) == null) {
+        if (Settings.VOT_USE_NATIVE_TTS.get() || (voice == null && VoiceCatalog.resolve(lang, null) == null)) {
             valueView.setText(str("morphe_vot_tts_system"));
         } else if (voice != null && (voice.id.startsWith(lang) || voice.isMultilingual)) {
             valueView.setText(voice.dialogDisplayName);
@@ -211,6 +197,11 @@ public final class VotBottomSheet {
             VoiceCatalog.Voice defaultVoice = VoiceCatalog.getVoice(defaultVoiceId);
             valueView.setText(defaultVoice != null ? defaultVoice.dialogDisplayName : str("morphe_vot_tts_system"));
         }
+
+        // Dim and disable when no Edge voice is available for the current language.
+        final boolean edgeAvailable = VoiceCatalog.resolve(lang, null) != null;
+        row.setAlpha(edgeAvailable ? 1f : 0.4f);
+        row.setClickable(edgeAvailable);
     }
 
     private static void showTranslationServicePicker(Context context, SheetBottomDialog.SlideDialog mainDialog) {
@@ -290,7 +281,6 @@ public final class VotBottomSheet {
         LayoutInflater inflater = LayoutInflater.from(context);
         int checkmarkRes = Utils.appIsUsingBoldIcons() ? DRAWABLE_CHECKMARK_BOLD : DRAWABLE_CHECKMARK;
         int speakerRes = Utils.appIsUsingBoldIcons() ? DRAWABLE_SPEAKER_BOLD : DRAWABLE_SPEAKER;
-        int downloadRes = Utils.appIsUsingBoldIcons() ? DRAWABLE_DOWNLOAD_BOLD : DRAWABLE_DOWNLOAD;
         final int rippleColor = Color.argb(60, Color.red(fg), Color.green(fg), Color.blue(fg));
 
         int maleCount = 0;
@@ -304,13 +294,6 @@ public final class VotBottomSheet {
 
         addVoiceRow(context, inflater, listLayout, TTS_ENGINE_SYSTEM, str("morphe_vot_tts_system"), true,
                 selectedValue, fg, rippleColor, checkmarkRes, speakerRes, pickerDialog);
-
-        final String langForPiper = lang;
-        PiperVoiceCatalog.Model piperModel = PiperVoiceCatalog.forLang(langForPiper);
-        if (piperModel != null) {
-            addPiperRow(context, inflater, listLayout, langForPiper, piperModel, selectedValue,
-                    fg, rippleColor, checkmarkRes, speakerRes, downloadRes, pickerDialog);
-        }
 
         for (VoiceCatalog.Voice voice : nativeVoices) {
             if (!maleHeaderAdded && voice.isMale && maleCount > 1) {
@@ -398,115 +381,6 @@ public final class VotBottomSheet {
         });
 
         listLayout.addView(row);
-    }
-
-    private static void addPiperRow(Context context, LayoutInflater inflater, LinearLayout listLayout,
-                                     String lang, PiperVoiceCatalog.Model model,
-                                     String selectedValue, int fg, int rippleColor,
-                                     int checkmarkRes, int speakerRes, int downloadRes,
-                                     SheetBottomDialog.SlideDialog pickerDialog) {
-        View row = inflater.inflate(LAYOUT_MORPHE_CUSTOM_LIST_ITEM_CHECKED, listLayout, false);
-
-        ImageView check = row.findViewById(ID_MORPHE_CHECK_ICON);
-        check.setImageResource(checkmarkRes);
-        check.setColorFilter(fg);
-        boolean isSelected = TTS_ENGINE_PIPER.equals(selectedValue);
-        check.setVisibility(isSelected ? View.VISIBLE : View.GONE);
-        row.findViewById(ID_MORPHE_CHECK_ICON_PLACEHOLDER)
-                .setVisibility(isSelected ? View.GONE : View.VISIBLE);
-
-        TextView itemText = row.findViewById(ID_MORPHE_ITEM_TEXT);
-        itemText.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-
-        boolean downloaded = PiperTtsEngine.isDownloaded(lang);
-        boolean downloadingNow = PiperTtsEngine.isDownloading(lang);
-
-        updatePiperRowLabel(itemText, model, downloaded, downloadingNow);
-
-        FrameLayout actionButton = new FrameLayout(context);
-        LinearLayout.LayoutParams buttonLp = new LinearLayout.LayoutParams(Dim.dp40, Dim.dp40);
-        buttonLp.setMarginStart(Dim.dp8);
-        actionButton.setLayoutParams(buttonLp);
-
-        GradientDrawable circle = new GradientDrawable();
-        circle.setShape(GradientDrawable.OVAL);
-        circle.setColor(Color.argb(20, Color.red(fg), Color.green(fg), Color.blue(fg)));
-        actionButton.setBackground(new RippleDrawable(
-                ColorStateList.valueOf(rippleColor), circle, new ShapeDrawable(new OvalShape())));
-
-        ImageView actionIcon = new ImageView(context);
-        actionIcon.setImageResource(downloaded ? speakerRes : downloadRes);
-        actionIcon.setColorFilter(new PorterDuffColorFilter(secondaryColor(fg), PorterDuff.Mode.SRC_IN));
-        actionIcon.setLayoutParams(new FrameLayout.LayoutParams(Dim.dp24, Dim.dp24, Gravity.CENTER));
-        actionIcon.setVisibility(downloadingNow ? View.GONE : View.VISIBLE);
-        actionButton.addView(actionIcon);
-
-        ProgressBar spinner = new ProgressBar(context);
-        spinner.setIndeterminate(true);
-        spinner.setIndeterminateTintList(ColorStateList.valueOf(secondaryColor(fg)));
-        spinner.setLayoutParams(new FrameLayout.LayoutParams(Dim.dp24, Dim.dp24, Gravity.CENTER));
-        spinner.setVisibility(downloadingNow ? View.VISIBLE : View.GONE);
-        actionButton.addView(spinner);
-
-        ((LinearLayout) row).addView(actionButton);
-
-        if (downloaded) {
-            actionButton.setOnClickListener(v -> VoiceOverTranslationPatch.testSpeak(TTS_ENGINE_PIPER));
-        } else if (!downloadingNow) {
-            actionButton.setOnClickListener(v -> {
-                actionButton.setEnabled(false);
-                actionIcon.setVisibility(View.GONE);
-                spinner.setVisibility(View.VISIBLE);
-                PiperTtsEngine.download(lang, new PiperTtsEngine.DownloadListener() {
-                    @Override
-                    public void onProgress(float progress) {
-                        updatePiperRowLabel(itemText, model, false, true);
-                    }
-                    @Override
-                    public void onComplete() {
-                        Settings.VOT_USE_NATIVE_TTS.save(false);
-                        Settings.VOT_TTS_VOICE_TYPE.save(TTS_ENGINE_PIPER);
-                        spinner.setVisibility(View.GONE);
-                        actionIcon.setImageResource(speakerRes);
-                        actionIcon.setVisibility(View.VISIBLE);
-                        actionButton.setOnClickListener(v -> VoiceOverTranslationPatch.testSpeak(TTS_ENGINE_PIPER));
-                        updatePiperRowLabel(itemText, model, true, false);
-                    }
-                    @Override
-                    public void onError(String message) {
-                        actionButton.setEnabled(true);
-                        spinner.setVisibility(View.GONE);
-                        actionIcon.setVisibility(View.VISIBLE);
-                        updatePiperRowLabel(itemText, model, false, false);
-                    }
-                });
-                updatePiperRowLabel(itemText, model, false, true);
-            });
-        }
-
-        row.setOnClickListener(v -> {
-            if (!PiperTtsEngine.isDownloaded(lang)) return;
-            Settings.VOT_USE_NATIVE_TTS.save(false);
-            Settings.VOT_TTS_VOICE_TYPE.save(TTS_ENGINE_PIPER);
-            VotBottomSheet.show(context);
-            pickerDialog.dismiss();
-        });
-
-        listLayout.addView(row);
-    }
-
-    @SuppressLint("SetTextI18n")
-    private static void updatePiperRowLabel(TextView itemText, PiperVoiceCatalog.Model model,
-                                             boolean downloaded, boolean downloadingNow) {
-        String base = str("morphe_vot_tts_piper") + " - " + model.displayName();
-        if (downloadingNow) {
-            int pct = Math.round(PiperTtsEngine.getDownloadProgress() * 100);
-            itemText.setText(base + " (" + pct + "%)");
-        } else if (!downloaded) {
-            itemText.setText(base + " (" + model.sizeMb() + " MB)");
-        } else {
-            itemText.setText(base);
-        }
     }
 
     private static View makeSectionHeader(Context context, String label, int fg) {

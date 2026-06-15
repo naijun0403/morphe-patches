@@ -123,19 +123,6 @@ final class TtsPrefetcher {
             String voice = VoiceCatalog.resolve(voiceLang, Settings.VOT_TTS_VOICE_TYPE.get());
 
             if (voice == null) {
-                if (!Settings.VOT_USE_NATIVE_TTS.get()
-                        && VoiceOverTranslationPatch.TTS_ENGINE_PIPER.equals(
-                                Settings.VOT_TTS_VOICE_TYPE.get())
-                        && PiperTtsEngine.isDownloaded(voiceLang)) {
-                    NextFetch next = findNextToFetch(videoId, segments, timeMs,
-                            VoiceOverTranslationPatch.TTS_ENGINE_PIPER);
-                    if (next != null) {
-                        boolean ok = fetchPiper(videoId, segments.get(next.index),
-                                next.index, voiceLang);
-                        if (waitOnLock(ok ? DELAY_BACKGROUND_MS : BACKOFF_MIN_MS)) return;
-                        continue;
-                    }
-                }
                 if (waitOnLock(DELAY_IDLE_MS)) return;
                 continue;
             }
@@ -215,23 +202,6 @@ final class TtsPrefetcher {
         }
 
         return null;
-    }
-
-    private static boolean fetchPiper(String videoId, TranscriptSegment seg, int index,
-                                      String lang) {
-        try {
-            byte[] data = PiperTtsEngine.synthesize(seg.text(), lang);
-            if (data != null && data.length > 0) {
-                TtsCache.put(videoId, index, VoiceOverTranslationPatch.TTS_ENGINE_PIPER,
-                        seg.text(), data);
-                Logger.printDebug(() -> "Prefetched Piper segment: " + index);
-                return true;
-            }
-            return false;
-        } catch (Exception ex) {
-            VoiceOverTranslationPatch.logError(() -> "Piper prefetch failed for segment " + index, ex);
-            return false;
-        }
     }
 
     private static boolean fetch(String videoId, TranscriptSegment seg, int index,
