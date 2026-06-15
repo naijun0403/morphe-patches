@@ -389,9 +389,9 @@ public final class NavigationBarPatch {
 
     private static final String SETTING_BUTTON_ENUM_NAME = "SETTINGS_CAIRO";
 
-    private static final boolean HIDE_TOOLBAR_CREATE_BUTTON = Settings.HIDE_TOOLBAR_CREATE_BUTTON.get();
-
     private static final boolean HIDE_TOOLBAR_CAST_BUTTON = Settings.HIDE_TOOLBAR_CAST_BUTTON.get();
+
+    private static final boolean HIDE_TOOLBAR_CREATE_BUTTON = Settings.HIDE_TOOLBAR_CREATE_BUTTON.get();
 
     private static final boolean HIDE_TOOLBAR_NOTIFICATION_BUTTON = Settings.HIDE_TOOLBAR_NOTIFICATION_BUTTON.get();
 
