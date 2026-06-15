@@ -110,6 +110,11 @@ public class VoiceOverTranslationPatch {
                     && playerType != PlayerType.WATCH_WHILE_SLIDING_MINIMIZED_MAXIMIZED) {
                 Logger.printDebug(() -> "Stopping TTS for player type: " + playerType);
                 stopTts();
+                if (playerType == PlayerType.NONE) {
+                    currentVideoId = "";
+                    segments = new ArrayList<>();
+                    TtsPrefetcher.clear();
+                }
             }
             return kotlin.Unit.INSTANCE;
         });

@@ -77,6 +77,15 @@ final class TtsPrefetcher {
         }
     }
 
+    static void clear() {
+        synchronized (lock) {
+            currentVideoId = "";
+            currentSegments = Collections.emptyList();
+            currentVideoTimeMs = 0;
+            lock.notifyAll();
+        }
+    }
+
     static void updateTime(long timeMs) {
         synchronized (lock) {
             currentVideoTimeMs = timeMs;
