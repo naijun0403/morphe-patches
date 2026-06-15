@@ -130,17 +130,19 @@ final class TranscriptFetcher {
     }
 
     /**
-     * Returns an English caption URL from the captionTracks list.
-     * Prefers a non-gemini English track; falls back to the first non-gemini track,
-     * then the first available.
+     * Returns the best caption URL from the captionTracks list.
+     * Prefers a non-gemini track in the target language; falls back to a non-gemini
+     * English track, then the first non-gemini track, then the first available.
      */
     @Nullable
     private static String findBestCaptionUrl(String json) {
         final int tracksIdx = json.indexOf("\"captionTracks\":[");
         if (tracksIdx < 0) return null;
 
+        String targetLang = VoiceOverTranslationPatch.resolveTargetLang().split("-")[0];
         String firstUrl = null;
         String firstNonGemini = null;
+        String targetLangUrl = null;
         String englishUrl = null;
         int searchFrom = tracksIdx;
 
@@ -161,14 +163,15 @@ final class TranscriptFetcher {
             if (firstUrl == null) firstUrl = url;
             final boolean nonGemini = !url.contains("variant=gemini");
             if (firstNonGemini == null && nonGemini) firstNonGemini = url;
-            if (englishUrl == null && nonGemini) {
-                String urlLang = extractLangFromUrl(url).split("-")[0];
-                if ("en".equals(urlLang)) englishUrl = url;
-            }
+
+            String urlLang = extractLangFromUrl(url).split("-")[0];
+            if (targetLangUrl == null && nonGemini && targetLang.equals(urlLang)) targetLangUrl = url;
+            if (englishUrl == null && nonGemini && "en".equals(urlLang)) englishUrl = url;
 
             searchFrom = endIdx + 1;
         }
 
+        if (targetLangUrl != null) return targetLangUrl;
         if (englishUrl != null) return englishUrl;
         return firstNonGemini != null ? firstNonGemini : firstUrl;
     }
