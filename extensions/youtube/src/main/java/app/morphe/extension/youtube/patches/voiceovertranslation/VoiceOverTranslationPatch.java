@@ -123,6 +123,10 @@ public class VoiceOverTranslationPatch {
             if (state == VideoState.PAUSED) {
                 Logger.printDebug(() -> "Stopping TTS for video state: " + state);
                 stopTts();
+            } else if (state == VideoState.ENDED) {
+                Logger.printDebug(() -> "Stopping TTS for video state: " + state);
+                stopTts();
+                TtsPrefetcher.clear();
             }
             return kotlin.Unit.INSTANCE;
         });
@@ -272,7 +276,8 @@ public class VoiceOverTranslationPatch {
                         },
                         () -> {
                             Utils.verifyOnMainThread();
-                            return !videoId.equals(currentVideoId);
+                            return !videoId.equals(currentVideoId)
+                                    || VideoState.getCurrent() == VideoState.ENDED;
                         });
 
                 Utils.runOnMainThread(() -> {
