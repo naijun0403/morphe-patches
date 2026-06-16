@@ -8,7 +8,7 @@
  * See the included NOTICE file for GPLv3 §7(b) and §7(c) terms that apply to Morphe contributions.
  */
 
-package app.morphe.extension.youtube.patches.spans;
+package app.morphe.extension.shared.patches.spans;
 
 import androidx.annotation.NonNull;
 
@@ -22,13 +22,13 @@ import java.util.function.Consumer;
 import app.morphe.extension.shared.StringTrieSearch;
 import app.morphe.extension.shared.TrieSearch;
 
-abstract class SpanFilterGroupList<V, T extends SpanFilterGroup<V>> implements Iterable<T> {
+public abstract class SpanFilterGroupList<V, T extends SpanFilterGroup<V>> implements Iterable<T> {
 
     private final List<T> filterGroups = new ArrayList<>();
     private final TrieSearch<V> search = createSearchGraph();
 
     @SafeVarargs
-    protected final void addAll(final T... groups) {
+    public final void addAll(final T... groups) {
         filterGroups.addAll(Arrays.asList(groups));
 
         for (T group : groups) {
@@ -67,7 +67,7 @@ abstract class SpanFilterGroupList<V, T extends SpanFilterGroup<V>> implements I
         return filterGroups.spliterator();
     }
 
-    protected SpanFilterGroup.FilterGroupResult check(V stack) {
+    public SpanFilterGroup.FilterGroupResult check(V stack) {
         SpanFilterGroup.FilterGroupResult result = new SpanFilterGroup.FilterGroupResult();
         search.matches(stack, result);
         return result;
@@ -76,9 +76,3 @@ abstract class SpanFilterGroupList<V, T extends SpanFilterGroup<V>> implements I
     protected abstract TrieSearch<V> createSearchGraph();
 }
 
-final class StringSpanFilterGroupList extends SpanFilterGroupList<String, StringSpanFilterGroup> {
-    @Override
-    protected StringTrieSearch createSearchGraph() {
-        return new StringTrieSearch();
-    }
-}

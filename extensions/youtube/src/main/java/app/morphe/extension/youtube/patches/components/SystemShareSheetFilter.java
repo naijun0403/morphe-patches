@@ -11,8 +11,10 @@ import static app.morphe.extension.youtube.patches.OpenSystemShareSheetPatch.ope
 import static app.morphe.extension.youtube.patches.OpenSystemShareSheetPatch.systemSheetOpened;
 import static app.morphe.extension.youtube.settings.Settings.OPEN_SYSTEM_SHARE_SHEET;
 
-import app.morphe.extension.youtube.patches.components.LithoFilterPatch.BufferAsciiStrings;
-import app.morphe.extension.youtube.shared.ConversionContext.ContextInterface;
+import app.morphe.extension.shared.patches.components.BufferAsciiStrings;
+import app.morphe.extension.shared.patches.components.ContextInterface;
+import app.morphe.extension.shared.patches.components.Filter;
+import app.morphe.extension.shared.patches.components.StringFilterGroup;
 
 @SuppressWarnings("unused")
 public final class SystemShareSheetFilter extends Filter {
@@ -28,18 +30,18 @@ public final class SystemShareSheetFilter extends Filter {
      * Replaces YouTube's in-app share sheet with the system share sheet.
      */
     @Override
-    boolean isFiltered(ContextInterface contextInterface,
-                       String identifier,
-                       String accessibility,
-                       String path,
-                       byte[] buffer,
-                       BufferAsciiStrings asciiStrings,
-                       StringFilterGroup matchedGroup,
-                       FilterContentType contentType,
-                       int contentIndex) {
+    public boolean isFiltered(ContextInterface contextInterface,
+                              String identifier,
+                              String accessibility,
+                              String path,
+                              byte[] buffer,
+                              BufferAsciiStrings asciiStrings,
+                              StringFilterGroup matchedGroup,
+                              FilterContentType contentType,
+                              int contentIndex) {
         if (!systemSheetOpened && openSystemShareSheet(asciiStrings.getStrings())) {
-            systemSheetOpened = false;
+            systemSheetOpened = true;
         }
-        return true;
+        return false;
     }
 }

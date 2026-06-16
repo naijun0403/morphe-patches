@@ -161,3 +161,4 @@ internal object FormatStreamModelMaxDvrDurationFingerprint : Fingerprint(
         opcode(Opcode.RETURN_WIDE, location = MatchAfterImmediately()),
     )
 )
+

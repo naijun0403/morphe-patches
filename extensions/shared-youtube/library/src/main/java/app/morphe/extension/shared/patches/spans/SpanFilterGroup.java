@@ -8,22 +8,22 @@
  * See the included NOTICE file for GPLv3 §7(b) and §7(c) terms that apply to Morphe contributions.
  */
 
-package app.morphe.extension.youtube.patches.spans;
+package app.morphe.extension.shared.patches.spans;
 
 import androidx.annotation.NonNull;
 
 import app.morphe.extension.shared.settings.BooleanSetting;
 
-abstract class SpanFilterGroup<T> {
-    final static class FilterGroupResult {
+public abstract class SpanFilterGroup<T> {
+    public final static class FilterGroupResult {
         private BooleanSetting setting;
         private int matchedIndex;
 
-        FilterGroupResult() {
+        public FilterGroupResult() {
             this(null, -1);
         }
 
-        FilterGroupResult(BooleanSetting setting, int matchedIndex) {
+        public FilterGroupResult(BooleanSetting setting, int matchedIndex) {
             setValues(setting, matchedIndex);
         }
 
@@ -41,8 +41,8 @@ abstract class SpanFilterGroup<T> {
         }
     }
 
-    protected final BooleanSetting setting;
-    protected final T[] filters;
+    public final BooleanSetting setting;
+    public final T[] filters;
 
     @SafeVarargs
     public SpanFilterGroup(final BooleanSetting setting, final T... filters) {
@@ -69,28 +69,4 @@ abstract class SpanFilterGroup<T> {
     }
 
     public abstract FilterGroupResult check(final T stack);
-}
-
-class StringSpanFilterGroup extends SpanFilterGroup<String> {
-
-    public StringSpanFilterGroup(final BooleanSetting setting, final String... filters) {
-        super(setting, filters);
-    }
-
-    @Override
-    public FilterGroupResult check(final String string) {
-        int matchedIndex = -1;
-        if (isEnabled()) {
-            for (String pattern : filters) {
-                if (!string.isEmpty()) {
-                    final int indexOf = string.indexOf(pattern);
-                    if (indexOf >= 0) {
-                        matchedIndex = indexOf;
-                        break;
-                    }
-                }
-            }
-        }
-        return new FilterGroupResult(setting, matchedIndex);
-    }
 }

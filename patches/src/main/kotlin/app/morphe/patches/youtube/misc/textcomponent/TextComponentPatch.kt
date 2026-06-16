@@ -119,6 +119,7 @@ internal fun hookSpannableString(
     """
 )
 
+@Suppress("unused")
 internal fun hookTextComponent(
     classDescriptor: String,
     methodName: String = "onLithoTextLoaded"

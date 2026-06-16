@@ -8,7 +8,7 @@
  * See the included NOTICE file for GPLv3 §7(b) and §7(c) terms that apply to Morphe contributions.
  */
 
-package app.morphe.extension.youtube.patches.spans;
+package app.morphe.extension.shared.patches.spans;
 
 import android.text.Spannable;
 import android.text.SpannableString;
@@ -26,7 +26,7 @@ import java.util.List;
 
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.StringTrieSearch;
-import app.morphe.extension.youtube.settings.Settings;
+import app.morphe.extension.shared.settings.SharedYouTubeSettings;
 
 /**
  * Placeholder for actual filters.
@@ -135,7 +135,7 @@ public final class InclusiveSpanPatch {
             filterUsingCallbacks(filter, filter.callbacks);
         }
 
-        if (Settings.DEBUG_SPANNABLE.get()) {
+        if (SharedYouTubeSettings.DEBUG_SPANNABLE.get()) {
             Logger.printDebug(() -> "Using: "
                     + searchTree.numberOfPatterns() + " conversion context filters"
                     + " (" + searchTree.getEstimatedMemorySize() + " KB)");
@@ -160,7 +160,7 @@ public final class InclusiveSpanPatch {
                                     parameters.span, parameters.start, parameters.end, parameters.flags, parameters.isWord,
                                     parameters.spanType, group);
 
-                            if (isFiltered && Settings.DEBUG_SPANNABLE.get()) {
+                            if (isFiltered && SharedYouTubeSettings.DEBUG_SPANNABLE.get()) {
                                 Logger.printDebug(() -> "Removed " + filterSimpleName
                                         + " setSpan: " + parameters.spanType);
                             }
@@ -192,7 +192,7 @@ public final class InclusiveSpanPatch {
             LithoFilterParameters parameter = new LithoFilterParameters(conversionContext,
                     spannableString, span, start, end, flags);
 
-            if (Settings.DEBUG_SPANNABLE.get()) {
+            if (SharedYouTubeSettings.DEBUG_SPANNABLE.get()) {
                 Logger.printDebug(() -> "Searching...\n\u200B\n" + parameter);
             }
 

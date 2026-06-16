@@ -8,7 +8,7 @@
  * See the included NOTICE file for GPLv3 §7(b) and §7(c) terms that apply to Morphe contributions.
  */
 
-package app.morphe.extension.youtube.patches.spans;
+package app.morphe.extension.shared.patches.spans;
 
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
@@ -26,7 +26,7 @@ import java.util.List;
  * <p>
  * All callbacks must be registered before the constructor completes.
  */
-abstract class SpanFilter {
+public abstract class SpanFilter {
     private static final RelativeSizeSpan relativeSizeSpanDummy = new RelativeSizeSpan(0f);
     private static final Drawable transparentDrawable = new ColorDrawable(Color.TRANSPARENT);
     private static final ImageSpan imageSpanDummy = new ImageSpan(transparentDrawable);
@@ -35,7 +35,7 @@ abstract class SpanFilter {
      * Path callbacks. Do not add to this instance,
      * and instead use {@link #addCallbacks(StringSpanFilterGroup...)}.
      */
-    protected final List<StringSpanFilterGroup> callbacks = new ArrayList<>();
+    public final List<StringSpanFilterGroup> callbacks = new ArrayList<>();
 
     /**
      * Adds callbacks to {@link #skip(String, SpannableString, Object, int, int, int, boolean, SpanType, StringSpanFilterGroup)}
@@ -62,7 +62,7 @@ abstract class SpanFilter {
      *
      * @param matchedGroup The actual filter that matched.
      */
-    boolean skip(String conversionContext, SpannableString spannableString, Object span, int start, int end,
+    public boolean skip(String conversionContext, SpannableString spannableString, Object span, int start, int end,
                  int flags, boolean isWord, SpanType spanType, StringSpanFilterGroup matchedGroup) {
         return true;
     }

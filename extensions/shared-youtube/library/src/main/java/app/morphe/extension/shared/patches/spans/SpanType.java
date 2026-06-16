@@ -5,11 +5,11 @@
  * See the included NOTICE file for GPLv3 §7(b) and §7(c) terms that apply to Morphe contributions.
  */
 
-package app.morphe.extension.youtube.patches.spans;
+package app.morphe.extension.shared.patches.spans;
 
 import androidx.annotation.NonNull;
 
-enum SpanType {
+public enum SpanType {
     ABSOLUTE_SIZE("AbsoluteSizeSpan"),
     CLICKABLE("ClickableSpan"),
     CUSTOM_CHARACTER_STYLE("CustomCharacterStyle"),
