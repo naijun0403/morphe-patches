@@ -8,7 +8,7 @@
  * See the included NOTICE file for GPLv3 §7(b) and §7(c) terms that apply to Morphe contributions.
  */
 
-package app.morphe.extension.youtube.patches.components;
+package app.morphe.extension.shared.patches.components;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -18,13 +18,9 @@ import java.util.List;
 
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.StringTrieSearch;
-import app.morphe.extension.shared.patches.components.BufferAsciiStrings;
-import app.morphe.extension.shared.patches.components.ContextInterface;
-import app.morphe.extension.shared.patches.components.Filter;
-import app.morphe.extension.shared.patches.components.StringFilterGroup;
+import app.morphe.extension.shared.Utils;
 import app.morphe.extension.shared.settings.BaseSettings;
-import app.morphe.extension.youtube.patches.VersionCheckPatch;
-import app.morphe.extension.youtube.settings.Settings;
+import app.morphe.extension.shared.settings.SharedYouTubeSettings;
 
 @SuppressWarnings("unused")
 public final class LithoFilterPatch {
@@ -52,7 +48,7 @@ public final class LithoFilterPatch {
             }
             builder.append(" Path: ");
             builder.append(path);
-            if (Settings.DEBUG_PROTOBUFFER.get()) {
+            if (SharedYouTubeSettings.DEBUG_PROTOBUFFER.get()) {
                 builder.append(" BufferStrings: ");
                 builder.append(asciiStrings.getStrings());
             }
@@ -191,7 +187,7 @@ public final class LithoFilterPatch {
                 accessibility = "";
             }
 
-            byte[] buffer = VersionCheckPatch.IS_20_22_OR_GREATER
+            byte[] buffer = is_20_22_or_greater()
                     ? bytes
                     : bufferThreadLocal.get();
             // Potentially the buffer may have been null or never set up until now.
@@ -212,6 +208,10 @@ public final class LithoFilterPatch {
         }
 
         return false;
+    }
+
+    private static boolean is_20_22_or_greater() {
+        return Utils.getAppVersionName().compareTo("20.22.00") >= 0;
     }
 
     /**

@@ -44,7 +44,7 @@ import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
 import java.lang.ref.WeakReference
 
-internal const val EXTENSION_CLASS = "Lapp/morphe/extension/youtube/patches/components/LithoFilterPatch;"
+internal const val EXTENSION_CLASS = "Lapp/morphe/extension/shared/patches/components/LithoFilterPatch;"
 
 internal const val EXTENSION_FILTER = "[Lapp/morphe/extension/shared/patches/components/Filter;"
 

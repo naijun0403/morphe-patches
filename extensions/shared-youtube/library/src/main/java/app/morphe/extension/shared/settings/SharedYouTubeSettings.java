@@ -54,6 +54,8 @@ public class SharedYouTubeSettings extends BaseSettings {
 
     public static final StringSetting DISABLED_FEATURE_FLAGS = new StringSetting("morphe_disabled_feature_flags", "", true, parent(DEBUG));
 
+    public static final BooleanSetting DEBUG_PROTOBUFFER = new BooleanSetting("morphe_debug_protobuffer", FALSE, false,
+            "morphe_debug_protobuffer_user_dialog_message", parent(DEBUG));
     public static final BooleanSetting DEBUG_SPANNABLE = new BooleanSetting("morphe_debug_spannable", FALSE, parent(DEBUG));
 
     // Renamed settings
