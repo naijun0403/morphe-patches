@@ -42,7 +42,7 @@ public final class LithoFilterPatch {
         public String getStrings() {
             String ascii = strings;
             if (ascii == null) {
-                strings = ascii = findAsciiStrings(bytes);
+                ascii = strings = findAsciiStrings(bytes);
             }
             return ascii;
         }
@@ -132,7 +132,6 @@ public final class LithoFilterPatch {
                     builder.append(" BufferStrings: ");
                     builder.append(asciiStrings.getStrings());
                 }
-                Logger.printDebug(() -> "buffer: " + buffer.length + " builder: " + builder.toString().length());
 
                 return builder.toString();
             }
@@ -257,12 +256,15 @@ public final class LithoFilterPatch {
                 return false;
             }
 
-            String accessibility = "";
-            if (accessibilityId != null && !accessibilityId.isBlank()) {
-                accessibility = accessibilityId;
-            }
+            String path = pathBuilder.toString();
+
+            String accessibility;
             if (accessibilityText != null && !accessibilityText.isBlank()) {
                 accessibility = accessibilityId + '|' + accessibilityText;
+            } else if (accessibilityId != null && !accessibilityId.isBlank()) {
+                accessibility = accessibilityId;
+            } else {
+                accessibility = "";
             }
 
             byte[] buffer = VersionCheckPatch.IS_20_22_OR_GREATER
@@ -274,13 +276,13 @@ public final class LithoFilterPatch {
                 buffer = EMPTY_BYTE_ARRAY;
             }
 
-            LithoFilterParameters parameter = new LithoFilterParameters(contextInterface,
-                    identifier, pathBuilder.toString(), accessibility,
+            LithoFilterParameters parameter = new LithoFilterParameters(
+                    contextInterface, identifier, path, accessibility,
                     buffer, new BufferAsciiStrings(buffer));
             Logger.printDebug(() -> "Searching " + parameter);
 
             return identifierSearchTree.matches(identifier, parameter)
-                    || pathSearchTree.matches(pathBuilder.toString(), parameter);
+                    || pathSearchTree.matches(path, parameter);
         } catch (Exception ex) {
             Logger.printException(() -> "isFiltered failure", ex);
         }
