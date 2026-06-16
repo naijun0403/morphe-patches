@@ -10,7 +10,7 @@
 
 @file:Suppress("SpellCheckingInspection")
 
-package app.morphe.patches.youtube.misc.spans
+package app.morphe.patches.shared.misc.spans
 
 import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
@@ -38,9 +38,9 @@ import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
 import java.lang.ref.WeakReference
 
-internal const val EXTENSION_SPANS_CLASS = "Lapp/morphe/extension/youtube/patches/spans/InclusiveSpanPatch;"
+internal const val EXTENSION_SPANS_CLASS = "Lapp/morphe/extension/shared/patches/spans/InclusiveSpanPatch;"
 
-internal const val EXTENSION_FILTER_ARRAY = "[Lapp/morphe/extension/youtube/patches/spans/SpanFilter;"
+internal const val EXTENSION_FILTER_ARRAY = "[Lapp/morphe/extension/shared/patches/spans/SpanFilter;"
 
 // Registers used in extension helperMethod.
 private const val REGISTER_FILTER_CLASS = 0
