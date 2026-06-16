@@ -214,6 +214,8 @@ final class TranscriptFetcher {
     private static final int MAX_SENTENCE_CHARS = 300;
     // A silence gap longer than this between lines starts a new utterance even mid-sentence.
     private static final long MAX_SENTENCE_GAP_MS = 1_500;
+    // Small gaps between segments are closed when they are below this threshold.
+    private static final long CLOSE_GAP_THRESHOLD_MS = 2000;
 
     // Heuristics for old ASR tracks that have no punctuation at all.
     // A pause this long is treated as a sentence boundary on its own.
@@ -256,14 +258,23 @@ final class TranscriptFetcher {
             }
         }
 
+        // Adjust timings to ensure contiguity for small gaps and resolve overlaps.
         // dDurationMs is display time: with ASR a line stays on screen while the next
         // line is already spoken, so ranges overlap. Clamp each end to the next start
         // so segments represent actual speech time instead of caption visibility.
+        // Small gaps are also closed to ensure smooth TTS flow.
         for (int i = 0, last = lines.size() - 1; i < last; i++) {
             TranscriptSegment cur = lines.get(i);
-            long nextStart = lines.get(i + 1).startMs();
-            if (cur.endMs() > nextStart) {
-                lines.set(i, new TranscriptSegment(cur.startMs(), nextStart, cur.text()));
+            TranscriptSegment next = lines.get(i + 1);
+
+            if (cur.endMs() > next.startMs()) {
+                // Overlap: shrink current segment's end.
+                lines.set(i, new TranscriptSegment(cur.startMs(), next.startMs(), cur.text()));
+            } else if (next.startMs() - cur.endMs() <= CLOSE_GAP_THRESHOLD_MS) {
+                // Small gap: expand each segment time duration to take up the gap.
+                final long mid = (cur.endMs() + next.startMs()) / 2;
+                lines.set(i, new TranscriptSegment(cur.startMs(), mid, cur.text()));
+                lines.set(i + 1, new TranscriptSegment(mid, next.endMs(), next.text()));
             }
         }
 
