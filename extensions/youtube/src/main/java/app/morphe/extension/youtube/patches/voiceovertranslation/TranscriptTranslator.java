@@ -93,7 +93,8 @@ final class TranscriptTranslator {
      * <p>Timings and list size never change between updates - only segment text - so callers
      * may keep indexing into the list across snapshots.
      */
-    static List<TranscriptSegment> translate(List<TranscriptSegment> segments,
+    static List<TranscriptSegment> translate(String videoId,
+                                             List<TranscriptSegment> segments,
                                              String targetLang,
                                              Consumer<List<TranscriptSegment>> onUpdate,
                                              BooleanSupplier cancelled) {
@@ -122,7 +123,7 @@ final class TranscriptTranslator {
         final Handler mainHandler = new Handler(Looper.getMainLooper());
 
         final List<TranscriptSegment> batch0 = batches.get(0);
-        applyBatch(working, batch0, 0, translateBatchSafe(batch0, targetLang,
+        applyBatch(working, batch0, 0, translateBatchSafe(videoId, batch0, targetLang,
                 streamCallback(onUpdate, mainHandler, working, batch0, 0)));
         if (batchesSize == 1) return working;
 
@@ -142,7 +143,7 @@ final class TranscriptTranslator {
             if (abortTranslation) break;
             List<TranscriptSegment> batchN = batches.get(batchIndex);
             final int batchOffset = offsets[batchIndex];
-            List<String> translated = translateBatchSafe(batchN, targetLang,
+            List<String> translated = translateBatchSafe(videoId, batchN, targetLang,
                     streamCallback(onUpdate, mainHandler, working, batchN, batchOffset));
 
             applyBatch(working, batchN, batchOffset, translated);
@@ -210,10 +211,11 @@ final class TranscriptTranslator {
     }
 
     @Nullable
-    private static List<String> translateBatchSafe(List<TranscriptSegment> batch, String targetLang,
-            @Nullable Consumer<List<String>> onLineStreamed) {
+    private static List<String> translateBatchSafe(String videoId,
+                                                   List<TranscriptSegment> batch, String targetLang,
+                                                   @Nullable Consumer<List<String>> onLineStreamed) {
         try {
-            return translateBatch(batch, targetLang, onLineStreamed);
+            return translateBatch(videoId, batch, targetLang, onLineStreamed);
         } catch (Exception ex) {
             String msg = ex.getMessage();
             // FileNotFoundException from getInputStream() is Android's HttpURLConnection reporting
@@ -251,12 +253,18 @@ final class TranscriptTranslator {
         return batches;
     }
 
-    private static List<String> translateBatch(List<TranscriptSegment> segments, String targetLang,
-            @Nullable Consumer<List<String>> onLineStreamed) throws Exception {
+    private static List<String> translateBatch(String videoId,
+                                               List<TranscriptSegment> segments,
+                                               String targetLang,
+                                               @Nullable Consumer<List<String>> onLineStreamed) throws Exception {
         String service = Settings.VOT_TRANSLATION_SERVICE.get();
-        if (service.equals(TRANSLATION_SERVICE_MY_MEMORY)) return translateBatchMyMemory(segments, targetLang);
-        if (service.equals(TRANSLATION_SERVICE_OPENROUTER)) return translateBatchOpenRouter(segments, targetLang, onLineStreamed);
-        return translateBatchGoogle(segments, targetLang);
+        if (service.equals(TRANSLATION_SERVICE_MY_MEMORY)) {
+            return translateBatchMyMemory(videoId, segments, targetLang);
+        }
+        if (service.equals(TRANSLATION_SERVICE_OPENROUTER)) {
+            return translateBatchOpenRouter(videoId, segments, targetLang, onLineStreamed);
+        }
+        return translateBatchGoogle(videoId, segments, targetLang);
     }
 
     private static boolean parseLine(String line, List<String> result, int segmentCount) {
@@ -276,11 +284,12 @@ final class TranscriptTranslator {
         return false;
     }
 
-    private static List<String> translateBatchGoogle(
-            List<TranscriptSegment> segments, String targetLang) throws Exception {
+    private static List<String> translateBatchGoogle(String videoId,
+                                                     List<TranscriptSegment> segments,
+                                                     String targetLang) throws Exception {
         Utils.verifyOffMainThread();
         final long start = System.currentTimeMillis();
-        Logger.printDebug(() -> "Google translation starting: " + targetLang);
+        Logger.printDebug(() -> "Google translation starting: " + videoId + " lang: " + targetLang);
 
         StringBuilder joined = new StringBuilder();
         for (TranscriptSegment seg : segments) {
@@ -326,11 +335,12 @@ final class TranscriptTranslator {
     // MyMemory limits q to 500 bytes per request.
     private static final int MYMEMORY_MAX_CHARS = 450;
 
-    private static List<String> translateBatchMyMemory(
-            List<TranscriptSegment> segments, String targetLang) throws Exception {
+    private static List<String> translateBatchMyMemory(String videoId,
+                                                       List<TranscriptSegment> segments,
+                                                       String targetLang) throws Exception {
         Utils.verifyOffMainThread();
         final long start = System.currentTimeMillis();
-        Logger.printDebug(() -> "MyMemory translation starting: " + targetLang);
+        Logger.printDebug(() -> "MyMemory translation starting: " + videoId + " lang: " + targetLang);
 
         StringBuilder joined = new StringBuilder();
         for (TranscriptSegment seg : segments) {
@@ -374,6 +384,7 @@ final class TranscriptTranslator {
     }
 
     private static List<String> translateBatchOpenRouter(
+            String videoId,
             List<TranscriptSegment> segments, String targetLang,
             @Nullable Consumer<List<String>> onLineStreamed) throws Exception {
         Utils.verifyOffMainThread();

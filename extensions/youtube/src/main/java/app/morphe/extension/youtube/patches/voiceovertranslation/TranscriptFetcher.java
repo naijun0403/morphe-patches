@@ -53,7 +53,7 @@ final class TranscriptFetcher {
             String targetLangCode = VoiceOverTranslationPatch.resolveTargetLang();
             // Skip translation when the caption track is already in the target language.
             if (!isSameSpokenLanguage(targetLangCode, lastSourceLang)) {
-                segments = TranscriptTranslator.translate(segments, targetLangCode, onUpdate, cancelled);
+                segments = TranscriptTranslator.translate(videoId, segments, targetLangCode, onUpdate, cancelled);
             }
         }
 

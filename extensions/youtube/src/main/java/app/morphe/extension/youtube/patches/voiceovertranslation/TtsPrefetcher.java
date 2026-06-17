@@ -22,12 +22,26 @@ import app.morphe.extension.youtube.settings.Settings;
  * Background prefetcher for Edge TTS audio segments.
  *
  * Uses an adaptive throttling strategy:
- * - Segments near the current time are fetched quickly (100ms delay).
- * - Segments further out are fetched moderately (500ms delay).
- * - Remaining segments are fetched slowly (1500ms delay) until the video is fully cached.
+ * - Segments near the current time are fetched quickly.
+ * - Segments further out are fetched moderately.
+ * - Remaining segments are fetched slowly until the video is fully cached.
  * </pre>
  */
 final class TtsPrefetcher {
+
+    // Adaptive delay tiers based on segment distance from playhead.
+    private static final int DISTANCE_IMMEDIATE = 10;
+    private static final int DISTANCE_NEAR      = 50;
+
+    private static final int DELAY_IMMEDIATE_MS = 200;
+    private static final int DELAY_NEAR_MS      = 600;
+    private static final int DELAY_BACKGROUND_MS = 1500;
+    private static final int DELAY_IDLE_MS       = 60_000;
+
+    // Backoff constants for handling server-side rate limits/errors.
+    private static final int BACKOFF_MIN_MS      = 5000;
+    private static final int BACKOFF_MAX_MS      = 60_000; // Cap at 1 minute.
+    private static final float BACKOFF_FACTOR    = 1.5f;
 
     private static final Object lock = new Object();
 
@@ -41,25 +55,11 @@ final class TtsPrefetcher {
     private static boolean running;
     @GuardedBy("lock")
     private static boolean waiting;
+    @GuardedBy("lock")
+    private static int currentBackoffMs;
 
     private static final TtsEngine engine = TtsEngine.INSTANCE;
-
-    // Adaptive delay tiers based on segment distance from playhead.
-    private static final int DISTANCE_IMMEDIATE = 10;
-    private static final int DISTANCE_NEAR      = 50;
-
-    private static final int DELAY_IMMEDIATE_MS = 200;
-    private static final int DELAY_NEAR_MS      = 600;
-    private static final int DELAY_BACKGROUND_MS = 1500;
-    private static final int DELAY_IDLE_MS       = 2000;
-
-    // Backoff constants for handling server-side rate limits/errors.
-    private static final int BACKOFF_MIN_MS      = 5000;
-    private static final int BACKOFF_MAX_MS      = 60_000; // Cap at 1 minute.
-    private static final float BACKOFF_FACTOR    = 1.5f;
-
-    private static int currentBackoffMs = 0;
-
+    
     private record NextFetch(int index, int distance) {}
 
     static void updateVideo(String videoId, List<TranscriptSegment> segments) {
@@ -67,8 +67,6 @@ final class TtsPrefetcher {
             currentVideoId = videoId;
             currentSegments = Collections.unmodifiableList(segments);
             currentVideoTimeMs = 0;
-            // Reset backoff when starting a new video.
-            currentBackoffMs = 0;
             if (running) {
                 lock.notifyAll();
             } else {
