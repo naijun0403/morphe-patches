@@ -560,7 +560,7 @@
         <item>Íslenska</item>
         <item>Italiano</item>
         <item>Kiswahili</item>
-        <item>Қาзақша</item>
+        <item>Қазақша</item>
         <item>Latviešu</item>
         <item>Lietuvių</item>
         <item>Македонски</item>
@@ -570,7 +570,8 @@
         <item>Nederlands</item>
         <item>Oʻzbekcha</item>
         <item>Polski</item>
-        <item>Português</item>
+        <item>Português (Brasil)</item>
+        <item>Português (Portugal)</item>
         <item>Română</item>
         <item>Shqip</item>
         <item>Slovenčina</item>
@@ -610,81 +611,82 @@
     </string-array>
     <string-array name="morphe_vot_caption_language_entry_values">
         <item>app</item>
-        <item>af</item>
-        <item>az</item>
-        <item>ms</item>
-        <item>jv</item>
-        <item>su</item>
-        <item>nb</item>
-        <item>bg</item>
-        <item>bs</item>
-        <item>ca</item>
-        <item>cs</item>
-        <item>sr</item>
-        <item>cy</item>
-        <item>da</item>
-        <item>de</item>
-        <item>et</item>
-        <item>el</item>
-        <item>en</item>
-        <item>es</item>
-        <item>fil</item>
-        <item>fr</item>
-        <item>ga</item>
-        <item>gl</item>
-        <item>hr</item>
-        <item>id</item>
-        <item>zu</item>
-        <item>is</item>
-        <item>it</item>
-        <item>sw</item>
-        <item>kk</item>
-        <item>lv</item>
-        <item>lt</item>
-        <item>mk</item>
-        <item>hu</item>
-        <item>mt</item>
-        <item>mn</item>
-        <item>nl</item>
-        <item>uz</item>
-        <item>pl</item>
-        <item>pt</item>
-        <item>ro</item>
-        <item>sq</item>
-        <item>sk</item>
-        <item>sl</item>
-        <item>so</item>
-        <item>fi</item>
-        <item>sv</item>
-        <item>vi</item>
-        <item>tr</item>
-        <item>ru</item>
-        <item>uk</item>
-        <item>am</item>
-        <item>ar</item>
-        <item>bn</item>
-        <item>fa</item>
-        <item>gu</item>
-        <item>he</item>
-        <item>hi</item>
-        <item>iu</item>
-        <item>ka</item>
-        <item>km</item>
-        <item>kn</item>
-        <item>lo</item>
-        <item>ml</item>
-        <item>mr</item>
-        <item>my</item>
-        <item>ne</item>
-        <item>ps</item>
-        <item>si</item>
-        <item>ta</item>
-        <item>te</item>
-        <item>th</item>
-        <item>ur</item>
-        <item>ja</item>
-        <item>ko</item>
-        <item>zh</item>
+        <item>af-ZA</item>
+        <item>az-AZ</item>
+        <item>ms-MY</item>
+        <item>jv-ID</item>
+        <item>su-ID</item>
+        <item>nb-NO</item>
+        <item>bg-BG</item>
+        <item>bs-BA</item>
+        <item>ca-ES</item>
+        <item>cs-CZ</item>
+        <item>sr-RS</item>
+        <item>cy-GB</item>
+        <item>da-DK</item>
+        <item>de-DE</item>
+        <item>et-EE</item>
+        <item>el-GR</item>
+        <item>en-US</item>
+        <item>es-ES</item>
+        <item>fil-PH</item>
+        <item>fr-FR</item>
+        <item>ga-IE</item>
+        <item>gl-ES</item>
+        <item>hr-HR</item>
+        <item>id-ID</item>
+        <item>zu-ZA</item>
+        <item>is-IS</item>
+        <item>it-IT</item>
+        <item>sw-TZ</item>
+        <item>kk-KZ</item>
+        <item>lv-LV</item>
+        <item>lt-LT</item>
+        <item>mk-MK</item>
+        <item>hu-HU</item>
+        <item>mt-MT</item>
+        <item>mn-MN</item>
+        <item>nl-NL</item>
+        <item>uz-UZ</item>
+        <item>pl-PL</item>
+        <item>pt-BR</item>
+        <item>pt-PT</item>
+        <item>ro-RO</item>
+        <item>sq-AL</item>
+        <item>sk-SK</item>
+        <item>sl-SI</item>
+        <item>so-SO</item>
+        <item>fi-FI</item>
+        <item>sv-SE</item>
+        <item>vi-VN</item>
+        <item>tr-TR</item>
+        <item>ru-RU</item>
+        <item>uk-UA</item>
+        <item>am-ET</item>
+        <item>ar-EG</item>
+        <item>bn-BD</item>
+        <item>fa-IR</item>
+        <item>gu-IN</item>
+        <item>he-IL</item>
+        <item>hi-IN</item>
+        <item>iu-CA</item>
+        <item>ka-GE</item>
+        <item>km-KH</item>
+        <item>kn-IN</item>
+        <item>lo-LA</item>
+        <item>ml-IN</item>
+        <item>mr-IN</item>
+        <item>my-MM</item>
+        <item>ne-NP</item>
+        <item>ps-AF</item>
+        <item>si-LK</item>
+        <item>ta-IN</item>
+        <item>te-IN</item>
+        <item>th-TH</item>
+        <item>ur-PK</item>
+        <item>ja-JP</item>
+        <item>ko-KR</item>
+        <item>zh-CN</item>
     </string-array>
     <string-array name="morphe_vot_translation_service_entries">
         <item>@string/morphe_vot_service_google</item>

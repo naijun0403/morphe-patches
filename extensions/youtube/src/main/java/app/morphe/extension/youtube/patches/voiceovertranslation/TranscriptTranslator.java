@@ -55,6 +55,7 @@ final class TranscriptTranslator {
     private static final int OPENROUTER_MAX_BATCH_CHARS = 1_500;
     // Delay between consecutive background batches to reduce IP rate-limit pressure.
     private static final int GOOGLE_INTER_BATCH_DELAY_MS = 500;
+    private static final int OPENROUTER_INTER_BATCH_DELAY_MS = 0;
     // OpenRouter LLM inference can take longer than the shared read timeout.
     private static final int OPENROUTER_READ_TIMEOUT_MS = 30_000;
     // MyMemory enforces a per-minute request rate; a longer pause keeps us well under it.
@@ -101,8 +102,9 @@ final class TranscriptTranslator {
 
         final String service = Settings.VOT_TRANSLATION_SERVICE.get();
         final boolean isMyMemory = service.equals(TRANSLATION_SERVICE_MY_MEMORY);
+        final boolean isOpenRouter = service.equals(TRANSLATION_SERVICE_OPENROUTER);
         final int maxBatchChars = isMyMemory ? MYMEMORY_MAX_CHARS
-                : service.equals(TRANSLATION_SERVICE_OPENROUTER) ? OPENROUTER_MAX_BATCH_CHARS
+                : isOpenRouter ? OPENROUTER_MAX_BATCH_CHARS
                 : GOOGLE_MAX_BATCH_CHARS;
         List<List<TranscriptSegment>> batches = splitByCharBudget(segments, maxBatchChars);
         reportNextTranslationError = true;
@@ -111,8 +113,9 @@ final class TranscriptTranslator {
         // Working copy that accumulates translated batches over the original text.
         List<TranscriptSegment> working = new ArrayList<>(segments);
 
-        int[] offsets = new int[batches.size()];
-        for (int b = 1, batchCount = batches.size(); b < batchCount; b++) {
+        final int batchesSize = batches.size();
+        int[] offsets = new int[batchesSize];
+        for (int b = 1; b < batchesSize; b++) {
             offsets[b] = offsets[b - 1] + batches.get(b - 1).size();
         }
 
@@ -121,28 +124,29 @@ final class TranscriptTranslator {
         final List<TranscriptSegment> batch0 = batches.get(0);
         applyBatch(working, batch0, 0, translateBatchSafe(batch0, targetLang,
                 streamCallback(onUpdate, mainHandler, working, batch0, 0)));
-        if (batches.size() == 1) return working;
+        if (batchesSize == 1) return working;
 
         // Snapshot to return before background batches start mutating the working copy.
         List<TranscriptSegment> initial = new ArrayList<>(working);
 
-        final int batchDelay = isMyMemory ? MYMEMORY_INTER_BATCH_DELAY_MS : GOOGLE_INTER_BATCH_DELAY_MS;
+        final int batchDelay = isMyMemory ? MYMEMORY_INTER_BATCH_DELAY_MS
+                : isOpenRouter ? OPENROUTER_INTER_BATCH_DELAY_MS
+                : GOOGLE_INTER_BATCH_DELAY_MS;
         // For non-streaming services (Google, MyMemory), onUpdate hasn't fired yet for batch 0 —
         // post it now so TTS can start. For OpenRouter the stream already posted incremental updates.
-        if (onUpdate != null && !service.equals(TRANSLATION_SERVICE_OPENROUTER)) {
+        if (onUpdate != null && !isOpenRouter) {
             mainHandler.post(() -> onUpdate.accept(initial));
         }
 
-        for (int batchIndex = 1, batchCount = batches.size(); batchIndex < batchCount; batchIndex++) {
+        for (int batchIndex = 1; batchIndex < batchesSize; batchIndex++) {
             if (abortTranslation) break;
-            final List<TranscriptSegment> batchN = batches.get(batchIndex);
+            List<TranscriptSegment> batchN = batches.get(batchIndex);
             final int batchOffset = offsets[batchIndex];
             List<String> translated = translateBatchSafe(batchN, targetLang,
                     streamCallback(onUpdate, mainHandler, working, batchN, batchOffset));
-            List<TranscriptSegment> snapshot;
 
             applyBatch(working, batchN, batchOffset, translated);
-            snapshot = new ArrayList<>(working);
+            List<TranscriptSegment> snapshot = new ArrayList<>(working);
             if (onUpdate != null) mainHandler.post(() -> onUpdate.accept(snapshot));
 
             // Skip remaining work when the result is no longer needed (video changed).
@@ -151,7 +155,7 @@ final class TranscriptTranslator {
                 mainHandler.post(cancelCheck);
                 try {
                     if (cancelCheck.get()) {
-                        Logger.printDebug(() -> "translate batch canceled for: " + targetLang);
+                        Logger.printDebug(() -> "Translate batch canceled for: " + targetLang);
                         return initial;
                     }
                 } catch (ExecutionException | InterruptedException e) {
@@ -228,7 +232,8 @@ final class TranscriptTranslator {
         }
     }
 
-    private static List<List<TranscriptSegment>> splitByCharBudget(List<TranscriptSegment> segments, int maxChars) {
+    private static List<List<TranscriptSegment>> splitByCharBudget(
+            List<TranscriptSegment> segments, int maxChars) {
         List<List<TranscriptSegment>> batches = new ArrayList<>();
         List<TranscriptSegment> batch = new ArrayList<>(segments.size());
         int chars = 0;
@@ -274,6 +279,7 @@ final class TranscriptTranslator {
     private static List<String> translateBatchGoogle(
             List<TranscriptSegment> segments, String targetLang) throws Exception {
         Utils.verifyOffMainThread();
+        final long start = System.currentTimeMillis();
         Logger.printDebug(() -> "Google translation starting: " + targetLang);
 
         StringBuilder joined = new StringBuilder();
@@ -312,7 +318,8 @@ final class TranscriptTranslator {
         for (int i = 0, length = sentences.length(); i < length; i++) {
             translatedJoined.append(sentences.getJSONArray(i).getString(0));
         }
-        Logger.printDebug(() -> "Google translation complete: " + targetLang);
+        Logger.printDebug(() -> "Google translation complete: " + targetLang
+                + " time: " + (System.currentTimeMillis() - start) + "ms");
         return Arrays.asList(translatedJoined.toString().split("\n", -1));
     }
 
@@ -322,6 +329,7 @@ final class TranscriptTranslator {
     private static List<String> translateBatchMyMemory(
             List<TranscriptSegment> segments, String targetLang) throws Exception {
         Utils.verifyOffMainThread();
+        final long start = System.currentTimeMillis();
         Logger.printDebug(() -> "MyMemory translation starting: " + targetLang);
 
         StringBuilder joined = new StringBuilder();
@@ -358,7 +366,11 @@ final class TranscriptTranslator {
                 + ": " + json.optString("responseDetails", "unknown error"));
 
         String translation = json.getJSONObject("responseData").getString("translatedText");
-        return Arrays.asList(translation.split("\n", -1));
+        List<String> result = Arrays.asList(translation.split("\n", -1));
+
+        Logger.printDebug(() -> "MyMemory translation complete: " + targetLang
+                + " time: " + (System.currentTimeMillis() - start) + "ms");
+        return result;
     }
 
     private static List<String> translateBatchOpenRouter(
@@ -367,6 +379,7 @@ final class TranscriptTranslator {
         Utils.verifyOffMainThread();
 
         final String model = Settings.VOT_OPENROUTER_MODEL.get();
+        final long start = System.currentTimeMillis();
         Logger.printDebug(() -> "OpenRouter translation starting: " + targetLang + " model: " + model);
 
         String apiKey = Settings.VOT_OPENROUTER_API_KEY.get().trim();
@@ -476,12 +489,16 @@ final class TranscriptTranslator {
             if (activeConnection == conn) activeConnection = null;
         }
 
-        if (matched[0] != segments.size()) {
-            final int m = matched[0], total = segments.size();
-            Logger.printDebug(() -> "OpenRouter line mismatch - expected: " + total
-                    + ", got: " + m + "; last: " + (total - m) + " segment(s) keep original text");
+        final int segmentSize = segments.size();
+        final int matchedFirst = matched[0];
+        if (matchedFirst != segmentSize) {
+            Logger.printDebug(() -> "OpenRouter line mismatch - expected: " + segmentSize
+                    + ", got: " + matchedFirst + "; last: " + (segmentSize - matchedFirst)
+                    + " segment(s) keep original text");
         }
-        Logger.printDebug(() -> "OpenRouter translation complete: " + targetLang);
+
+        Logger.printDebug(() -> "OpenRouter translation complete: " + targetLang
+                + " time: " + (System.currentTimeMillis() - start) + "ms");
         return result;
     }
 }

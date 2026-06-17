@@ -50,14 +50,25 @@ final class TranscriptFetcher {
         List<TranscriptSegment> segments = fetchEnglishSegments(videoId);
 
         if (!segments.isEmpty()) {
-            String targetLangCode = VoiceOverTranslationPatch.resolveTargetLang().split("-")[0];
+            String targetLangCode = VoiceOverTranslationPatch.resolveTargetLang();
             // Skip translation when the caption track is already in the target language.
-            if (!targetLangCode.equals(lastSourceLang)) {
+            if (!isSameSpokenLanguage(targetLangCode, lastSourceLang)) {
                 segments = TranscriptTranslator.translate(segments, targetLangCode, onUpdate, cancelled);
             }
         }
 
         return segments;
+    }
+
+    public static boolean isSameSpokenLanguage(String target, String source) {
+        if (target == null || source == null) return false;
+        if (target.equalsIgnoreCase(source)) return true; // Direct match (handles pt-BR == pt-BR)
+
+        // If Portuguese but didn't match directly above, the regions are different (e.g., pt-BR != pt-PT)
+        if (target.startsWith("pt-")) return false;
+
+        // For everything else, strip the region and compare base languages (e.g., en-US == en-GB)
+        return VoiceCatalog.getIso639(target).equalsIgnoreCase(VoiceCatalog.getIso639(source));
     }
 
     private static List<TranscriptSegment> fetchEnglishSegments(String videoId) {
@@ -139,7 +150,7 @@ final class TranscriptFetcher {
         final int tracksIdx = json.indexOf("\"captionTracks\":[");
         if (tracksIdx < 0) return null;
 
-        String targetLang = VoiceOverTranslationPatch.resolveTargetLang().split("-")[0];
+        String targetLang = VoiceOverTranslationPatch.resolveTargetLangIso639();
         String firstUrl = null;
         String firstNonGemini = null;
         String targetLangUrl = null;

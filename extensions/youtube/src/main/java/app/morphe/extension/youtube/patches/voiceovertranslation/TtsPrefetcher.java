@@ -128,8 +128,7 @@ final class TtsPrefetcher {
                 continue;
             }
 
-            String lang = Settings.VOT_CAPTION_LANGUAGE.get();
-            String voiceLang = "app".equals(lang) ? VoiceOverTranslationPatch.resolveTargetLang() : lang;
+            String voiceLang = VoiceOverTranslationPatch.resolveTargetLang();
             String voice = VoiceCatalog.resolve(voiceLang, Settings.VOT_TTS_VOICE_TYPE.get());
 
             if (voice == null) {
@@ -166,7 +165,7 @@ final class TtsPrefetcher {
 
 
     /**
-     * @return false, if the wait was interrupted..
+     * @return false, if the wait was interrupted.
      */
     private static boolean waitOnLock(long millis) {
         synchronized (lock) {

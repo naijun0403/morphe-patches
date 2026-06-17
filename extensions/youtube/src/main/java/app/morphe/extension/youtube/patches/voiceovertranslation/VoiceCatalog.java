@@ -7,20 +7,15 @@
 
 package app.morphe.extension.youtube.patches.voiceovertranslation;
 
-import static app.morphe.extension.shared.StringRef.str;
-
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-
-import app.morphe.extension.youtube.settings.Settings;
 
 /**
  * Maps language codes (same values as {@code morphe_vot_caption_language_entry_values})
@@ -105,6 +100,21 @@ final class VoiceCatalog {
             final int countryComp = this.countryTag.compareToIgnoreCase(other.countryTag);
             if (countryComp != 0) return countryComp;
             return this.shortName.compareToIgnoreCase(other.shortName);
+        }
+
+        @NonNull
+        @Override
+        public String toString() {
+            return "Voice{" +
+                    "id='" + id + '\'' +
+                    ", languageTag='" + languageTag + '\'' +
+                    ", countryTag='" + countryTag + '\'' +
+                    ", flag='" + flag + '\'' +
+                    ", isMale=" + isMale +
+                    ", shortName='" + shortName + '\'' +
+                    ", dialogDisplayName='" + dialogDisplayName + '\'' +
+                    ", isMultilingual=" + isMultilingual +
+                    '}';
         }
     }
 
@@ -472,17 +482,33 @@ final class VoiceCatalog {
         return VOICES_BY_ID.get(id);
     }
 
+    /**
+     * @param lang BCP 47 (pt-BR, en-US) or ISO 639 (pt, en)
+     */
     @Nullable
     static List<Voice> getVoicesForLang(String lang) {
-        return VOICES_BY_LANG.get(lang);
+        return VOICES_BY_LANG.get(getIso639(lang));
     }
 
     /**
-     * Returns a voice ID for {@code lang} and the requested gender,
-     * or {@code null} if the language is not supported.
+     * @param lang BCP 47 (pt-BR, en-US) or ISO 639 (pt, en)
+     * @return ISO 639 language.
+     */
+    public static String getIso639(String lang) {
+        final int separatorIndex = lang.indexOf('-');
+        if (separatorIndex > 0) {
+            lang = lang.substring(0, separatorIndex);
+        }
+        return lang;
+    }
+
+    /**
+     * @param lang ISO-639 (pt, en) or BCP 47 language (pt-BR, en-US).
      */
     @Nullable
     static String resolve(String lang, @Nullable String preferredVoiceId) {
+        lang = getIso639(lang);
+
         List<Voice> voices = VOICES_BY_LANG.get(lang);
         if (voices == null || voices.isEmpty()) {
             voices = Objects.requireNonNull(VOICES_BY_LANG.get("en"));

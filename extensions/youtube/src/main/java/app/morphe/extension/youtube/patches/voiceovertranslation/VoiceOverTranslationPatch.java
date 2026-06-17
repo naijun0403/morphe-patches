@@ -432,7 +432,7 @@ public class VoiceOverTranslationPatch {
 
     private static void speak(TranscriptSegment seg, int index) {
         Utils.verifyOnMainThread();
-        Logger.printDebug(() -> "speak: " + seg);
+        Logger.printDebug(() -> "Speak: " + seg);
         String lang = resolveTargetLang();
         final float volume = Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f;
 
@@ -520,6 +520,7 @@ public class VoiceOverTranslationPatch {
         if (voice == null) return;
 
         // Group segments into contiguous clusters (gap < MAX_START_TIME_EXPANSION).
+        //noinspection ExtractMethodRecommender
         List<List<Integer>> clusters = new ArrayList<>();
         List<Integer> currentCluster = new ArrayList<>();
         for (int i = 0, size = segments.size(); i < size; i++) {
@@ -814,12 +815,31 @@ public class VoiceOverTranslationPatch {
         return audioManager;
     }
 
+    /**
+     * @return BCP-47 language code(pt-BR, pt-PT, en-US, etc).
+     */
     static String resolveTargetLang() {
-        return Settings.VOT_CAPTION_LANGUAGE.isSetToDefault() // Default is app language.
-                ? AppLanguage.DEFAULT.getLanguage()
+        return Settings.VOT_CAPTION_LANGUAGE.isSetToDefault()
+                ? Locale.getDefault().toLanguageTag()
                 : Settings.VOT_CAPTION_LANGUAGE.get();
     }
 
+    /**
+     * @return ISO 639 language code (pt, en, es, etc).
+     */
+    static String resolveTargetLangIso639() {
+        String lang = resolveTargetLang();
+        final int index = lang.indexOf('-');
+        if (index > 0) {
+            lang = lang.substring(0, index);
+        }
+        return lang;
+    }
+
+
+    /**
+     * @param lang ISO 639 (pt) or BCP 47 (pt-BR).
+     */
     private static String resolveVoice(String lang) {
         return Settings.VOT_USE_NATIVE_TTS.get()
                 ? TTS_ENGINE_SYSTEM
