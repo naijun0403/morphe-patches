@@ -71,6 +71,7 @@ public final class VotBottomSheet {
 
     public static void show(Context context) {
         VoiceOverTranslationPatch.preloadTestVoices();
+        VoiceOverTranslationPatch.ensureTts();
 
         SheetBottomDialog.DraggableLinearLayout root = SheetBottomDialog
                 .createMainLayout(context, getDialogBackgroundColor());

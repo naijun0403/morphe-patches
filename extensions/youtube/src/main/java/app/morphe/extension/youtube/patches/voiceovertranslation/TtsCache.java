@@ -1,5 +1,7 @@
 package app.morphe.extension.youtube.patches.voiceovertranslation;
 
+import static app.morphe.extension.youtube.patches.voiceovertranslation.VoiceOverTranslationPatch.TTS_ENGINE_SYSTEM;
+
 import android.content.Context;
 
 import java.io.File;
@@ -30,22 +32,27 @@ final class TtsCache {
     private static final String TEST_SAMPLES_DIR = "vot_voice_samples";
 
     static synchronized boolean notCached(String videoId, int segmentIndex, String voice, String lang, String text) {
+        if (TTS_ENGINE_SYSTEM.equals(voice)) return true;
         return !cache.containsKey(key(videoId, segmentIndex, voice, lang, text));
     }
 
     static synchronized byte[] get(String videoId, int segmentIndex, String voice, String lang, String text) {
+        if (TTS_ENGINE_SYSTEM.equals(voice)) return null;
         return cache.get(key(videoId, segmentIndex, voice, lang, text));
     }
 
     static synchronized void put(String videoId, int segmentIndex, String voice, String lang, String text, byte[] data) {
+        if (TTS_ENGINE_SYSTEM.equals(voice)) return;
         cache.put(key(videoId, segmentIndex, voice, lang, text), data);
     }
 
     static void putDuration(String videoId, int segmentIndex, String voice, String lang, String text, long durationMs) {
+        if (TTS_ENGINE_SYSTEM.equals(voice)) return;
         durations.put(key(videoId, segmentIndex, voice, lang, text), durationMs);
     }
 
     static long getDuration(String videoId, int segmentIndex, String voice, String lang, String text) {
+        if ("system".equals(voice)) return -1;
         Long d = durations.get(key(videoId, segmentIndex, voice, lang, text));
         return d != null ? d : -1;
     }

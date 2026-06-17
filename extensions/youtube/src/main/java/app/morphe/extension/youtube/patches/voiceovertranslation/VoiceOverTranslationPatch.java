@@ -99,7 +99,7 @@ public class VoiceOverTranslationPatch {
     // from normal speed to maximum. Slowing back down is applied immediately.
     private static final float MAX_RATE_STEP_UP = 0.25f;
 
-    static final String TTS_ENGINE_SYSTEM = "system";
+    public static final String TTS_ENGINE_SYSTEM = "system";
     private static final String VOT_ID_PREFIX = "vot_";
     private static final String VOT_TEST_ID_PREFIX = "vot_test_";
     private static final String TEST_VIDEO_ID = "test";
@@ -363,7 +363,7 @@ public class VoiceOverTranslationPatch {
         });
     }
 
-    private static void ensureTts() {
+    public static void ensureTts() {
         Utils.verifyOnMainThread();
         if (tts != null) return;
         Logger.printDebug(() -> "ensureTts creating tts");
@@ -597,6 +597,7 @@ public class VoiceOverTranslationPatch {
                 isTestSpeaking = false;
                 return;
             }
+            updateTtsLanguage();
             requestDuck();
             Bundle params = new Bundle();
             params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume);
