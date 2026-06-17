@@ -310,8 +310,13 @@ public class VoiceOverTranslationPatch {
 
                 Utils.runOnMainThread(() -> {
                     if (videoId.equals(currentVideoId)) {
-                        segments = fetched;
-                        TtsPrefetcher.updateVideo(videoId, fetched);
+                        // With sequential batch execution, cancelCheck.get() ensures every
+                        // onUpdate fires before translate() returns, so segments is already
+                        // fully translated by the time we arrive here. Only fall back to the
+                        // batch-0 snapshot (fetched) if onUpdate never ran (single batch or
+                        // no translation needed).
+                        if (segments.isEmpty()) segments = fetched;
+                        TtsPrefetcher.updateVideo(videoId, segments);
                         Logger.printDebug(() -> "Loaded: " + fetched.size() + " segments for :" + videoId);
                         notifyStateChanged();
                     }
