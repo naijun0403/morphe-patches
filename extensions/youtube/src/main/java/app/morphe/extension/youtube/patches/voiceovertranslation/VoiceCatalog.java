@@ -150,7 +150,8 @@ final class VoiceCatalog {
             new Voice(true, "en-HK-SamNeural"),
             new Voice(true, "en-IE-ConnorNeural"),
             new Voice(true, "en-IN-PrabhatNeural"),
-            new Voice(true, "en-KE-ChilembaNeural"),
+            // Voice sounds almost identical to Abeo below
+            // new Voice(true, "en-KE-ChilembaNeural"),
             new Voice(true, "en-NG-AbeoNeural"),
             new Voice(true, "en-NZ-MitchellNeural"),
             new Voice(true, "en-PH-JamesNeural"),
