@@ -47,7 +47,7 @@ final class TranscriptTranslator {
 
     // Batches are built by character budget rather than segment count, so request
     // sizes stay uniform regardless of how long the merged sentences are.
-    private static final int MAX_BATCH_CHARS = 4_000;
+    private static final int GOOGLE_MAX_BATCH_CHARS = 4_000;
     // Smaller batches for OpenRouter so the first batch completes faster and TTS starts sooner.
     private static final int OPENROUTER_MAX_BATCH_CHARS = 1_500;
     // Delay between consecutive background batches to reduce IP rate-limit pressure.
@@ -91,7 +91,7 @@ final class TranscriptTranslator {
         final boolean isMyMemory = service.equals(TRANSLATION_SERVICE_MY_MEMORY);
         final int maxBatchChars = isMyMemory ? MYMEMORY_MAX_CHARS
                 : service.equals(TRANSLATION_SERVICE_OPENROUTER) ? OPENROUTER_MAX_BATCH_CHARS
-                : MAX_BATCH_CHARS;
+                : GOOGLE_MAX_BATCH_CHARS;
         List<List<TranscriptSegment>> batches = splitByCharBudget(segments, maxBatchChars);
         reportNextTranslationError = true;
         abortTranslation = false;
