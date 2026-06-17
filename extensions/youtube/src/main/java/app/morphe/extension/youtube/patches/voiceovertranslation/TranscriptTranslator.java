@@ -219,7 +219,10 @@ final class TranscriptTranslator {
         }
 
         final int code = conn.getResponseCode();
-        if (code != 200) throw new Exception("HTTP " + code);
+        if (code != 200) {
+            VoiceOverTranslationPatch.notifyHttpError(code);
+            throw new Exception("HTTP " + code);
+        }
 
         // Response: [[["translated","original",...],...],null,"src_lang",...]
         // Concatenate sentence translations; newline separators from joined input are preserved.
@@ -280,7 +283,10 @@ final class TranscriptTranslator {
         conn.setRequestProperty("User-Agent", "Mozilla/5.0");
 
         final int httpCode = conn.getResponseCode();
-        if (httpCode != 200) throw new Exception("MyMemory HTTP status: " + httpCode);
+        if (httpCode != 200) {
+            VoiceOverTranslationPatch.notifyHttpError(httpCode);
+            throw new Exception("MyMemory HTTP status: " + httpCode);
+        }
 
         // Response: {"responseStatus": 200, "responseData": {"translatedText": "..."}}
         JSONObject json = new JSONObject(Requester.parseString(conn));

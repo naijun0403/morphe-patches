@@ -7,9 +7,12 @@
 
 package app.morphe.extension.youtube.patches.voiceovertranslation;
 
+import static app.morphe.extension.shared.StringRef.str;
 import static app.morphe.extension.shared.settings.BaseSettings.DEBUG;
 import static app.morphe.extension.youtube.patches.voiceovertranslation.TranscriptTranslator.TRANSLATION_SERVICE_MY_MEMORY;
 
+import android.app.Activity;
+import android.app.Dialog;
 import android.content.Context;
 import android.media.AudioAttributes;
 import android.media.AudioFocusRequest;
@@ -17,6 +20,8 @@ import android.media.AudioManager;
 import android.os.Bundle;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
+import android.util.Pair;
+import android.widget.LinearLayout;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,6 +30,7 @@ import java.util.Locale;
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.ResourceUtils;
 import app.morphe.extension.shared.Utils;
+import app.morphe.extension.shared.ui.CustomDialog;
 import app.morphe.extension.shared.settings.AppLanguage;
 import app.morphe.extension.shared.settings.Setting;
 import app.morphe.extension.youtube.settings.Settings;
@@ -83,6 +89,7 @@ public class VoiceOverTranslationPatch {
     private static boolean isLoading;
     private static boolean sessionEnabled = Settings.VOT_SESSION_ENABLED.get();
     private static boolean wasExplicitSeek;
+    private static volatile boolean httpErrorDialogShownThisVideo = false;
 
     private static Runnable onStateChangeCallback;
 
@@ -151,6 +158,7 @@ public class VoiceOverTranslationPatch {
             stopTts();
             currentVideoId = videoId;
             segments = new ArrayList<>();
+            httpErrorDialogShownThisVideo = false;
 
             if (!Settings.VOT_ENABLED.get() || !sessionEnabled) return;
             if (PlayerType.getCurrent() == PlayerType.INLINE_MINIMAL) return;
@@ -668,6 +676,39 @@ public class VoiceOverTranslationPatch {
         return Settings.VOT_CAPTION_LANGUAGE.isSetToDefault() // Default is app language.
                 ? AppLanguage.DEFAULT.getLanguage()
                 : Settings.VOT_CAPTION_LANGUAGE.get();
+    }
+
+    static void notifyHttpError(int statusCode) {
+        if (statusCode < 400 || statusCode >= 500) return;
+        if (!Settings.VOT_SHOW_HTTP_ERROR_DIALOG.get()) return;
+        if (httpErrorDialogShownThisVideo) return;
+        httpErrorDialogShownThisVideo = true;
+        Utils.runOnMainThread(() -> {
+            Activity activity = Utils.getActivity();
+            if (activity == null || activity.isFinishing() || activity.isDestroyed()) return;
+            showHttpErrorDialog(activity, statusCode);
+        });
+    }
+
+    private static void showHttpErrorDialog(Activity activity, int statusCode) {
+        Utils.verifyOnMainThread();
+        try {
+            Pair<Dialog, LinearLayout> pair = CustomDialog.create(
+                    activity,
+                    str("morphe_vot_http_error_title"),
+                    str("morphe_vot_http_error_message", statusCode),
+                    null,
+                    null,
+                    () -> { },
+                    null,
+                    str("morphe_vot_do_not_show_again"),
+                    () -> Settings.VOT_SHOW_HTTP_ERROR_DIALOG.save(false),
+                    true
+            );
+            pair.first.show();
+        } catch (Exception ex) {
+            logError(() -> "showHttpErrorDialog failure", ex);
+        }
     }
 
     static void logError(Logger.LogMessage message, Exception ex) {
