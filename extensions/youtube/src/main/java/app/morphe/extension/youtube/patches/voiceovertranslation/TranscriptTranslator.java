@@ -68,9 +68,13 @@ final class TranscriptTranslator {
     // video is reported via printException (visible to the user), while subsequent batch
     // failures in the same session are downgraded to debug to avoid toast spam.
     private static volatile boolean reportNextTranslationError;
-    // Set to true when any batch returns HTTP 429. Remaining batches are skipped because
-    // all subsequent requests will fail the same way until the quota/rate-limit window resets.
+    // Set to true when any batch returns HTTP 429, or when a new video is loaded while
+    // translation is in progress. Remaining batches are skipped immediately.
     private static volatile boolean abortTranslation;
+
+    static void requestAbort() {
+        abortTranslation = true;
+    }
 
     /**
      * Progressive translation. The first batch is translated synchronously so the returned
@@ -113,9 +117,12 @@ final class TranscriptTranslator {
 
         final int batchDelay = isMyMemory ? MYMEMORY_INTER_BATCH_DELAY_MS : GOOGLE_INTER_BATCH_DELAY_MS;
         Handler mainHandler = new Handler(Looper.getMainLooper());
+        // Notify immediately after batch 0 so TTS can start without waiting for batch 1.
+        if (onUpdate != null) mainHandler.post(() -> onUpdate.accept(initial));
+
         for (int batchIndex = 1, batchCount = batches.size(); batchIndex < batchCount; batchIndex++) {
-            List<String> translated = translateBatchSafe(batches.get(batchIndex), targetLang);
             if (abortTranslation) break;
+            List<String> translated = translateBatchSafe(batches.get(batchIndex), targetLang);
             List<TranscriptSegment> snapshot;
 
             applyBatch(working, batches.get(batchIndex), offsets[batchIndex], translated);

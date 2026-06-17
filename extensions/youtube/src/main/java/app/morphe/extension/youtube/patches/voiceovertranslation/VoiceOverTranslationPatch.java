@@ -173,6 +173,7 @@ public class VoiceOverTranslationPatch {
             if (videoId.equals(currentVideoId)) return;
 
             Logger.printDebug(() -> "newVideoLoaded");
+            TranscriptTranslator.requestAbort();
             stopTts();
             currentVideoId = videoId;
             segments = new ArrayList<>();
