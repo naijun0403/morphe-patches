@@ -82,6 +82,10 @@ public class VoiceOverTranslationPatch {
 
     private static float lastSpeechRate = MIN_SPEECH_RATE;
     private static long lastVideoTimeMs;
+    // Estimated video timestamp when the currently-playing TTS audio finishes.
+    // Duck is held until this time so TTS that extends into the gap before the
+    // next segment does not prematurely restore the original audio volume.
+    private static long ttsEndVideoTimeMs;
 
     private static List<TranscriptSegment> segments = new ArrayList<>();
     private static int lastSpokenIndex = -1;
@@ -219,8 +223,10 @@ public class VoiceOverTranslationPatch {
                 return;
             }
         }
-        // Not inside any segment - release duck so original audio resumes at full volume.
-        if (!isTestSpeaking) abandonDuck();
+        // Not inside any segment - release duck once TTS has finished playing.
+        // ttsEndVideoTimeMs keeps the duck alive while TTS speaks into the gap
+        // before the next segment, preventing a brief volume flicker mid-utterance.
+        if (!isTestSpeaking && timeMs >= ttsEndVideoTimeMs) abandonDuck();
     }
 
     public static boolean isTranslationActive() {
@@ -403,14 +409,18 @@ public class VoiceOverTranslationPatch {
         String lang = resolveTargetLang();
         final float volume = Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f;
 
-        // Time left until the next segment starts, measured from the current playback
-        // position so a late start (busy engine, synthesis latency) raises the rate.
-        final long availableMs = seg.endMs() - Math.max(lastVideoTimeMs, seg.startMs());
-
         String voice = Settings.VOT_USE_NATIVE_TTS.get()
                 ? TTS_ENGINE_SYSTEM
                 : VoiceCatalog.resolve(lang, Settings.VOT_TTS_VOICE_TYPE.get());
         if (voice == null) return;
+
+        final long speakFromMs = Math.max(lastVideoTimeMs, seg.startMs());
+        // Extend the window into the gap before the next segment so TTS can play at a
+        // natural rate even when the segment window alone would require speeding up.
+        final long expandedEndMs = index + 1 < segments.size()
+                ? Math.max(seg.endMs(), segments.get(index + 1).startMs())
+                : seg.endMs();
+        final long availableMs = expandedEndMs - speakFromMs;
 
         // Calculate if we should seek into the audio (e.g. after a short seek within segment).
         long startTimeMs = 0;
@@ -428,13 +438,22 @@ public class VoiceOverTranslationPatch {
             wasExplicitSeek = false;
         }
 
+        // Natural TTS duration (exact if cached, estimated from char count otherwise).
+        // Used for rate calculation and for tracking when duck should be released.
+        final long naturalDurationMs = TTS_ENGINE_SYSTEM.equals(voice) ? -1
+                : TtsCache.getDuration(currentVideoId, index, voice, seg.text());
+        final long speechDurationMs = naturalDurationMs > 0
+                ? naturalDurationMs
+                : (long) seg.text().length() * ESTIMATED_MS_PER_CHAR;
+
         if (TTS_ENGINE_SYSTEM.equals(voice)) {
             ensureTts();
             if (!ttsReady) {
                 Logger.printDebug(() -> "Native TTS not ready, skipping segment");
                 return;
             }
-            final float rate = smoothRate(calculateSpeechRate(seg.text(), availableMs));
+            final float rate = smoothRate(calculateSpeechRate(speechDurationMs, availableMs));
+            ttsEndVideoTimeMs = speakFromMs + (long) (speechDurationMs / rate);
             requestDuck();
             tts.setSpeechRate(rate);
             Bundle params = new Bundle();
@@ -447,18 +466,15 @@ public class VoiceOverTranslationPatch {
 
         // Check cache for Edge TTS.
         byte[] cached = TtsCache.get(currentVideoId, index, voice, seg.text());
+        final float rate = smoothRate(calculateSpeechRate(speechDurationMs, availableMs));
+        ttsEndVideoTimeMs = speakFromMs + (long) (speechDurationMs / rate);
         if (cached != null) {
-            long naturalDurationMs = TtsCache.getDuration(currentVideoId, index, voice, seg.text());
-            final float rate = smoothRate(naturalDurationMs > 0
-                    ? calculateSpeechRate(naturalDurationMs, availableMs)
-                    : calculateSpeechRate(seg.text(), availableMs));
             requestDuck();
             final long playbackId = ttsEngine.markBusy();
             ttsEngine.play(cached, volume, rate, startTimeMs, playbackId, null);
             return;
         }
 
-        final float rate = smoothRate(calculateSpeechRate(seg.text(), availableMs));
         requestDuck();
         // Use unified Edge synthesis/playback in background.
         // Edge synthesis doesn't support seeking during synthesis, but play() will seek the result.
@@ -628,6 +644,7 @@ public class VoiceOverTranslationPatch {
         // up on, so the next utterance starts from normal speed again.
         lastSpeechRate = MIN_SPEECH_RATE;
         lastSpokenIndex = -1;
+        ttsEndVideoTimeMs = 0;
         abandonDuck();
     }
 
