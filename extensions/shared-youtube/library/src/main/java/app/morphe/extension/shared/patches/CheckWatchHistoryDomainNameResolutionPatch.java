@@ -67,11 +67,17 @@ public class CheckWatchHistoryDomainNameResolutionPatch {
                         || domainResolvesToValidIP(HISTORY_TRACKING_ENDPOINT)
                         // Check multiple times, so a false positive from a flaky connection is almost impossible.
                         || !domainResolvesToValidIP(domainYouTube)
+                        || domainResolvesToValidIP(HISTORY_TRACKING_ENDPOINT)
+                        || !domainResolvesToValidIP(domainYouTube)
                         || domainResolvesToValidIP(HISTORY_TRACKING_ENDPOINT)) {
                     return;
                 }
 
                 Utils.runOnMainThread(() -> {
+                    if (context.isFinishing()) {
+                        Logger.printInfo(() -> "Activity is finishing, skipping watch history dialog warningx");
+                        return;
+                    }
                     Pair<Dialog, LinearLayout> dialogPair = CustomDialog.create(
                             context,
                             str("morphe_check_watch_history_domain_name_dialog_title"), // Title.

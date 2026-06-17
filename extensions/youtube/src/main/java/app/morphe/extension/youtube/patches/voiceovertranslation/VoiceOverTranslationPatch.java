@@ -108,7 +108,7 @@ public class VoiceOverTranslationPatch {
     private static boolean isLoading;
     private static boolean sessionEnabled = Settings.VOT_SESSION_ENABLED.get();
     private static boolean wasExplicitSeek;
-    private static volatile boolean httpErrorDialogShownThisVideo = false;
+    private static volatile boolean httpErrorDialogShownThisVideo;
 
     private static Runnable onStateChangeCallback;
 
