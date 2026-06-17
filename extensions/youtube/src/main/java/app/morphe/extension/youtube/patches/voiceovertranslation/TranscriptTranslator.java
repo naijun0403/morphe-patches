@@ -71,9 +71,13 @@ final class TranscriptTranslator {
     // Set to true when any batch returns HTTP 429, or when a new video is loaded while
     // translation is in progress. Remaining batches are skipped immediately.
     private static volatile boolean abortTranslation;
+    // Held during the blocking getResponseCode() call so requestAbort() can disconnect it.
+    private static volatile HttpURLConnection activeConnection;
 
     static void requestAbort() {
         abortTranslation = true;
+        HttpURLConnection conn = activeConnection;
+        if (conn != null) conn.disconnect();
     }
 
     /**
@@ -360,15 +364,21 @@ final class TranscriptTranslator {
             os.write(bodyBytes);
         }
 
-        final int code = conn.getResponseCode();
-        if (code != 200) {
-            VoiceOverTranslationPatch.notifyHttpError(code);
-            throw new Exception("OpenRouter HTTP status: " + code + " language: " + targetLang
-                    + " response: " + Requester.parseString(conn));
+        activeConnection = conn;
+        final int code;
+        final String rawResponse;
+        try {
+            code = conn.getResponseCode();
+            if (code != 200) {
+                VoiceOverTranslationPatch.notifyHttpError(code);
+                throw new Exception("OpenRouter HTTP status: " + code + " language: " + targetLang
+                        + " response: " + Requester.parseString(conn));
+            }
+            // Response: {"choices": [{"message": {"content": "translated text"}}]}
+            rawResponse = Requester.parseString(conn);
+        } finally {
+            if (activeConnection == conn) activeConnection = null;
         }
-
-        // Response: {"choices": [{"message": {"content": "translated text"}}]}
-        String rawResponse = Requester.parseString(conn);
         Logger.printDebug(() -> "OpenRouter raw response: " + rawResponse);
         JSONObject json = new JSONObject(rawResponse);
         String translation = json.getJSONArray("choices")
