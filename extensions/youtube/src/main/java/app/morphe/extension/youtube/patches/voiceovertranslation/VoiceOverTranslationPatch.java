@@ -219,6 +219,8 @@ public class VoiceOverTranslationPatch {
                 return;
             }
         }
+        // Not inside any segment - release duck so original audio resumes at full volume.
+        if (!isTestSpeaking) abandonDuck();
     }
 
     public static boolean isTranslationActive() {
@@ -369,7 +371,6 @@ public class VoiceOverTranslationPatch {
                             long id = Long.parseLong(utteranceId.substring(VOT_ID_PREFIX.length()));
                             if (id == ttsEngine.getPlaybackId()) {
                                 ttsEngine.clearBusy(id);
-                                abandonDuck();
                             }
                         } catch (Exception ex) {
                             logError(() -> "Utterance listener onDone failure", ex);
@@ -453,7 +454,7 @@ public class VoiceOverTranslationPatch {
                     : calculateSpeechRate(seg.text(), availableMs));
             requestDuck();
             final long playbackId = ttsEngine.markBusy();
-            ttsEngine.play(cached, volume, rate, startTimeMs, playbackId, VoiceOverTranslationPatch::abandonDuck);
+            ttsEngine.play(cached, volume, rate, startTimeMs, playbackId, null);
             return;
         }
 
@@ -461,7 +462,7 @@ public class VoiceOverTranslationPatch {
         requestDuck();
         // Use unified Edge synthesis/playback in background.
         // Edge synthesis doesn't support seeking during synthesis, but play() will seek the result.
-        ttsEngine.speak(seg.text(), voice, volume, rate, startTimeMs, VoiceOverTranslationPatch::abandonDuck);
+        ttsEngine.speak(seg.text(), voice, volume, rate, startTimeMs, null);
     }
 
     /**
