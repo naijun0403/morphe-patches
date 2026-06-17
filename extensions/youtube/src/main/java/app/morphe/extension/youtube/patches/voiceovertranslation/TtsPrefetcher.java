@@ -29,9 +29,9 @@ import app.morphe.extension.youtube.settings.Settings;
  */
 final class TtsPrefetcher {
 
-    // Adaptive delay tiers based on segment distance from playhead.
-    private static final int DISTANCE_IMMEDIATE = 10;
-    private static final int DISTANCE_NEAR      = 50;
+    // Adaptive delay tiers based on segment distance (number of segments) from play head.
+    private static final int DISTANCE_IMMEDIATE_SEGMENTS = 10;
+    private static final int DISTANCE_NEAR_SEGMENTS      = 50;
 
     private static final int DELAY_IMMEDIATE_MS = 200;
     private static final int DELAY_NEAR_MS      = 600;
@@ -59,7 +59,7 @@ final class TtsPrefetcher {
     private static int currentBackoffMs;
 
     private static final TtsEngine engine = TtsEngine.INSTANCE;
-    
+
     private record NextFetch(int index, int distance) {}
 
     static void updateVideo(String videoId, List<TranscriptSegment> segments) {
@@ -108,14 +108,22 @@ final class TtsPrefetcher {
     }
 
     private static void runPrefetchLoop() {
+        long lastFetchTimeMs = 0;
+        String lastVideoId = "";
+
         while (!Thread.currentThread().isInterrupted()) {
             String videoId;
             List<TranscriptSegment> segments;
             final long timeMs;
             synchronized (lock) {
-                videoId  = currentVideoId;
+                videoId = currentVideoId;
                 segments = currentSegments;
-                timeMs   = currentVideoTimeMs;
+                timeMs = currentVideoTimeMs;
+            }
+
+            if (!videoId.equals(lastVideoId)) {
+                lastVideoId = videoId;
+                lastFetchTimeMs = 0;
             }
 
             if (videoId.isEmpty() || segments.isEmpty()
@@ -136,25 +144,40 @@ final class TtsPrefetcher {
 
             NextFetch next = findNextToFetch(videoId, segments, timeMs, voice, voiceLang);
             if (next != null) {
-                final boolean success = fetch(videoId, segments.get(next.index),
-                        next.index, segments.size(), voice, voiceLang);
-
+                //noinspection ExtractMethodRecommender
                 final int delay;
-                if (success) {
-                    // Success: use tiered delay and gradually reduce backoff.
-                    if (next.distance <= DISTANCE_IMMEDIATE) delay = DELAY_IMMEDIATE_MS;
-                    else if (next.distance <= DISTANCE_NEAR) delay = DELAY_NEAR_MS;
-                    else delay = DELAY_BACKGROUND_MS;
-
-                    currentBackoffMs = Math.max(0, currentBackoffMs - 500);
-                } else {
-                    // Failure: Apply exponential backoff.
-                    if (currentBackoffMs == 0) currentBackoffMs = BACKOFF_MIN_MS;
-                    else currentBackoffMs = (int) Math.min(BACKOFF_MAX_MS, currentBackoffMs * BACKOFF_FACTOR);
-                    delay = currentBackoffMs;
+                synchronized (lock) {
+                    if (currentBackoffMs > 0) {
+                        delay = currentBackoffMs;
+                    } else if (next.distance <= DISTANCE_IMMEDIATE_SEGMENTS) {
+                        delay = DELAY_IMMEDIATE_MS;
+                    } else if (next.distance <= DISTANCE_NEAR_SEGMENTS) {
+                        delay = DELAY_NEAR_MS;
+                    } else {
+                        delay = DELAY_BACKGROUND_MS;
+                    }
                 }
 
-                if (waitOnLock(delay)) return;
+                long now = System.currentTimeMillis();
+                long elapsed = now - lastFetchTimeMs;
+
+                if (elapsed < delay) {
+                    if (waitOnLock(delay - elapsed)) return;
+                    continue;
+                }
+
+                final boolean success = fetch(videoId, segments.get(next.index),
+                        next.index, segments.size(), voice, voiceLang);
+                lastFetchTimeMs = System.currentTimeMillis();
+
+                synchronized (lock) {
+                    if (success) {
+                        currentBackoffMs = Math.max(0, currentBackoffMs - 500);
+                    } else {
+                        if (currentBackoffMs == 0) currentBackoffMs = BACKOFF_MIN_MS;
+                        else currentBackoffMs = (int) Math.min(BACKOFF_MAX_MS, currentBackoffMs * BACKOFF_FACTOR);
+                    }
+                }
             } else {
                 if (waitOnLock(DELAY_IDLE_MS)) return;
             }
@@ -214,12 +237,17 @@ final class TtsPrefetcher {
     private static boolean fetch(String videoId, TranscriptSegment seg, int index,
                                  int totalSegments, String voice, String lang) {
         try {
+            final long start = System.currentTimeMillis();
             final byte[] data = engine.prefetch(seg.text(), voice, lang);
             if (data.length > 0) {
                 TtsCache.put(videoId, index, voice, lang, seg.text(), data);
                 TtsCache.putDuration(videoId, index, voice, lang, seg.text(), TtsEngine.mp3DurationMs(data.length));
-                Logger.printDebug(() -> "Prefetched TTS: " + videoId
-                        + " segment: " + index + "/" + totalSegments + " text: " + seg.text());
+                final int textSubstringLength = 30;
+                Logger.printDebug(() -> "prefetched TTS: " + videoId
+                        + " segment: " + index + "/" + totalSegments + " fetchTime: "
+                        + (System.currentTimeMillis() - start) + "ms text: "
+                        + (seg.text().length() > textSubstringLength ? seg.text()
+                        .substring(0, textSubstringLength).concat("...") : seg.text()));
                 return true;
             }
             return false;

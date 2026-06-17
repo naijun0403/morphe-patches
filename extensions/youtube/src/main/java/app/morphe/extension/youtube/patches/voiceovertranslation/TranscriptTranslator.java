@@ -328,7 +328,7 @@ final class TranscriptTranslator {
             translatedJoined.append(sentences.getJSONArray(i).getString(0));
         }
         Logger.printDebug(() -> "Google translation complete: " + targetLang
-                + " time: " + (System.currentTimeMillis() - start) + "ms");
+                + " fetchTime: " + (System.currentTimeMillis() - start) + "ms");
         return Arrays.asList(translatedJoined.toString().split("\n", -1));
     }
 
@@ -379,7 +379,7 @@ final class TranscriptTranslator {
         List<String> result = Arrays.asList(translation.split("\n", -1));
 
         Logger.printDebug(() -> "MyMemory translation complete: " + targetLang
-                + " time: " + (System.currentTimeMillis() - start) + "ms");
+                + " fetchTime: " + (System.currentTimeMillis() - start) + "ms");
         return result;
     }
 
@@ -509,7 +509,7 @@ final class TranscriptTranslator {
         }
 
         Logger.printDebug(() -> "OpenRouter translation complete: " + targetLang
-                + " time: " + (System.currentTimeMillis() - start) + "ms");
+                + " fetchTime: " + (System.currentTimeMillis() - start) + "ms");
         return result;
     }
 }

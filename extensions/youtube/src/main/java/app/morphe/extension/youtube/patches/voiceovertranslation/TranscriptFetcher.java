@@ -226,7 +226,7 @@ final class TranscriptFetcher {
     // A silence gap longer than this between lines starts a new utterance even mid-sentence.
     private static final long MAX_SENTENCE_GAP_MS = 1_500;
     // Small gaps between segments are closed when they are below this threshold.
-    private static final long CLOSE_GAP_THRESHOLD_MS = 3000;
+    private static final long CLOSE_GAP_THRESHOLD_MS = 2500;
 
     // Heuristics for old ASR tracks that have no punctuation at all.
     // A pause this long is treated as a sentence boundary on its own.
