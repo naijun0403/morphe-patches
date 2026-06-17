@@ -348,9 +348,27 @@ Verify the package name is correct and the app is installed"</string>
     <string name="morphe_vot_max_speech_rate_summary">Maximum speed multiplier when fitting speech into a subtitle slot</string>
     <string name="morphe_vot_service_google" translatable="false">Google Translate</string>
     <string name="morphe_vot_service_mymemory" translatable="false">MyMemory</string>
-    <string name="morphe_vot_mymemory_info_summary">Free translation API, no API key required. Up to 5,000 characters per day on the free tier, or up to 50,000 characters per day with an email address.\n\nTap here to open mymemory.translated.net</string>
+    <string name="morphe_vot_mymemory_info_summary">"Free translation API, no API key required. Up to 5,000 characters per day on the free tier, or up to 50,000 characters per day with an email address.
+
+Tap here to open mymemory.translated.net"</string>
     <string name="morphe_vot_mymemory_email_title">MyMemory email</string>
     <string name="morphe_vot_mymemory_email_summary">Optional. Enter your MyMemory email address to increase the daily limit from 5,000 to 50,000 characters. Leave empty to use the anonymous limit</string>
+    <string name="morphe_vot_service_openrouter" translatable="false">OpenRouter</string>
+    <string name="morphe_vot_paid_suffix">paid</string>
+    <string name="morphe_vot_openrouter_info_summary">"Paid AI translation via OpenRouter. Top up once and get thousands of translations. Mistral Nemo is the cheapest option; Gemma 3 27B offers the highest quality.
+
+Tap here to open openrouter.ai"</string>
+    <string name="morphe_vot_openrouter_api_key_title">OpenRouter API key</string>
+    <string name="morphe_vot_openrouter_api_key_summary">Required. Enter your OpenRouter API key. Get one at openrouter.ai/settings/keys</string>
+    <string name="morphe_vot_openrouter_model_title">Model</string>
+    <string name="morphe_vot_openrouter_model_mistral_nemo" translatable="false">Mistral Nemo</string>
+    <string name="morphe_vot_openrouter_model_gemma3_4b" translatable="false">Gemma 3 4B</string>
+    <string name="morphe_vot_openrouter_model_gemma3_27b" translatable="false">Gemma 3 27B</string>
+    <string name="morphe_vot_openrouter_model_custom">Custom...</string>
+    <string name="morphe_vot_openrouter_custom_model_id_title">Custom model ID</string>
+    <string name="morphe_vot_openrouter_custom_model_id_summary">Enter the OpenRouter model ID (e.g. mistralai/mistral-nemo). Check pricing at openrouter.ai before using unfamiliar models</string>
+    <string name="morphe_vot_openrouter_not_configured_title">OpenRouter not configured</string>
+    <string name="morphe_vot_openrouter_not_configured_message">Enter your OpenRouter API key in settings before selecting this provider</string>
     <string name="morphe_vot_tts_voice_type">Voice</string>
     <string name="morphe_vot_tts_system">System</string>
     <string name="morphe_vot_voice_gender_male_multilingual">Multilingual male</string>

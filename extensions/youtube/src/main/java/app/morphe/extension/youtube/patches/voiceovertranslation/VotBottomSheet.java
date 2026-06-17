@@ -16,6 +16,7 @@ import static app.morphe.extension.shared.settings.preference.CustomDialogListPr
 import static app.morphe.extension.shared.settings.preference.CustomDialogListPreference.LAYOUT_MORPHE_CUSTOM_LIST_ITEM_CHECKED;
 import static app.morphe.extension.youtube.patches.voiceovertranslation.TranscriptTranslator.TRANSLATION_SERVICE_GOOGLE;
 import static app.morphe.extension.youtube.patches.voiceovertranslation.TranscriptTranslator.TRANSLATION_SERVICE_MY_MEMORY;
+import static app.morphe.extension.youtube.patches.voiceovertranslation.TranscriptTranslator.TRANSLATION_SERVICE_OPENROUTER;
 import static app.morphe.extension.youtube.patches.voiceovertranslation.VoiceOverTranslationPatch.TTS_ENGINE_SYSTEM;
 import static app.morphe.extension.youtube.videoplayer.LegacyPlayerControlButton.fadeInDuration;
 import static app.morphe.extension.youtube.videoplayer.LegacyPlayerControlButton.getDialogBackgroundColor;
@@ -51,6 +52,7 @@ import app.morphe.extension.shared.ResourceType;
 import app.morphe.extension.shared.ResourceUtils;
 import app.morphe.extension.shared.Utils;
 import app.morphe.extension.shared.settings.preference.CustomDialogListPreference;
+import app.morphe.extension.shared.ui.CustomDialog;
 import app.morphe.extension.shared.ui.Dim;
 import app.morphe.extension.shared.ui.SheetBottomDialog;
 import app.morphe.extension.youtube.settings.Settings;
@@ -100,13 +102,8 @@ public final class VotBottomSheet {
         refreshEngine.run();
 
         LinearLayout translationRow = makeValueRow(context, fg, str("morphe_vot_translation_service_title"));
-        Runnable refreshTranslation = () -> {
-            String label = str(
-                    Settings.VOT_TRANSLATION_SERVICE.get().equals(TRANSLATION_SERVICE_MY_MEMORY)
-                            ? "morphe_vot_service_mymemory"
-                            : "morphe_vot_service_google");
-            ((TextView) translationRow.getTag()).setText(label);
-        };
+        Runnable refreshTranslation = () -> ((TextView) translationRow.getTag())
+                .setText(str("morphe_vot_service_" + Settings.VOT_TRANSLATION_SERVICE.get()));
         translationRow.setOnClickListener(v -> showTranslationServicePicker(context, mainRef[0]));
         refreshTranslation.run();
 
@@ -205,8 +202,12 @@ public final class VotBottomSheet {
     }
 
     private static void showTranslationServicePicker(Context context, SheetBottomDialog.SlideDialog mainDialog) {
-        String[] entries = {str("morphe_vot_service_google"), str("morphe_vot_service_mymemory")};
-        String[] values = { TRANSLATION_SERVICE_GOOGLE, TRANSLATION_SERVICE_MY_MEMORY };
+        String[] entries = {
+                str("morphe_vot_service_google"),
+                str("morphe_vot_service_mymemory"),
+                str("morphe_vot_service_openrouter") + " (" + str("morphe_vot_paid_suffix") + ")"
+        };
+        String[] values = { TRANSLATION_SERVICE_GOOGLE, TRANSLATION_SERVICE_MY_MEMORY, TRANSLATION_SERVICE_OPENROUTER };
 
         SheetBottomDialog.DraggableLinearLayout pickerRoot =
                 SheetBottomDialog.createMainLayout(context, getDialogBackgroundColor());
@@ -226,7 +227,17 @@ public final class VotBottomSheet {
                 SheetBottomDialog.createSlideDialog(context, pickerRoot, fadeInDuration);
 
         listView.setOnItemClickListener((parent, view, position, id) -> {
-            Settings.VOT_TRANSLATION_SERVICE.save(values[position]);
+            String selected = values[position];
+            if (selected.equals(TRANSLATION_SERVICE_OPENROUTER)
+                    && Settings.VOT_OPENROUTER_API_KEY.get().trim().isEmpty()) {
+                CustomDialog.create(context,
+                        str("morphe_vot_openrouter_not_configured_title"),
+                        str("morphe_vot_openrouter_not_configured_message"),
+                        null, null, () -> {}, null, null, null, false)
+                        .first.show();
+                return;
+            }
+            Settings.VOT_TRANSLATION_SERVICE.save(selected);
             VoiceOverTranslationPatch.reloadTranscript();
             VotBottomSheet.show(context);
             pickerDialog.dismiss();

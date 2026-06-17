@@ -10,6 +10,7 @@ package app.morphe.extension.youtube.patches.voiceovertranslation;
 import static app.morphe.extension.shared.StringRef.str;
 import static app.morphe.extension.shared.settings.BaseSettings.DEBUG;
 import static app.morphe.extension.youtube.patches.voiceovertranslation.TranscriptTranslator.TRANSLATION_SERVICE_MY_MEMORY;
+import static app.morphe.extension.youtube.patches.voiceovertranslation.TranscriptTranslator.TRANSLATION_SERVICE_OPENROUTER;
 
 import android.app.Activity;
 import android.app.Dialog;
@@ -54,6 +55,31 @@ public class VoiceOverTranslationPatch {
         @Override
         public List<Setting<?>> getParentSettings() {
             return List.of(Settings.VOT_TRANSLATION_SERVICE);
+        }
+    }
+
+    public static class OpenRouterServiceAvailability implements Setting.Availability {
+        @Override
+        public boolean isAvailable() {
+            return Settings.VOT_TRANSLATION_SERVICE.get().equals(TRANSLATION_SERVICE_OPENROUTER);
+        }
+
+        @Override
+        public List<Setting<?>> getParentSettings() {
+            return List.of(Settings.VOT_TRANSLATION_SERVICE);
+        }
+    }
+
+    public static class OpenRouterCustomModelAvailability implements Setting.Availability {
+        @Override
+        public boolean isAvailable() {
+            return Settings.VOT_TRANSLATION_SERVICE.get().equals(TRANSLATION_SERVICE_OPENROUTER)
+                    && Settings.VOT_OPENROUTER_MODEL.get().equals("custom");
+        }
+
+        @Override
+        public List<Setting<?>> getParentSettings() {
+            return List.of(Settings.VOT_TRANSLATION_SERVICE, Settings.VOT_OPENROUTER_MODEL);
         }
     }
 

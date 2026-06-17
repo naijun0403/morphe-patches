@@ -49,12 +49,16 @@ final class TranscriptTranslator {
     private static final int MAX_BATCH_CHARS = 4_000;
     // Delay between consecutive background batches to reduce IP rate-limit pressure.
     private static final int GOOGLE_INTER_BATCH_DELAY_MS = 500;
+    // OpenRouter LLM inference can take longer than the shared read timeout.
+    private static final int OPENROUTER_READ_TIMEOUT_MS = 30_000;
     // MyMemory enforces a per-minute request rate; a longer pause keeps us well under it.
     private static final int MYMEMORY_INTER_BATCH_DELAY_MS = 2_000;
     // Same as arrays.xml value
     public static final String TRANSLATION_SERVICE_GOOGLE = "google";
     // Same as arrays.xml value
     public static final String TRANSLATION_SERVICE_MY_MEMORY = "mymemory";
+    // Same as arrays.xml value
+    public static final String TRANSLATION_SERVICE_OPENROUTER = "openrouter";
 
     // Set to true at the start of each translate() call so the first batch failure per
     // video is reported via printException (visible to the user), while subsequent batch
@@ -192,9 +196,10 @@ final class TranscriptTranslator {
     }
 
     private static List<String> translateBatch(List<TranscriptSegment> segments, String targetLang) throws Exception {
-        return Settings.VOT_TRANSLATION_SERVICE.get().equals(TRANSLATION_SERVICE_MY_MEMORY)
-                ? translateBatchMyMemory(segments, targetLang)
-                : translateBatchGoogle(segments, targetLang);
+        String service = Settings.VOT_TRANSLATION_SERVICE.get();
+        if (service.equals(TRANSLATION_SERVICE_MY_MEMORY)) return translateBatchMyMemory(segments, targetLang);
+        if (service.equals(TRANSLATION_SERVICE_OPENROUTER)) return translateBatchOpenRouter(segments, targetLang);
+        return translateBatchGoogle(segments, targetLang);
     }
 
     private static List<String> translateBatchGoogle(
@@ -282,6 +287,72 @@ final class TranscriptTranslator {
                 + ": " + json.optString("responseDetails", "unknown error"));
 
         String translation = json.getJSONObject("responseData").getString("translatedText");
+        return Arrays.asList(translation.split("\n", -1));
+    }
+
+    private static List<String> translateBatchOpenRouter(
+            List<TranscriptSegment> segments, String targetLang) throws Exception {
+        Utils.verifyOffMainThread();
+
+        String modelValue = Settings.VOT_OPENROUTER_MODEL.get();
+        if (modelValue.equals("custom")) {
+            modelValue = Settings.VOT_OPENROUTER_CUSTOM_MODEL_ID.get().trim();
+            if (modelValue.isEmpty()) throw new Exception("Custom OpenRouter model ID is not set");
+        }
+        final String model = modelValue;
+        Logger.printDebug(() -> "OpenRouter translation starting: " + targetLang + " model: " + model);
+
+        String apiKey = Settings.VOT_OPENROUTER_API_KEY.get().trim();
+        if (apiKey.isEmpty()) throw new Exception("OpenRouter API key is not set");
+
+        StringBuilder joined = new StringBuilder();
+        for (TranscriptSegment seg : segments) {
+            if (joined.length() > 0) joined.append('\n');
+            joined.append(seg.text());
+        }
+
+        JSONObject systemMessage = new JSONObject()
+                .put("role", "system")
+                .put("content", "Translate the following subtitle lines to " + targetLang
+                        + ". Output ONLY the translated lines in the same order, one per line. Do not add explanations or extra text.");
+        JSONObject userMessage = new JSONObject()
+                .put("role", "user")
+                .put("content", joined.toString());
+
+        JSONObject body = new JSONObject()
+                .put("model", model)
+                .put("messages", new JSONArray().put(systemMessage).put(userMessage));
+
+        byte[] bodyBytes = body.toString().getBytes(StandardCharsets.UTF_8);
+
+        //noinspection ExtractMethodRecommender
+        HttpURLConnection conn = (HttpURLConnection) new URL(
+                "https://openrouter.ai/api/v1/chat/completions").openConnection();
+        conn.setRequestMethod("POST");
+        conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
+        conn.setReadTimeout(OPENROUTER_READ_TIMEOUT_MS);
+        conn.setRequestProperty("Content-Type", "application/json");
+        conn.setRequestProperty("Authorization", "Bearer " + apiKey);
+        conn.setDoOutput(true);
+        conn.setFixedLengthStreamingMode(bodyBytes.length);
+        try (OutputStream os = conn.getOutputStream()) {
+            os.write(bodyBytes);
+        }
+
+        final int code = conn.getResponseCode();
+        if (code != 200) {
+            VoiceOverTranslationPatch.notifyHttpError(code);
+            throw new Exception("HTTP " + code);
+        }
+
+        // Response: {"choices": [{"message": {"content": "translated text"}}]}
+        JSONObject json = new JSONObject(Requester.parseString(conn));
+        String translation = json.getJSONArray("choices")
+                .getJSONObject(0)
+                .getJSONObject("message")
+                .getString("content");
+
+        Logger.printDebug(() -> "OpenRouter translation complete: " + targetLang);
         return Arrays.asList(translation.split("\n", -1));
     }
 }

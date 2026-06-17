@@ -689,9 +689,23 @@
     <string-array name="morphe_vot_translation_service_entries">
         <item>@string/morphe_vot_service_google</item>
         <item>@string/morphe_vot_service_mymemory</item>
+        <item>@string/morphe_vot_service_openrouter</item>
     </string-array>
     <string-array name="morphe_vot_translation_service_entry_values">
         <item>google</item>
         <item>mymemory</item>
+        <item>openrouter</item>
+    </string-array>
+    <string-array name="morphe_vot_openrouter_model_entries">
+        <item>@string/morphe_vot_openrouter_model_mistral_nemo</item>
+        <item>@string/morphe_vot_openrouter_model_gemma3_4b</item>
+        <item>@string/morphe_vot_openrouter_model_gemma3_27b</item>
+        <item>@string/morphe_vot_openrouter_model_custom</item>
+    </string-array>
+    <string-array name="morphe_vot_openrouter_model_entry_values">
+        <item>mistralai/mistral-nemo</item>
+        <item>google/gemma-3-4b-it</item>
+        <item>google/gemma-3-27b-it</item>
+        <item>custom</item>
     </string-array>
 </resources>

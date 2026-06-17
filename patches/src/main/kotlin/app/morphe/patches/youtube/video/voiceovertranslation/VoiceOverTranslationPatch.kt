@@ -83,6 +83,13 @@ val voiceOverTranslationPatch = bytecodePatch(
                         tag = "app.morphe.extension.youtube.settings.preference.VoiceOverTranslationMyMemoryInfoPreference",
                         selectable = true),
                     TextPreference("morphe_vot_mymemory_email"),
+                    NonInteractivePreference("morphe_vot_openrouter_info",
+                        titleKey = "morphe_vot_service_openrouter",
+                        tag = "app.morphe.extension.youtube.settings.preference.VoiceOverTranslationOpenRouterInfoPreference",
+                        selectable = true),
+                    TextPreference("morphe_vot_openrouter_api_key"),
+                    ListPreference("morphe_vot_openrouter_model"),
+                    TextPreference("morphe_vot_openrouter_custom_model_id"),
                     NonInteractivePreference("morphe_vot_max_speech_rate",
                         tag = "app.morphe.extension.shared.settings.preference.SeekBarPreference",
                         selectable = true)
