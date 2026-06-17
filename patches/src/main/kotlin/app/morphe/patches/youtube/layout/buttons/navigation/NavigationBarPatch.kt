@@ -355,6 +355,8 @@ val navigationBarPatch = bytecodePatch(
         //
 
         val toolbarPreferences = mutableSetOf(
+            SwitchPreference("morphe_hide_toolbar_cast_button"),
+            SwitchPreference("morphe_hide_toolbar_chat_button"),
             SwitchPreference("morphe_hide_toolbar_create_button"),
             SwitchPreference("morphe_hide_toolbar_microphone_button"),
             SwitchPreference("morphe_hide_toolbar_notification_button"),
@@ -378,6 +380,37 @@ val navigationBarPatch = bytecodePatch(
         hookToolBar("$EXTENSION_CLASS->hideCreateButton")
         hookToolBar("$EXTENSION_CLASS->hideNotificationButton")
         hookToolBar("$EXTENSION_CLASS->hideSearchButton")
+        hookToolBar("$EXTENSION_CLASS->hideChatButton")
+
+        //
+        // Hide cast button
+        //
+        CastMenuItemInitializeFingerprint.let {
+            it.method.apply {
+                val index = it.instructionMatches.last().index
+                val menuItemRegister = getInstruction<FiveRegisterInstruction>(index).registerC
+
+                addInstruction(
+                    index,
+                    "invoke-static { v$menuItemRegister }, $EXTENSION_CLASS->hideCastButton(Landroid/view/MenuItem;)V"
+                )
+            }
+        }
+
+        CastMenuItemVisibilityFingerprint.let {
+            it.method.apply {
+                val index = it.instructionMatches.last().index
+                val visibilityRegister = getInstruction<FiveRegisterInstruction>(index).registerD
+
+                addInstructions(
+                    index,
+                    """
+                        invoke-static { v$visibilityRegister }, $EXTENSION_CLASS->hideCastButton(Z)Z
+                        move-result v$visibilityRegister
+                    """
+                )
+            }
+        }
 
         //
         // Hide old search button

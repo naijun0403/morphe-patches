@@ -234,6 +234,7 @@ Endringer inkluderer:
   <string name="morphe_hide_keyword_content_home_title">Skjul Hjem-videoer etter nøkkelord</string>
   <string name="morphe_hide_keyword_content_search_title">Skjul søkeresultater etter nøkkelord</string>
   <string name="morphe_hide_keyword_content_subscriptions_title">Skjul videoer fra abonnementer etter nøkkelord</string>
+  <string name="morphe_hide_keyword_content_comments_title">Skjul kommentarer etter nøkkelord</string>
   <string name="morphe_hide_keyword_content_phrases_title">Nøkkelord som skal skjules</string>
   <!-- For localization, it is preferred, but not required, if 'LeBlanc' is replaced with a localized name or a familiar word that has upper case letters in the middle of the word.
          This is because keywords can be in any language, and showing an example in the localized script helps convey this. -->
@@ -243,11 +244,11 @@ Nøkkelord kan være all tekst som vises i videotitler eller kanalnavn
 
 Ord med store bokstaver i midten må samsvare nøyaktig (f.eks. iPhone, TikTok, LeBlanc)"</string>
   <string name="morphe_hide_keyword_content_about_title">Om nøkkelordfiltrering</string>
-  <string name="morphe_hide_keyword_content_about_summary">"Hjem / Abonnementer / Søkeresultater filtreres for å skjule innhold som samsvarer med nøkkelord
+  <string name="morphe_hide_keyword_content_about_summary">"Hjem / Abonnementer / Søk / Kommentarer er filtrert for å skjule innhold som samsvarer med nøkkelordfraser
 
 Begrensninger:
 • Shorts kan ikke skjules etter kanalnavn
-• Noen UI-komponenter kanskje ikke skjules
+• Noen UI-komponenter kan ikke skjules
 • Søk etter et nøkkelord kan vise ingen resultater"</string>
   <string name="morphe_hide_keyword_content_about_whole_words_title">Match hele ord</string>
   <!-- Translations must use a localized example. For languages that do not use spaces between words (Chinese, Japanese, etc.) the English AI example should be used since no localized examples exist. Or if using machine translations, or if nobody wants to think of a localized example, then the English 'ai' example should be left as-is. -->
@@ -579,6 +580,7 @@ For å få tilgang til Innstillinger, aktiver Innstillingsknappen via General �
   <string name="morphe_toolbar_screen_title">Verktøylinje</string>
   <string name="morphe_toolbar_screen_summary">Velg hvilke komponenter som vises i popup-menyen</string>
   <string name="morphe_hide_toolbar_cast_button_title">Skjul Kast-knapp</string>
+  <string name="morphe_hide_toolbar_chat_button_title">Skjul chat-knapp</string>
   <string name="morphe_hide_toolbar_create_button_title">Skjul Opprett-knappen</string>
   <string name="morphe_hide_toolbar_microphone_button_title">Skjul Mikrofon-knapp</string>
   <string name="morphe_hide_toolbar_notification_button_title">Skjul Varsler-knapp</string>
@@ -733,6 +735,12 @@ Innstillinger → Avspilling (eller Autoplay) → Spill av neste video automatis
   <string name="morphe_exit_fullscreen_entry_2">Stående format</string>
   <string name="morphe_exit_fullscreen_entry_3">Liggende format</string>
   <string name="morphe_exit_fullscreen_entry_4">Stående og liggende</string>
+  <!-- layout.player.fullscreen.disableFullscreenGesturesPatch -->
+  <string name="morphe_disable_fullscreen_gestures_title">Fullskjermbevegelser</string>
+  <string name="morphe_disable_fullscreen_gestures_summary">Spillerbevegelser for å gå inn eller ut av fullskjermmodus</string>
+  <string name="morphe_disable_fullscreen_pulled_up_gesture_title">Deaktiver sveip opp-bevegelse i stående modus</string>
+  <string name="morphe_disable_fullscreen_sliding_down_gesture_title">Deaktiver sveip-ned-gesten i stående modus</string>
+  <string name="morphe_disable_fullscreen_dragged_down_gesture_title">Deaktiver sveip-ned-gesten i liggende modus</string>
   <!-- layout.player.fullscreen.openVideosFullscreen -->
   <string name="morphe_open_videos_fullscreen_portrait_title">Åpne videoer i fullskjermmodus i stående format</string>
   <!-- layout.player.overlay.customPlayerOverlayOpacityPatch -->

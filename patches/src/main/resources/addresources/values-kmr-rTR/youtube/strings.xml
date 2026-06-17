@@ -236,6 +236,7 @@ Guherînan têne xistine:
   <string name="morphe_hide_keyword_content_home_title">Vîdyoyên tabeya malê bi şêwaziyan veşêre</string>
   <string name="morphe_hide_keyword_content_search_title">Encamên lêgerînê bi şêwaziyan veşêre</string>
   <string name="morphe_hide_keyword_content_subscriptions_title">Vîdyoyên tabeya aboneyan bi şêwaziyan veşêre</string>
+  <string name="morphe_hide_keyword_content_comments_title">Şîroveyên bi peyvên sereke veşêrin</string>
   <string name="morphe_hide_keyword_content_phrases_title">Şêwaziyên veşerê</string>
   <!-- For localization, it is preferred, but not required, if 'LeBlanc' is replaced with a localized name or a familiar word that has upper case letters in the middle of the word.
          This is because keywords can be in any language, and showing an example in the localized script helps convey this. -->
@@ -245,12 +246,12 @@ Keywords can be any text shown in video titles or channel names
 
 Words with uppercase letters in the middle must match exactly (ie: iPhone, TikTok, LeBlanc)"</string>
   <string name="morphe_hide_keyword_content_about_title">Li ser filtrakirina gotinan</string>
-  <string name="morphe_hide_keyword_content_about_summary">"Mal / Aboneyan / Sonuçên lêgerînê ji bo veşartina pêwîstên ku bandora navê frazên lêgerînê dikin, hatine çêkirin
+  <string name="morphe_hide_keyword_content_about_summary">"Serê malê / Abonayî / Lêgerîn / Şîrovet bi peyvên sereke fêltirêkirin da ku naveroka ku bi hev re tê peyvên sereke veşêre
 
-Sînorgertî:
-• Shorts nikare bi navê kanalê veşêre.
-• Çend komên UI berê veşêre.
-• Lêgerîna ji bo pêwistiyek dibe ku dibe ku encamên nêzîk nedê."</string>
+Sînorkirin:
+• Kurtevîdan bi navê kanalenê nayê veşartin
+• Hinek pêkhateyên UI neyê veşartin
+• Lêgerîna peyvek sereke dibe ku encamên tune nîşan bide"</string>
   <string name="morphe_hide_keyword_content_about_whole_words_title">Hevokan tevbidin</string>
   <!-- Translations must use a localized example. For languages that do not use spaces between words (Chinese, Japanese, etc.) the English AI example should be used since no localized examples exist. Or if using machine translations, or if nobody wants to think of a localized example, then the English 'ai' example should be left as-is. -->
   <string name="morphe_hide_keyword_content_about_whole_words_summary">Nêçirandin şêwaziyê/ji aşîqê bi pêlên dobel ve, pêvajo bibe ku ne hemî sêwirên navan û kanalê tên neseranden&lt;br&gt;&lt;br&gt;Bo nimûne,&lt;br&gt;&lt;b&gt;\"ai\"&lt;/b&gt; vîdyoya: &lt;b&gt;Ka AI kî wa dîtin?&lt;/b&gt; veşêre&lt;br&gt;lê &lt;b&gt;Ferqa ku fermanskeriya çekebeweşana raya çawa dîtin?&lt;/b&gt; neserandin.</string>
@@ -582,6 +583,7 @@ Ji bo ku derfetên sazkarî pêşero, rêzika 'Settings' zivirînin bi General �
   <string name="morphe_toolbar_screen_title">Rêz</string>
   <string name="morphe_toolbar_screen_summary">Hilbijêre ku kîjan pêkhateyên di menuya veşêrîn de xuya dibe</string>
   <string name="morphe_hide_toolbar_cast_button_title">Butona birêveberînê veşêrin</string>
+  <string name="morphe_hide_toolbar_chat_button_title">Butona Şîrkirina Chatê veşêre</string>
   <string name="morphe_hide_toolbar_create_button_title">Dîmena Butona Çêkirin</string>
   <string name="morphe_hide_toolbar_microphone_button_title">Butona mikrofonê veşêrin</string>
   <string name="morphe_hide_toolbar_notification_button_title">Butona nigihîştinê veşêrin</string>
@@ -736,6 +738,12 @@ Settings → Playback (an Autoplay) → Autoplay next video"</string>
   <string name="morphe_exit_fullscreen_entry_2">Tênîşîn tenê</string>
   <string name="morphe_exit_fullscreen_entry_3">Horîzontal tenê</string>
   <string name="morphe_exit_fullscreen_entry_4">Portrait and landscape</string>
+  <!-- layout.player.fullscreen.disableFullscreenGesturesPatch -->
+  <string name="morphe_disable_fullscreen_gestures_title">Têkelên tevna tîkê</string>
+  <string name="morphe_disable_fullscreen_gestures_summary">Têkelên neşrîyê da ku biçîne an derkeve modê tîkê</string>
+  <string name="morphe_disable_fullscreen_pulled_up_gesture_title">Devêrê têkelê neşrîyê parçebûyî</string>
+  <string name="morphe_disable_fullscreen_sliding_down_gesture_title">Portret mod da xêrkirina destûrê sekinîn</string>
+  <string name="morphe_disable_fullscreen_dragged_down_gesture_title">Portreta horizontal da xêrkirina destûrê sekinîn</string>
   <!-- layout.player.fullscreen.openVideosFullscreen -->
   <string name="morphe_open_videos_fullscreen_portrait_title">Vîdyoyên li portreya qerezalîyê veke.</string>
   <!-- layout.player.overlay.customPlayerOverlayOpacityPatch -->

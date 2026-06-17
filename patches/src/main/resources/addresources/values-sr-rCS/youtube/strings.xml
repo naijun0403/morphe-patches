@@ -234,6 +234,7 @@ Promene uključuju:
   <string name="morphe_hide_keyword_content_home_title">Sakrij videe na kartici „Početna” prema ključnim rečima</string>
   <string name="morphe_hide_keyword_content_search_title">Sakrij rezultate pretrage prema ključnim rečima</string>
   <string name="morphe_hide_keyword_content_subscriptions_title">Sakrij videe na kartici „Praćenja” prema ključnim rečima</string>
+  <string name="morphe_hide_keyword_content_comments_title">Sakrij komentare prema ključnim rečima</string>
   <string name="morphe_hide_keyword_content_phrases_title">Ključne reči za sakrivanje</string>
   <!-- For localization, it is preferred, but not required, if 'LeBlanc' is replaced with a localized name or a familiar word that has upper case letters in the middle of the word.
          This is because keywords can be in any language, and showing an example in the localized script helps convey this. -->
@@ -243,7 +244,7 @@ Ključne reči mogu biti bilo koji tekst prikazan u naslovima videa ili nazivima
 
 Reči sa velikim slovima u sredini moraju se uneti tačno (npr.: iPhone, TikTok, LeBlanc)"</string>
   <string name="morphe_hide_keyword_content_about_title">O filtriranju prema ključnim rečima</string>
-  <string name="morphe_hide_keyword_content_about_summary">"Početna/Praćenja/Rezultati pretrage se filtriraju da bi sakrili sadržaj koji se podudara sa frazama ključnih reči
+  <string name="morphe_hide_keyword_content_about_summary">"Početna/Praćenja/Pretraga/Komentari su filtrirani da bi sakrili sadržaj koji se podudara sa frazama ključnih reči
 
 Ograničenja:
 • Shorts videi se ne mogu sakriti prema nazivu kanala
@@ -579,6 +580,7 @@ Da biste pristupili Podešavanjima, omogućite dugme Podešavanja preko Opšte �
   <string name="morphe_toolbar_screen_title">Traka za alatke</string>
   <string name="morphe_toolbar_screen_summary">Izaberite koje komponente se pojavljuju u padajućem meniju</string>
   <string name="morphe_hide_toolbar_cast_button_title">Sakrij dugme „Prebacuj”</string>
+  <string name="morphe_hide_toolbar_chat_button_title">Sakrij dugme „Chat“</string>
   <string name="morphe_hide_toolbar_create_button_title">Sakrij dugme „Kreiraj”</string>
   <string name="morphe_hide_toolbar_microphone_button_title">Sakrij dugme „Mikrofon”</string>
   <string name="morphe_hide_toolbar_notification_button_title">Sakrij dugme „Obaveštenja”</string>
@@ -733,6 +735,12 @@ Postavke → Reprodukcija (ili Automatsko puštanje) → Automatski pusti slede�
   <string name="morphe_exit_fullscreen_entry_2">Portretni režim</string>
   <string name="morphe_exit_fullscreen_entry_3">Pejzažni režim</string>
   <string name="morphe_exit_fullscreen_entry_4">Uspravno i vodoravno</string>
+  <!-- layout.player.fullscreen.disableFullscreenGesturesPatch -->
+  <string name="morphe_disable_fullscreen_gestures_title">Gestovi punog ekrana</string>
+  <string name="morphe_disable_fullscreen_gestures_summary">Gestovi plejera za ulazak ili izlazak iz režima punog ekrana</string>
+  <string name="morphe_disable_fullscreen_pulled_up_gesture_title">Onemogući gest povlačenja nagore u portretnom režimu</string>
+  <string name="morphe_disable_fullscreen_sliding_down_gesture_title">Isključi gest povlačenja prema dole u portretnom režimu</string>
+  <string name="morphe_disable_fullscreen_dragged_down_gesture_title">Isključi gest povlačenja prema dole u pejzažnom režimu</string>
   <!-- layout.player.fullscreen.openVideosFullscreen -->
   <string name="morphe_open_videos_fullscreen_portrait_title">Otvori videe preko celog ekrana uspravno</string>
   <!-- layout.player.overlay.customPlayerOverlayOpacityPatch -->
