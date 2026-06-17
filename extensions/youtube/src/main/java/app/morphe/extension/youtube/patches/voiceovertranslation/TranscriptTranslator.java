@@ -48,6 +48,8 @@ final class TranscriptTranslator {
     // Batches are built by character budget rather than segment count, so request
     // sizes stay uniform regardless of how long the merged sentences are.
     private static final int MAX_BATCH_CHARS = 4_000;
+    // Smaller batches for OpenRouter so the first batch completes faster and TTS starts sooner.
+    private static final int OPENROUTER_MAX_BATCH_CHARS = 1_500;
     // Delay between consecutive background batches to reduce IP rate-limit pressure.
     private static final int GOOGLE_INTER_BATCH_DELAY_MS = 500;
     // OpenRouter LLM inference can take longer than the shared read timeout.
@@ -85,9 +87,12 @@ final class TranscriptTranslator {
         if (segments.isEmpty()) return segments;
         Utils.verifyOffMainThread();
 
-        final boolean isMyMemory = Settings.VOT_TRANSLATION_SERVICE.get().equals(TRANSLATION_SERVICE_MY_MEMORY);
-        List<List<TranscriptSegment>> batches = splitByCharBudget(segments,
-                isMyMemory ? MYMEMORY_MAX_CHARS : MAX_BATCH_CHARS);
+        final String service = Settings.VOT_TRANSLATION_SERVICE.get();
+        final boolean isMyMemory = service.equals(TRANSLATION_SERVICE_MY_MEMORY);
+        final int maxBatchChars = isMyMemory ? MYMEMORY_MAX_CHARS
+                : service.equals(TRANSLATION_SERVICE_OPENROUTER) ? OPENROUTER_MAX_BATCH_CHARS
+                : MAX_BATCH_CHARS;
+        List<List<TranscriptSegment>> batches = splitByCharBudget(segments, maxBatchChars);
         reportNextTranslationError = true;
         abortTranslation = false;
 
