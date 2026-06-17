@@ -232,7 +232,8 @@ final class TranscriptTranslator {
         final int code = conn.getResponseCode();
         if (code != 200) {
             VoiceOverTranslationPatch.notifyHttpError(code);
-            throw new Exception("HTTP " + code);
+            throw new Exception("Google HTTP status: " + code + " language: " + targetLang
+                    + " response: " + Requester.parseString(conn));
         }
 
         // Response: [[["translated","original",...],...],null,"src_lang",...]
@@ -277,7 +278,8 @@ final class TranscriptTranslator {
         final int httpCode = conn.getResponseCode();
         if (httpCode != 200) {
             VoiceOverTranslationPatch.notifyHttpError(httpCode);
-            throw new Exception("MyMemory HTTP status: " + httpCode);
+            throw new Exception("MyMemory HTTP status: " + httpCode + " language: " + targetLang
+                    + " response: " + Requester.parseString(conn));
         }
 
         // Response: {"responseStatus": 200, "responseData": {"translatedText": "..."}}
@@ -337,7 +339,8 @@ final class TranscriptTranslator {
         final int code = conn.getResponseCode();
         if (code != 200) {
             VoiceOverTranslationPatch.notifyHttpError(code);
-            throw new Exception("HTTP " + code);
+            throw new Exception("OpenRouter HTTP status: " + code + " language: " + targetLang
+                    + " response: " + Requester.parseString(conn));
         }
 
         // Response: {"choices": [{"message": {"content": "translated text"}}]}
