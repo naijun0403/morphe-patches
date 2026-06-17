@@ -75,7 +75,9 @@ final class TranscriptTranslator {
         if (segments.isEmpty()) return segments;
         Utils.verifyOffMainThread();
 
-        List<List<TranscriptSegment>> batches = splitByCharBudget(segments);
+        final boolean isMyMemory = Settings.VOT_TRANSLATION_SERVICE.get().equals(TRANSLATION_SERVICE_MY_MEMORY);
+        List<List<TranscriptSegment>> batches = splitByCharBudget(segments,
+                isMyMemory ? MYMEMORY_MAX_CHARS : MAX_BATCH_CHARS);
         reportNextTranslationError = true;
 
         // Working copy that accumulates translated batches over the original text.
@@ -161,10 +163,6 @@ final class TranscriptTranslator {
         }
     }
 
-    private static List<List<TranscriptSegment>> splitByCharBudget(List<TranscriptSegment> segments) {
-        return splitByCharBudget(segments, MAX_BATCH_CHARS);
-    }
-
     private static List<List<TranscriptSegment>> splitByCharBudget(List<TranscriptSegment> segments, int maxChars) {
         List<List<TranscriptSegment>> batches = new ArrayList<>();
         List<TranscriptSegment> batch = new ArrayList<>(segments.size());
@@ -227,8 +225,6 @@ final class TranscriptTranslator {
         JSONArray sentences = new JSONArray(Requester.parseString(conn)).getJSONArray(0);
         StringBuilder translatedJoined = new StringBuilder();
         for (int i = 0, length = sentences.length(); i < length; i++) {
-            final int iFinal = i;
-            Logger.printDebug(() -> "Translating batch: " + (iFinal + 1) + "/" + length);
             translatedJoined.append(sentences.getJSONArray(i).getString(0));
         }
         Logger.printDebug(() -> "Google translation complete: " + targetLang);
@@ -240,25 +236,8 @@ final class TranscriptTranslator {
 
     private static List<String> translateBatchMyMemory(
             List<TranscriptSegment> segments, String targetLang) throws Exception {
-        Logger.printDebug(() -> "MyMemory translation starting: " + targetLang);
-
-        // Re-split into sub-batches that fit within the 500-byte request limit.
-        List<List<TranscriptSegment>> subBatches = splitByCharBudget(segments, MYMEMORY_MAX_CHARS);
-        List<String> results = new ArrayList<>(segments.size());
-        int i = 0;
-        final int subBatchesSize = subBatches.size();
-        for (List<TranscriptSegment> sub : subBatches) {
-            final int iFinal = i++;
-            Logger.printDebug(() -> "Translating batch: " + iFinal + "/" + subBatchesSize);
-            results.addAll(translateMyMemoryRequest(sub, targetLang));
-        }
-        Logger.printDebug(() -> "MyMemory translation complete: " + targetLang);
-        return results;
-    }
-
-    private static List<String> translateMyMemoryRequest(
-            List<TranscriptSegment> segments, String targetLang) throws Exception {
         Utils.verifyOffMainThread();
+        Logger.printDebug(() -> "MyMemory translation starting: " + targetLang);
 
         StringBuilder joined = new StringBuilder();
         for (TranscriptSegment seg : segments) {
