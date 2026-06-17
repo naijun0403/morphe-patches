@@ -72,7 +72,7 @@ public class VoiceOverTranslationPatch {
 
     private static final long SEEK_JUMP_THRESHOLD_MS = 2_900;
     private static final long TTS_LOOKAHEAD_MS = 400;
-    private static final int MAX_SPEED_START_TIME_EXPANSION = 5000;
+    private static final int MAX_TTS_SEGMENT_TIME_EXPANSION = 3000;
 
     // Minimum time into a segment to justify seeking within the audio instead of
     // playing from the start. Prevents tiny pops on small adjustments.
@@ -517,13 +517,13 @@ public class VoiceOverTranslationPatch {
         final String voice = resolveVoice(lang);
         if (voice == null) return;
 
-        // Group segments into contiguous clusters (gap < 200ms).
+        // Group segments into contiguous clusters (gap < MAX_TTS_SEGMENT_TIME_EXPANSION).
         List<List<Integer>> clusters = new ArrayList<>();
         List<Integer> currentCluster = new ArrayList<>();
         for (int i = 0, size = segments.size(); i < size; i++) {
             if (!currentCluster.isEmpty()) {
                 long gap = segments.get(i).startMs() - segments.get(i - 1).endMs();
-                if (gap > 200) {
+                if (gap > MAX_TTS_SEGMENT_TIME_EXPANSION) {
                     clusters.add(currentCluster);
                     currentCluster = new ArrayList<>();
                 }
@@ -549,7 +549,7 @@ public class VoiceOverTranslationPatch {
         long availableEnd = lastIdx + 1 < segments.size() ? segments.get(lastIdx + 1).startMs() : clusterEnd + 10_000;
 
         // Expand cluster start up to 3s if possible.
-        long expandedStart = Math.max(availableStart, clusterStart - MAX_SPEED_START_TIME_EXPANSION);
+        long expandedStart = Math.max(availableStart, clusterStart - MAX_TTS_SEGMENT_TIME_EXPANSION);
 
         long totalAvailableMs = availableEnd - expandedStart;
         long totalNaturalMs = 0;
