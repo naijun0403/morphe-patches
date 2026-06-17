@@ -358,11 +358,8 @@ Verify the package name is correct and the app is installed"</string>
     <string name="morphe_vot_voice_gender_male">Male</string>
     <string name="morphe_vot_voice_gender_female">Female</string>
     <string name="morphe_vot_tts_sample">It\'s morphing time!</string>
-    <string name="morphe_vot_enabled_user_dialog_message">"This feature uses third-party services to translate video captions in real time.
-
-If translations stop working, your IP address may have been rate-limited for up to 24 hours. Switch to a different provider in settings or use a VPN"</string>
     <string name="morphe_vot_http_error_title">Translation unavailable</string>
-    <string name="morphe_vot_http_error_message">"The translation service returned HTTP error %1$d. Your IP address has likely been rate-limited for up to 24 hours.
+    <string name="morphe_vot_http_error_message">"The translation service returned HTTP error %s. Your IP address has likely been rate-limited for up to 24 hours.
 
 To continue using translations, switch to a different provider in settings or use a VPN"</string>
     <string name="morphe_vot_do_not_show_again">Do not show again</string>
