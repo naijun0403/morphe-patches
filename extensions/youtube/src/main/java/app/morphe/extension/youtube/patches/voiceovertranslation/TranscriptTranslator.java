@@ -51,6 +51,8 @@ final class TranscriptTranslator {
     private static final int MAX_BATCH_CHARS = 4_000;
     // Concurrent requests to the translation endpoint. Keep modest to avoid rate limiting.
     private static final int PARALLEL_REQUESTS = 1;
+    // Delay between consecutive background batches to reduce IP rate-limit pressure.
+    private static final int INTER_BATCH_DELAY_MS = 500;
     // Same as arrays.xml value
     public static final String TRANSLATION_SERVICE_GOOGLE = "google";
     // Same as arrays.xml value
@@ -112,6 +114,12 @@ final class TranscriptTranslator {
                     } catch (ExecutionException | InterruptedException e) {
                         throw new RuntimeException(e);
                     }
+                }
+                try {
+                    Thread.sleep(INTER_BATCH_DELAY_MS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
                 }
                 List<String> translated = translateBatchSafe(batches.get(batchIndex), targetLang);
                 List<TranscriptSegment> snapshot;
