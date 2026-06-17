@@ -24,8 +24,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
@@ -49,8 +47,6 @@ final class TranscriptTranslator {
     // Batches are built by character budget rather than segment count, so request
     // sizes stay uniform regardless of how long the merged sentences are.
     private static final int MAX_BATCH_CHARS = 4_000;
-    // Concurrent requests to the translation endpoint. Keep modest to avoid rate limiting.
-    private static final int PARALLEL_REQUESTS = 1;
     // Delay between consecutive background batches to reduce IP rate-limit pressure.
     private static final int INTER_BATCH_DELAY_MS = 500;
     // Same as arrays.xml value
@@ -77,6 +73,7 @@ final class TranscriptTranslator {
                                              Consumer<List<TranscriptSegment>> onUpdate,
                                              BooleanSupplier cancelled) {
         if (segments.isEmpty()) return segments;
+        Utils.verifyOffMainThread();
 
         List<List<TranscriptSegment>> batches = splitByCharBudget(segments);
         reportNextTranslationError = true;
@@ -95,43 +92,36 @@ final class TranscriptTranslator {
         // Snapshot to return before background batches start mutating the working copy.
         List<TranscriptSegment> initial = new ArrayList<>(working);
 
-        //noinspection resource
-        ExecutorService pool = Executors.newFixedThreadPool(
-                Math.min(PARALLEL_REQUESTS, batches.size() - 1));
         Handler mainHandler = new Handler(Looper.getMainLooper());
-        for (int b = 1, batchCount = batches.size(); b < batchCount; b++) {
-            final int batchIndex = b;
-            pool.execute(() -> {
-                // Skip remaining work when the result is no longer needed (video changed).
-                if (cancelled != null) {
-                    FutureTask<Boolean> cancelCheck = new FutureTask<>(cancelled::getAsBoolean);
-                    mainHandler.post(cancelCheck);
-                    try {
-                        if (cancelCheck.get()) {
-                            Logger.printDebug(() -> "translate batch canceled for: " + targetLang);
-                            return;
-                        }
-                    } catch (ExecutionException | InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
-                }
+        for (int batchIndex = 1, batchCount = batches.size(); batchIndex < batchCount; batchIndex++) {
+            List<String> translated = translateBatchSafe(batches.get(batchIndex), targetLang);
+            List<TranscriptSegment> snapshot;
+
+            applyBatch(working, batches.get(batchIndex), offsets[batchIndex], translated);
+            snapshot = new ArrayList<>(working);
+            if (onUpdate != null) mainHandler.post(() -> onUpdate.accept(snapshot));
+
+            // Skip remaining work when the result is no longer needed (video changed).
+            if (cancelled != null) {
+                FutureTask<Boolean> cancelCheck = new FutureTask<>(cancelled::getAsBoolean);
+                mainHandler.post(cancelCheck);
                 try {
-                    Thread.sleep(INTER_BATCH_DELAY_MS);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return;
+                    if (cancelCheck.get()) {
+                        Logger.printDebug(() -> "translate batch canceled for: " + targetLang);
+                        return initial;
+                    }
+                } catch (ExecutionException | InterruptedException e) {
+                    throw new RuntimeException(e);
                 }
-                List<String> translated = translateBatchSafe(batches.get(batchIndex), targetLang);
-                List<TranscriptSegment> snapshot;
-                synchronized (working) {
-                    applyBatch(working, batches.get(batchIndex), offsets[batchIndex], translated);
-                    snapshot = new ArrayList<>(working);
-                }
-                if (onUpdate != null) mainHandler.post(() -> onUpdate.accept(snapshot));
-            });
+            }
+
+            try {
+                Thread.sleep(INTER_BATCH_DELAY_MS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return initial;
+            }
         }
-        // Graceful shutdown - queued batches still run, the pool exits when they finish.
-        pool.shutdown();
 
         return initial;
     }
@@ -145,8 +135,8 @@ final class TranscriptTranslator {
         if (translated == null) return;
         final int limit = Math.min(batch.size(), translated.size());
         if (translated.size() != batch.size()) {
-            Logger.printDebug(() -> "Line count mismatch - expected "
-                    + batch.size() + ", got " + translated.size() + "; last "
+            Logger.printDebug(() -> "Line count mismatch - expected: "
+                    + batch.size() + ", got: " + translated.size() + "; last: "
                     + (batch.size() - limit) + " segment(s) keep original text");
         }
         for (int j = 0; j < limit; j++) {
@@ -165,7 +155,7 @@ final class TranscriptTranslator {
                 reportNextTranslationError = false;
                 VoiceOverTranslationPatch.logError(() -> "Translation failed: " + ex.getMessage(), ex);
             } else {
-                Logger.printDebug(() -> "Batch failed: " + ex.getMessage());
+                Logger.printDebug(() -> "Batch failed", ex);
             }
             return null;
         }

@@ -177,7 +177,7 @@ final class TranscriptFetcher {
     }
 
     private static List<TranscriptSegment> fetchDirect(String videoId) {
-        for (String srcLang : new String[]{"en", "en-US", "en-GB"}) {
+        for (String srcLang : List.of("en", "en-US", "en-GB")) {
             try {
                 String urlStr = "https://www.youtube.com/api/timedtext?v=" + videoId
                         + "&lang=" + srcLang + "&kind=asr&fmt=json3";
@@ -199,7 +199,7 @@ final class TranscriptFetcher {
     }
 
     private static String extractLangFromUrl(String url) {
-        for (String prefix : new String[]{"&lang=", "?lang="}) {
+        for (String prefix : List.of("&lang=", "?lang=")) {
             int idx = url.indexOf(prefix);
             if (idx >= 0) {
                 idx += prefix.length();
