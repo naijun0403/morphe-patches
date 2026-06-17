@@ -70,20 +70,7 @@ public class VoiceOverTranslationPatch {
         }
     }
 
-    public static class OpenRouterCustomModelAvailability implements Setting.Availability {
-        @Override
-        public boolean isAvailable() {
-            return Settings.VOT_TRANSLATION_SERVICE.get().equals(TRANSLATION_SERVICE_OPENROUTER)
-                    && Settings.VOT_OPENROUTER_MODEL.get().equals("custom");
-        }
-
-        @Override
-        public List<Setting<?>> getParentSettings() {
-            return List.of(Settings.VOT_TRANSLATION_SERVICE, Settings.VOT_OPENROUTER_MODEL);
-        }
-    }
-
-    private static final long SEEK_JUMP_THRESHOLD_MS = 2_900;
+private static final long SEEK_JUMP_THRESHOLD_MS = 2_900;
     private static final long TTS_LOOKAHEAD_MS = 400;
 
     // Minimum time into a segment to justify seeking within the audio instead of

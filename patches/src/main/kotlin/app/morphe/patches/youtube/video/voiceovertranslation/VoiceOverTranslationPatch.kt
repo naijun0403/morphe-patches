@@ -88,8 +88,8 @@ val voiceOverTranslationPatch = bytecodePatch(
                         tag = "app.morphe.extension.youtube.settings.preference.VoiceOverTranslationOpenRouterInfoPreference",
                         selectable = true),
                     TextPreference("morphe_vot_openrouter_api_key"),
-                    ListPreference("morphe_vot_openrouter_model"),
-                    TextPreference("morphe_vot_openrouter_custom_model_id"),
+                    TextPreference("morphe_vot_openrouter_model",
+                        tag = "app.morphe.extension.youtube.settings.preference.VoiceOverTranslationModelPreference"),
                     NonInteractivePreference("morphe_vot_max_speech_rate",
                         tag = "app.morphe.extension.shared.settings.preference.SeekBarPreference",
                         selectable = true)

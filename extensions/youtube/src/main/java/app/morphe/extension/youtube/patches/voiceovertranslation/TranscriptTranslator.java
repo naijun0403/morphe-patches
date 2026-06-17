@@ -294,12 +294,7 @@ final class TranscriptTranslator {
             List<TranscriptSegment> segments, String targetLang) throws Exception {
         Utils.verifyOffMainThread();
 
-        String modelValue = Settings.VOT_OPENROUTER_MODEL.get();
-        if (modelValue.equals("custom")) {
-            modelValue = Settings.VOT_OPENROUTER_CUSTOM_MODEL_ID.get().trim();
-            if (modelValue.isEmpty()) throw new Exception("Custom OpenRouter model ID is not set");
-        }
-        final String model = modelValue;
+        final String model = Settings.VOT_OPENROUTER_MODEL.get();
         Logger.printDebug(() -> "OpenRouter translation starting: " + targetLang + " model: " + model);
 
         String apiKey = Settings.VOT_OPENROUTER_API_KEY.get().trim();

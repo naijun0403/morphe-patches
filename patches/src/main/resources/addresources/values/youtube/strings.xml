@@ -364,9 +364,8 @@ Tap here to open openrouter.ai"</string>
     <string name="morphe_vot_openrouter_model_mistral_nemo" translatable="false">Mistral Nemo</string>
     <string name="morphe_vot_openrouter_model_gemma3_4b" translatable="false">Gemma 3 4B</string>
     <string name="morphe_vot_openrouter_model_gemma3_27b" translatable="false">Gemma 3 27B</string>
-    <string name="morphe_vot_openrouter_model_custom">Custom...</string>
-    <string name="morphe_vot_openrouter_custom_model_id_title">Custom model ID</string>
-    <string name="morphe_vot_openrouter_custom_model_id_summary">Enter the OpenRouter model ID (e.g. mistralai/mistral-nemo). Check pricing at openrouter.ai before using unfamiliar models</string>
+    <string name="morphe_vot_openrouter_model_custom">Custom</string>
+    <string name="morphe_vot_openrouter_model_hint" translatable="false">e.g. mistralai/mistral-nemo</string>
     <string name="morphe_vot_openrouter_not_configured_title">OpenRouter not configured</string>
     <string name="morphe_vot_openrouter_not_configured_message">Enter your OpenRouter API key in settings before selecting this provider</string>
     <string name="morphe_vot_tts_voice_type">Voice</string>
