@@ -24,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.function.BooleanSupplier;
@@ -320,10 +321,12 @@ final class TranscriptTranslator {
             joined.append(i + 1).append(": ").append(segments.get(i).text());
         }
 
+        final String targetLangName = Locale.forLanguageTag(targetLang).getDisplayLanguage(Locale.ENGLISH);
         JSONObject systemMessage = new JSONObject()
                 .put("role", "system")
-                .put("content", "Translate the following numbered subtitle lines to " + targetLang
-                        + ". Return each translation in the format \"N: translation\" using the same number. "
+                .put("content", "Translate the following numbered subtitle lines to " + targetLangName
+                        + " (BCP 47 language code: " + targetLang + "). "
+                        + "Return each translation in the format \"N: translation\" using the same number. "
                         + "Output exactly one line per input number. Do not merge, skip, or reorder lines.");
         JSONObject userMessage = new JSONObject()
                 .put("role", "user")
@@ -358,7 +361,9 @@ final class TranscriptTranslator {
         }
 
         // Response: {"choices": [{"message": {"content": "translated text"}}]}
-        JSONObject json = new JSONObject(Requester.parseString(conn));
+        String rawResponse = Requester.parseString(conn);
+        Logger.printDebug(() -> "OpenRouter raw response: " + rawResponse);
+        JSONObject json = new JSONObject(rawResponse);
         String translation = json.getJSONArray("choices")
                 .getJSONObject(0)
                 .getJSONObject("message")
