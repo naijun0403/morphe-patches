@@ -74,8 +74,8 @@ public class CheckWatchHistoryDomainNameResolutionPatch {
                 }
 
                 Utils.runOnMainThread(() -> {
-                    if (context.isFinishing()) {
-                        Logger.printInfo(() -> "Activity is finishing, skipping watch history dialog warningx");
+                    if (context.isFinishing() || context.isDestroyed()) {
+                        Logger.printInfo(() -> "Activity is finishing, skipping watch history dialog warning");
                         return;
                     }
                     Pair<Dialog, LinearLayout> dialogPair = CustomDialog.create(

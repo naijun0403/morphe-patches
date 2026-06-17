@@ -44,7 +44,7 @@ public class InitializationPatch {
                 return;
             }
 
-            if (context.isFinishing()) {
+            if (context.isFinishing() || context.isDestroyed()) {
                 Logger.printInfo(() -> "Activity is finishing, skipping restart dialog");
                 return;
             }
