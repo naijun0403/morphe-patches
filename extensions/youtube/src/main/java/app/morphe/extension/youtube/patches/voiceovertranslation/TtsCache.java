@@ -29,24 +29,24 @@ final class TtsCache {
 
     private static final String TEST_SAMPLES_DIR = "vot_voice_samples";
 
-    static synchronized boolean notCached(String videoId, int segmentIndex, String voice, String text) {
-        return !cache.containsKey(key(videoId, segmentIndex, voice, text));
+    static synchronized boolean notCached(String videoId, int segmentIndex, String voice, String lang, String text) {
+        return !cache.containsKey(key(videoId, segmentIndex, voice, lang, text));
     }
 
-    static synchronized byte[] get(String videoId, int segmentIndex, String voice, String text) {
-        return cache.get(key(videoId, segmentIndex, voice, text));
+    static synchronized byte[] get(String videoId, int segmentIndex, String voice, String lang, String text) {
+        return cache.get(key(videoId, segmentIndex, voice, lang, text));
     }
 
-    static synchronized void put(String videoId, int segmentIndex, String voice, String text, byte[] data) {
-        cache.put(key(videoId, segmentIndex, voice, text), data);
+    static synchronized void put(String videoId, int segmentIndex, String voice, String lang, String text, byte[] data) {
+        cache.put(key(videoId, segmentIndex, voice, lang, text), data);
     }
 
-    static void putDuration(String videoId, int segmentIndex, String voice, String text, long durationMs) {
-        durations.put(key(videoId, segmentIndex, voice, text), durationMs);
+    static void putDuration(String videoId, int segmentIndex, String voice, String lang, String text, long durationMs) {
+        durations.put(key(videoId, segmentIndex, voice, lang, text), durationMs);
     }
 
-    static long getDuration(String videoId, int segmentIndex, String voice, String text) {
-        Long d = durations.get(key(videoId, segmentIndex, voice, text));
+    static long getDuration(String videoId, int segmentIndex, String voice, String lang, String text) {
+        Long d = durations.get(key(videoId, segmentIndex, voice, lang, text));
         return d != null ? d : -1;
     }
 
@@ -87,7 +87,7 @@ final class TtsCache {
         return new File(context.getCacheDir(), TEST_SAMPLES_DIR + File.separator + voiceId + '_' + lang);
     }
 
-    private static String key(String videoId, int segmentIndex, String voice, String text) {
-        return videoId + ':' + segmentIndex + ':' + voice + ':' + text;
+    private static String key(String videoId, int segmentIndex, String voice, String lang, String text) {
+        return videoId + ':' + segmentIndex + ':' + voice + ':' + lang + ':' + text;
     }
 }

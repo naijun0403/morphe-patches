@@ -137,10 +137,10 @@ final class TtsPrefetcher {
                 continue;
             }
 
-            NextFetch next = findNextToFetch(videoId, segments, timeMs, voice);
+            NextFetch next = findNextToFetch(videoId, segments, timeMs, voice, voiceLang);
             if (next != null) {
                 final boolean success = fetch(videoId, segments.get(next.index),
-                        next.index, segments.size(), voice);
+                        next.index, segments.size(), voice, voiceLang);
 
                 final int delay;
                 if (success) {
@@ -186,7 +186,7 @@ final class TtsPrefetcher {
 
     @Nullable
     private static NextFetch findNextToFetch(String videoId, List<TranscriptSegment> segments,
-                                             long timeMs, String voice) {
+                                             long timeMs, String voice, String lang) {
         final int segmentsSize = segments.size();
         int firstFutureIndex = segmentsSize;
 
@@ -197,7 +197,7 @@ final class TtsPrefetcher {
                 if (firstFutureIndex == segmentsSize) {
                     firstFutureIndex = i;
                 }
-                if (TtsCache.notCached(videoId, i, voice, seg.text())) {
+                if (TtsCache.notCached(videoId, i, voice, lang, seg.text())) {
                     return new NextFetch(i, i - firstFutureIndex);
                 }
             }
@@ -206,7 +206,7 @@ final class TtsPrefetcher {
         // Priority 2: Past segments (for loops/seeks), closest to playhead first.
         for (int i = firstFutureIndex - 1; i >= 0; i--) {
             final TranscriptSegment seg = segments.get(i);
-            if (TtsCache.notCached(videoId, i, voice, seg.text())) {
+            if (TtsCache.notCached(videoId, i, voice, lang, seg.text())) {
                 return new NextFetch(i, firstFutureIndex - i);
             }
         }
@@ -215,12 +215,12 @@ final class TtsPrefetcher {
     }
 
     private static boolean fetch(String videoId, TranscriptSegment seg, int index,
-                                 int totalSegments, String voice) {
+                                 int totalSegments, String voice, String lang) {
         try {
-            final byte[] data = engine.prefetch(seg.text(), voice);
+            final byte[] data = engine.prefetch(seg.text(), voice, lang);
             if (data.length > 0) {
-                TtsCache.put(videoId, index, voice, seg.text(), data);
-                TtsCache.putDuration(videoId, index, voice, seg.text(), TtsEngine.mp3DurationMs(data.length));
+                TtsCache.put(videoId, index, voice, lang, seg.text(), data);
+                TtsCache.putDuration(videoId, index, voice, lang, seg.text(), TtsEngine.mp3DurationMs(data.length));
                 Logger.printDebug(() -> "Prefetched TTS: " + videoId
                         + " segment: " + index + "/" + totalSegments + " text: " + seg.text());
                 return true;

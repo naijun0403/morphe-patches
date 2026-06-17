@@ -441,7 +441,7 @@ public class VoiceOverTranslationPatch {
         // Natural TTS duration (exact if cached, estimated from char count otherwise).
         // Used for rate calculation and for tracking when duck should be released.
         final long naturalDurationMs = TTS_ENGINE_SYSTEM.equals(voice) ? -1
-                : TtsCache.getDuration(currentVideoId, index, voice, seg.text());
+                : TtsCache.getDuration(currentVideoId, index, voice, seg.text(), lang);
         final long speechDurationMs = naturalDurationMs > 0
                 ? naturalDurationMs
                 : (long) seg.text().length() * ESTIMATED_MS_PER_CHAR;
@@ -465,7 +465,7 @@ public class VoiceOverTranslationPatch {
         }
 
         // Check cache for Edge TTS.
-        byte[] cached = TtsCache.get(currentVideoId, index, voice, seg.text());
+        byte[] cached = TtsCache.get(currentVideoId, index, voice, seg.text(), lang);
         final float rate = smoothRate(calculateSpeechRate(speechDurationMs, availableMs));
         ttsEndVideoTimeMs = speakFromMs + (long) (speechDurationMs / rate);
         if (cached != null) {
@@ -478,7 +478,7 @@ public class VoiceOverTranslationPatch {
         requestDuck();
         // Use unified Edge synthesis/playback in background.
         // Edge synthesis doesn't support seeking during synthesis, but play() will seek the result.
-        ttsEngine.speak(seg.text(), voice, volume, rate, startTimeMs, null);
+        ttsEngine.speak(seg.text(), voice, lang, volume, rate, startTimeMs, null);
     }
 
     /**
@@ -576,7 +576,8 @@ public class VoiceOverTranslationPatch {
             return;
         }
 
-        byte[] cached = TtsCache.get(TEST_VIDEO_ID, TEST_SEGMENT_INDEX, voiceId, getTestString());
+        final String lang = resolveTargetLang();
+        byte[] cached = TtsCache.get(TEST_VIDEO_ID, TEST_SEGMENT_INDEX, voiceId, lang, getTestString());
         if (cached != null) {
             requestDuck();
             final long id = ttsEngine.markBusy();
@@ -585,7 +586,7 @@ public class VoiceOverTranslationPatch {
         }
 
         requestDuck();
-        ttsEngine.speak(getTestString(), voiceId, volume, () -> abandonDuckAfterTest(testId));
+        ttsEngine.speak(getTestString(), voiceId, resolveTargetLang(), volume, () -> abandonDuckAfterTest(testId));
     }
 
     /**
@@ -607,21 +608,21 @@ public class VoiceOverTranslationPatch {
                     return;
                 }
 
-                if (TtsCache.get(TEST_VIDEO_ID, TEST_SEGMENT_INDEX, voice.id, testString) != null) {
+                if (TtsCache.get(TEST_VIDEO_ID, TEST_SEGMENT_INDEX, voice.id, lang, testString) != null) {
                     continue;
                 }
 
                 byte[] diskData = TtsCache.getTestSampleFromDisk(voice.id, lang);
                 if (diskData != null) {
-                    TtsCache.put(TEST_VIDEO_ID, TEST_SEGMENT_INDEX, voice.id, testString, diskData);
+                    TtsCache.put(TEST_VIDEO_ID, TEST_SEGMENT_INDEX, voice.id, lang, testString, diskData);
                     continue;
                 }
 
                 try {
                     Logger.printDebug(() -> "Prefetching test phrase for: " + voice.id);
-                    byte[] data = ttsEngine.prefetch(testString, voice.id);
+                    byte[] data = ttsEngine.prefetch(testString, voice.id, lang);
                     if (data.length > 0) {
-                        TtsCache.put(TEST_VIDEO_ID, TEST_SEGMENT_INDEX, voice.id, testString, data);
+                        TtsCache.put(TEST_VIDEO_ID, TEST_SEGMENT_INDEX, voice.id, lang, testString, data);
                         TtsCache.putTestSampleToDisk(voice.id, lang, data);
                     }
                     Thread.sleep(TEST_PREFETCH_WAIT);

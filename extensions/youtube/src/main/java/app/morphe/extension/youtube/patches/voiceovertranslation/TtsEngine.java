@@ -99,20 +99,20 @@ final class TtsEngine {
      * High-level entry point for Edge TTS speech at natural speed (rate=1.0).
      * Handles background synthesis and playback for the given voice.
      */
-    void speak(String text, String voiceId, float volume, Runnable onDone) {
-        speak(text, voiceId, volume, 1.0f, 0, onDone);
+    void speak(String text, String voiceId, String lang, float volume, Runnable onDone) {
+        speak(text, voiceId, lang, volume, 1.0f, 0, onDone);
     }
 
     /**
      * High-level entry point for Edge TTS speech starting at {@code startTimeMs}.
      */
-    void speak(String text, String voiceId, float volume, float rate, long startTimeMs, Runnable onDone) {
+    void speak(String text, String voiceId, String lang, float volume, float rate, long startTimeMs, Runnable onDone) {
         Utils.verifyOnMainThread();
         final long id = markBusy();
 
         Utils.runOnBackgroundThread(() -> {
             try {
-                byte[] data = synthesize(text, voiceId, rate);
+                byte[] data = synthesize(text, voiceId, lang, rate);
                 Utils.runOnMainThread(() -> {
                     if (data.length > 0 && !stopped && id == playbackId) {
                         play(data, volume, 1.0f, startTimeMs, id, onDone); // rate is baked into SSML
@@ -163,13 +163,13 @@ final class TtsEngine {
     /**
      * Synthesizes {@code text} with the given Edge TTS {@code voice} on a background thread.
      */
-    byte[] synthesize(String text, String voice, float rate) throws Exception {
-        return synthesizeEdge(text, voice, rate);
+    byte[] synthesize(String text, String voice, String lang, float rate) throws Exception {
+        return synthesizeEdge(text, voice, lang, rate);
     }
 
     /** Overload for background synthesis (prefetching). */
-    byte[] prefetch(String text, String voice) throws Exception {
-        return synthesizeEdge(text, voice, 1.0f);
+    byte[] prefetch(String text, String voice, String lang) throws Exception {
+        return synthesizeEdge(text, voice, lang, 1.0f);
     }
 
     /**
@@ -254,7 +254,7 @@ final class TtsEngine {
         }
     }
 
-    private byte[] synthesizeEdge(String text, String voice, float rate) throws Exception {
+    private byte[] synthesizeEdge(String text, String voice, String lang, float rate) throws Exception {
         Utils.verifyOffMainThread();
         synchronized (synthesisLock) {
             IOException lastEx = null;
@@ -262,7 +262,7 @@ final class TtsEngine {
                 try {
                     String timestamp = edgeTimestamp();
                     String requestId = uuidHex();
-                    String ssml = buildSsml(text, voice, rate);
+                    String ssml = buildSsml(text, voice, lang, rate);
 
                     // Ensure we have a valid connection.
                     ensureConnected();
@@ -302,15 +302,16 @@ final class TtsEngine {
         }
     }
 
-    private String buildSsml(String text, String voice, float rate) {
+    private String buildSsml(String text, String voice, String lang, float rate) {
         String inner = escapeXml(text);
         int ratePercent = Math.round((rate - 1.0f) * 100);
         if (ratePercent != 0) {
             inner = "<prosody rate='" + (ratePercent > 0 ? "+" : "") + ratePercent + "%'>"
                     + inner + "</prosody>";
         }
+        final String speakLang = lang != null && !lang.isEmpty() ? lang : localePart(voice);
         return "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis'"
-                + " xml:lang='" + localePart(voice) + "'>"
+                + " xml:lang='" + speakLang + "'>"
                 + "<voice name='" + voice + "'>" + inner + "</voice></speak>";
     }
 
