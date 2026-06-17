@@ -50,9 +50,9 @@ final class TtsCache {
         return d != null ? d : -1;
     }
 
-    static byte[] getTestSampleFromDisk(String voiceId) {
+    static byte[] getTestSampleFromDisk(String voiceId, String lang) {
         try {
-            File file = testSampleFile(voiceId);
+            File file = testSampleFile(voiceId, lang);
             if (!file.exists()) return null;
             try (FileInputStream fis = new FileInputStream(file)) {
                 byte[] data = new byte[(int) file.length()];
@@ -66,9 +66,9 @@ final class TtsCache {
         }
     }
 
-    static void putTestSampleToDisk(String voiceId, byte[] data) {
+    static void putTestSampleToDisk(String voiceId, String lang, byte[] data) {
         try {
-            File file = testSampleFile(voiceId);
+            File file = testSampleFile(voiceId, lang);
             File parent = file.getParentFile();
             if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
                 Logger.printDebug(() -> "Failed to create cache directory");
@@ -82,9 +82,9 @@ final class TtsCache {
         }
     }
 
-    private static File testSampleFile(String voiceId) {
+    private static File testSampleFile(String voiceId, String lang) {
         Context context = Utils.getContext();
-        return new File(context.getCacheDir(), TEST_SAMPLES_DIR + File.separator + voiceId);
+        return new File(context.getCacheDir(), TEST_SAMPLES_DIR + File.separator + voiceId + '_' + lang);
     }
 
     private static String key(String videoId, int segmentIndex, String voice, String text) {

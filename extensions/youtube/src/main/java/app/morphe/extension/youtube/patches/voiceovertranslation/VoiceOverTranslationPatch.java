@@ -595,7 +595,7 @@ public class VoiceOverTranslationPatch {
                     continue;
                 }
 
-                byte[] diskData = TtsCache.getTestSampleFromDisk(voice.id);
+                byte[] diskData = TtsCache.getTestSampleFromDisk(voice.id, lang);
                 if (diskData != null) {
                     TtsCache.put(TEST_VIDEO_ID, TEST_SEGMENT_INDEX, voice.id, testString, diskData);
                     continue;
@@ -606,7 +606,7 @@ public class VoiceOverTranslationPatch {
                     byte[] data = ttsEngine.prefetch(testString, voice.id);
                     if (data.length > 0) {
                         TtsCache.put(TEST_VIDEO_ID, TEST_SEGMENT_INDEX, voice.id, testString, data);
-                        TtsCache.putTestSampleToDisk(voice.id, data);
+                        TtsCache.putTestSampleToDisk(voice.id, lang, data);
                     }
                     Thread.sleep(TEST_PREFETCH_WAIT);
 
