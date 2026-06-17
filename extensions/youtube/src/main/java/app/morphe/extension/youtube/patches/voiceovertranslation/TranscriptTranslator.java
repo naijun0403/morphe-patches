@@ -15,7 +15,9 @@ import androidx.annotation.Nullable;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.BufferedReader;
 import java.io.FileNotFoundException;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -71,7 +73,8 @@ final class TranscriptTranslator {
     // Set to true when any batch returns HTTP 429, or when a new video is loaded while
     // translation is in progress. Remaining batches are skipped immediately.
     private static volatile boolean abortTranslation;
-    // Held during the blocking getResponseCode() call so requestAbort() can disconnect it.
+    // Held while an OpenRouter request is in flight (connecting, waiting for response, or reading
+    // the SSE stream) so requestAbort() can disconnect it and unblock the background thread.
     private static volatile HttpURLConnection activeConnection;
 
     static void requestAbort() {
@@ -113,23 +116,32 @@ final class TranscriptTranslator {
             offsets[b] = offsets[b - 1] + batches.get(b - 1).size();
         }
 
-        applyBatch(working, batches.get(0), 0, translateBatchSafe(batches.get(0), targetLang));
+        final Handler mainHandler = new Handler(Looper.getMainLooper());
+
+        final List<TranscriptSegment> batch0 = batches.get(0);
+        applyBatch(working, batch0, 0, translateBatchSafe(batch0, targetLang,
+                streamCallback(onUpdate, mainHandler, working, batch0, 0)));
         if (batches.size() == 1) return working;
 
         // Snapshot to return before background batches start mutating the working copy.
         List<TranscriptSegment> initial = new ArrayList<>(working);
 
         final int batchDelay = isMyMemory ? MYMEMORY_INTER_BATCH_DELAY_MS : GOOGLE_INTER_BATCH_DELAY_MS;
-        Handler mainHandler = new Handler(Looper.getMainLooper());
-        // Notify immediately after batch 0 so TTS can start without waiting for batch 1.
-        if (onUpdate != null) mainHandler.post(() -> onUpdate.accept(initial));
+        // For non-streaming services (Google, MyMemory), onUpdate hasn't fired yet for batch 0 —
+        // post it now so TTS can start. For OpenRouter the stream already posted incremental updates.
+        if (onUpdate != null && !service.equals(TRANSLATION_SERVICE_OPENROUTER)) {
+            mainHandler.post(() -> onUpdate.accept(initial));
+        }
 
         for (int batchIndex = 1, batchCount = batches.size(); batchIndex < batchCount; batchIndex++) {
             if (abortTranslation) break;
-            List<String> translated = translateBatchSafe(batches.get(batchIndex), targetLang);
+            final List<TranscriptSegment> batchN = batches.get(batchIndex);
+            final int batchOffset = offsets[batchIndex];
+            List<String> translated = translateBatchSafe(batchN, targetLang,
+                    streamCallback(onUpdate, mainHandler, working, batchN, batchOffset));
             List<TranscriptSegment> snapshot;
 
-            applyBatch(working, batches.get(batchIndex), offsets[batchIndex], translated);
+            applyBatch(working, batchN, batchOffset, translated);
             snapshot = new ArrayList<>(working);
             if (onUpdate != null) mainHandler.post(() -> onUpdate.accept(snapshot));
 
@@ -179,9 +191,25 @@ final class TranscriptTranslator {
     }
 
     @Nullable
-    private static List<String> translateBatchSafe(List<TranscriptSegment> batch, String targetLang) {
+    private static Consumer<List<String>> streamCallback(
+            @Nullable Consumer<List<TranscriptSegment>> onUpdate,
+            Handler mainHandler,
+            List<TranscriptSegment> working,
+            List<TranscriptSegment> batch,
+            int offset) {
+        if (onUpdate == null) return null;
+        return partial -> {
+            List<TranscriptSegment> snap = new ArrayList<>(working);
+            applyBatch(snap, batch, offset, partial);
+            mainHandler.post(() -> onUpdate.accept(snap));
+        };
+    }
+
+    @Nullable
+    private static List<String> translateBatchSafe(List<TranscriptSegment> batch, String targetLang,
+            @Nullable Consumer<List<String>> onLineStreamed) {
         try {
-            return translateBatch(batch, targetLang);
+            return translateBatch(batch, targetLang, onLineStreamed);
         } catch (Exception ex) {
             String msg = ex.getMessage();
             // FileNotFoundException from getInputStream() is Android's HttpURLConnection reporting
@@ -218,11 +246,29 @@ final class TranscriptTranslator {
         return batches;
     }
 
-    private static List<String> translateBatch(List<TranscriptSegment> segments, String targetLang) throws Exception {
+    private static List<String> translateBatch(List<TranscriptSegment> segments, String targetLang,
+            @Nullable Consumer<List<String>> onLineStreamed) throws Exception {
         String service = Settings.VOT_TRANSLATION_SERVICE.get();
         if (service.equals(TRANSLATION_SERVICE_MY_MEMORY)) return translateBatchMyMemory(segments, targetLang);
-        if (service.equals(TRANSLATION_SERVICE_OPENROUTER)) return translateBatchOpenRouter(segments, targetLang);
+        if (service.equals(TRANSLATION_SERVICE_OPENROUTER)) return translateBatchOpenRouter(segments, targetLang, onLineStreamed);
         return translateBatchGoogle(segments, targetLang);
+    }
+
+    private static boolean parseLine(String line, List<String> result, int segmentCount) {
+        int i = 0;
+        while (i < line.length() && Character.isDigit(line.charAt(i))) i++;
+        if (i == 0 || i >= line.length()) return false;
+        final char sep = line.charAt(i);
+        if (sep != ':' && sep != '.') return false;
+        try {
+            int num = Integer.parseInt(line.substring(0, i));
+            String text = line.substring(i + 1).trim();
+            if (num >= 1 && num <= segmentCount && !text.isEmpty()) {
+                result.set(num - 1, text);
+                return true;
+            }
+        } catch (NumberFormatException ignored) {}
+        return false;
     }
 
     private static List<String> translateBatchGoogle(
@@ -316,7 +362,8 @@ final class TranscriptTranslator {
     }
 
     private static List<String> translateBatchOpenRouter(
-            List<TranscriptSegment> segments, String targetLang) throws Exception {
+            List<TranscriptSegment> segments, String targetLang,
+            @Nullable Consumer<List<String>> onLineStreamed) throws Exception {
         Utils.verifyOffMainThread();
 
         final String model = Settings.VOT_OPENROUTER_MODEL.get();
@@ -346,6 +393,7 @@ final class TranscriptTranslator {
         JSONObject body = new JSONObject()
                 .put("model", model)
                 .put("temperature", 0)
+                .put("stream", true)
                 .put("messages", new JSONArray().put(systemMessage).put(userMessage));
 
         byte[] bodyBytes = body.toString().getBytes(StandardCharsets.UTF_8);
@@ -358,63 +406,82 @@ final class TranscriptTranslator {
         conn.setReadTimeout(OPENROUTER_READ_TIMEOUT_MS);
         conn.setRequestProperty("Content-Type", "application/json");
         conn.setRequestProperty("Authorization", "Bearer " + apiKey);
+        conn.setRequestProperty("Accept-Encoding", "identity");
         conn.setDoOutput(true);
         conn.setFixedLengthStreamingMode(bodyBytes.length);
         try (OutputStream os = conn.getOutputStream()) {
             os.write(bodyBytes);
         }
 
+        List<String> result = new ArrayList<>(segments.size());
+        for (TranscriptSegment seg : segments) result.add(seg.text());
+        int[] matched = {0};
+
         activeConnection = conn;
-        final int code;
-        final String rawResponse;
         try {
-            code = conn.getResponseCode();
+            final int code = conn.getResponseCode();
             if (code != 200) {
                 VoiceOverTranslationPatch.notifyHttpError(code);
                 throw new Exception("OpenRouter HTTP status: " + code + " language: " + targetLang
                         + " response: " + Requester.parseString(conn));
             }
-            // Response: {"choices": [{"message": {"content": "translated text"}}]}
-            rawResponse = Requester.parseString(conn);
+
+            // Read SSE stream. Each chunk is a "data: {...}" line; content deltas are accumulated
+            // into lineBuffer and flushed to result whenever a newline arrives.
+            StringBuilder lineBuffer = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+                String sseLine;
+                while ((sseLine = reader.readLine()) != null) {
+                    if (!sseLine.startsWith("data: ")) continue;
+                    final String data = sseLine.substring(6).trim();
+                    if (data.equals("[DONE]")) break;
+
+                    final JSONObject chunk;
+                    try {
+                        chunk = new JSONObject(data);
+                    } catch (Exception ignored) {
+                        continue;
+                    }
+                    JSONArray choices = chunk.optJSONArray("choices");
+                    if (choices == null || choices.length() == 0) continue;
+                    JSONObject delta = choices.getJSONObject(0).optJSONObject("delta");
+                    if (delta == null) continue;
+
+                    String content = delta.optString("content", "");
+                    for (int ci = 0; ci < content.length(); ci++) {
+                        final char c = content.charAt(ci);
+                        if (c == '\n') {
+                            final String line = lineBuffer.toString().trim();
+                            lineBuffer.setLength(0);
+                            if (!line.isEmpty() && parseLine(line, result, segments.size())) {
+                                matched[0]++;
+                                if (onLineStreamed != null) onLineStreamed.accept(new ArrayList<>(result));
+                            }
+                        } else {
+                            lineBuffer.append(c);
+                        }
+                    }
+                }
+                // Flush any remaining content that arrived without a trailing newline.
+                if (lineBuffer.length() > 0) {
+                    final String line = lineBuffer.toString().trim();
+                    if (!line.isEmpty() && parseLine(line, result, segments.size())) {
+                        matched[0]++;
+                        if (onLineStreamed != null) onLineStreamed.accept(new ArrayList<>(result));
+                    }
+                }
+            }
         } finally {
             if (activeConnection == conn) activeConnection = null;
         }
-        Logger.printDebug(() -> "OpenRouter raw response: " + rawResponse);
-        JSONObject json = new JSONObject(rawResponse);
-        String translation = json.getJSONArray("choices")
-                .getJSONObject(0)
-                .getJSONObject("message")
-                .getString("content");
 
-        Logger.printDebug(() -> "OpenRouter translation complete: " + targetLang);
-
-        // Parse numbered lines ("N: text" or "N. text"); fall back to original for missing numbers.
-        List<String> result = new ArrayList<>(segments.size());
-        for (TranscriptSegment seg : segments) result.add(seg.text());
-
-        int matched = 0;
-        for (String line : translation.split("\n", -1)) {
-            line = line.trim();
-            int i = 0;
-            while (i < line.length() && Character.isDigit(line.charAt(i))) i++;
-            if (i == 0 || i >= line.length()) continue;
-            final char sep = line.charAt(i);
-            if (sep != ':' && sep != '.') continue;
-            try {
-                int num = Integer.parseInt(line.substring(0, i));
-                String text = line.substring(i + 1).trim();
-                if (num >= 1 && num <= segments.size() && !text.isEmpty()) {
-                    result.set(num - 1, text);
-                    matched++;
-                }
-            } catch (NumberFormatException ignored) {}
-        }
-
-        if (matched != segments.size()) {
-            final int m = matched, total = segments.size();
+        if (matched[0] != segments.size()) {
+            final int m = matched[0], total = segments.size();
             Logger.printDebug(() -> "OpenRouter line mismatch - expected: " + total
                     + ", got: " + m + "; last: " + (total - m) + " segment(s) keep original text");
         }
+        Logger.printDebug(() -> "OpenRouter translation complete: " + targetLang);
         return result;
     }
 }
