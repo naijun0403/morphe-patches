@@ -362,8 +362,8 @@ Tap here to open openrouter.ai"</string>
     <string name="morphe_vot_openrouter_api_key_summary">Required. Enter your OpenRouter API key. Get one at openrouter.ai/settings/keys</string>
     <string name="morphe_vot_openrouter_model_title">Model</string>
     <string name="morphe_vot_openrouter_model_mistral_nemo" translatable="false">Mistral Nemo</string>
-    <string name="morphe_vot_openrouter_model_gemma3_4b" translatable="false">Gemma 3 4B</string>
-    <string name="morphe_vot_openrouter_model_gemma3_27b" translatable="false">Gemma 3 27B</string>
+    <string name="morphe_vot_openrouter_model_gemma4_26b_a4b" translatable="false">Gemma 4 26B A4B</string>
+    <string name="morphe_vot_openrouter_model_deepseek_flash_v4" translatable="false">DeepSeek V4 Flash</string>
     <string name="morphe_vot_openrouter_model_custom">Custom</string>
     <string name="morphe_vot_openrouter_model_hint" translatable="false">e.g. mistralai/mistral-nemo</string>
     <string name="morphe_vot_openrouter_not_configured_title">OpenRouter not configured</string>

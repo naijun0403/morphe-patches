@@ -17,6 +17,9 @@ import android.widget.ListView;
 
 import androidx.annotation.Nullable;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.function.Function;
 
 import app.morphe.extension.shared.Utils;
@@ -30,11 +33,11 @@ public class VoiceOverTranslationModelPreference extends CustomDialogListPrefere
 
     private static final String CUSTOM_SENTINEL = "custom";
 
-    private static final String[] PRESET_IDS = {
+    private static final List<String> PRESET_IDS = List.of(
             "mistralai/mistral-nemo",
-            "google/gemma-3-4b-it",
-            "google/gemma-3-27b-it"
-    };
+            "deepseek/deepseek-v4-flash",
+            "google/gemma-4-26b-a4b-it"
+    );
 
     private EditText editText;
     private ListPreferenceArrayAdapter adapter;
@@ -65,16 +68,13 @@ public class VoiceOverTranslationModelPreference extends CustomDialogListPrefere
     private void updateEntries() {
         setEntries(new CharSequence[]{
                 str("morphe_vot_openrouter_model_mistral_nemo"),
-                str("morphe_vot_openrouter_model_gemma3_4b"),
-                str("morphe_vot_openrouter_model_gemma3_27b"),
+                str("morphe_vot_openrouter_model_deepseek_flash_v4"),
+                str("morphe_vot_openrouter_model_gemma4_26b_a4b"),
                 str("morphe_vot_openrouter_model_custom")
         });
-        setEntryValues(new CharSequence[]{
-                "mistralai/mistral-nemo",
-                "google/gemma-3-4b-it",
-                "google/gemma-3-27b-it",
-                CUSTOM_SENTINEL
-        });
+        List<String> entryValues = new ArrayList<>(PRESET_IDS);
+        entryValues.add(CUSTOM_SENTINEL);
+        setEntryValues(entryValues.toArray(new String[0]));
     }
 
     @Override
