@@ -166,7 +166,7 @@ final class TranscriptTranslator {
             return translateBatch(batch, targetLang);
         } catch (Exception ex) {
             String msg = ex.getMessage();
-            if (msg != null && msg.contains("429")) abortTranslation = true;
+            if (msg != null && (msg.contains("429") || msg.contains("401") || msg.contains("403"))) abortTranslation = true;
             if (reportNextTranslationError) {
                 reportNextTranslationError = false;
                 VoiceOverTranslationPatch.logError(() -> "Translation failed: " + msg, ex);
