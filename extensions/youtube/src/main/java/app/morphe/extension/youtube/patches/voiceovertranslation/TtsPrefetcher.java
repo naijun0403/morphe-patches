@@ -222,6 +222,9 @@ final class TtsPrefetcher {
                 TtsCache.put(videoId, index, voice, seg.text(), data);
                 Logger.printDebug(() -> "Prefetched TTS: " + videoId
                         + " segment: " + index + "/" + totalSegments + " text: " + seg.text());
+                final long naturalDurationMs = TtsEngine.mp3DurationMs(data.length);
+                Utils.runOnMainThread(() -> VoiceOverTranslationPatch.onSegmentDurationKnown(
+                        videoId, index, naturalDurationMs));
                 return true;
             }
             return false;

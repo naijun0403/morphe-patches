@@ -555,12 +555,12 @@ public class VoiceOverTranslationPatch {
         if (cached != null) {
             requestDuck();
             final long id = ttsEngine.markBusy();
-            ttsEngine.play(cached, volume, 1.0f, id, () -> abandonDuckAfterTest(testId));
+            ttsEngine.play(cached, volume, id, () -> abandonDuckAfterTest(testId));
             return;
         }
 
         requestDuck();
-        ttsEngine.speak(getTestString(), voiceId, volume, 1.0f, () -> abandonDuckAfterTest(testId));
+        ttsEngine.speak(getTestString(), voiceId, volume, () -> abandonDuckAfterTest(testId));
     }
 
     /**
@@ -683,6 +683,49 @@ public class VoiceOverTranslationPatch {
         return Settings.VOT_CAPTION_LANGUAGE.isSetToDefault() // Default is app language.
                 ? AppLanguage.DEFAULT.getLanguage()
                 : Settings.VOT_CAPTION_LANGUAGE.get();
+    }
+
+    /**
+     * Called on the main thread when a prefetched TTS segment's natural audio duration is known.
+     * Adjusts segment end time to match actual speech length and propagates the delta to any
+     * directly adjacent (touching) successors, keeping the chain gapless.
+     */
+    static void onSegmentDurationKnown(String videoId, int index, long naturalDurationMs) {
+        Utils.verifyOnMainThread();
+        if (!videoId.equals(currentVideoId)) return;
+        if (index >= segments.size()) return;
+        if (index < lastSpokenIndex) return;
+
+        TranscriptSegment seg = segments.get(index);
+        long rawDelta = (seg.startMs() + naturalDurationMs) - seg.endMs();
+        if (Math.abs(rawDelta) < 50) return;
+
+        // Walk forward to find the end of the touching chain starting at index.
+        int chainEnd = index;
+        while (chainEnd + 1 < segments.size()
+                && segments.get(chainEnd).endMs() == segments.get(chainEnd + 1).startMs()) {
+            chainEnd++;
+        }
+
+        // Positive delta: cap so the chain does not push into the next non-touching segment.
+        final long delta;
+        if (rawDelta > 0 && chainEnd + 1 < segments.size()) {
+            long room = segments.get(chainEnd + 1).startMs() - segments.get(chainEnd).endMs();
+            delta = Math.min(rawDelta, room);
+            if (delta <= 0) return;
+        } else {
+            delta = rawDelta;
+        }
+
+        final long newEndMs = seg.endMs() + delta;
+        final int finalChainEnd = chainEnd;
+        Logger.printDebug(() -> "Adjusting segment " + index + " end by " + delta
+                + "ms, chain length " + (finalChainEnd - index + 1));
+        segments.set(index, new TranscriptSegment(seg.startMs(), newEndMs, seg.text()));
+        for (int j = index + 1; j <= finalChainEnd; j++) {
+            TranscriptSegment s = segments.get(j);
+            segments.set(j, new TranscriptSegment(s.startMs() + delta, s.endMs() + delta, s.text()));
+        }
     }
 
     static void notifyHttpError(int statusCode) {

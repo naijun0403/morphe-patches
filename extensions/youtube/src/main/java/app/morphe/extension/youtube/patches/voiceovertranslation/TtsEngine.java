@@ -96,11 +96,11 @@ final class TtsEngine {
     }
 
     /**
-     * High-level entry point for Edge TTS speech.
+     * High-level entry point for Edge TTS speech at natural speed (rate=1.0).
      * Handles background synthesis and playback for the given voice.
      */
-    void speak(String text, String voiceId, float volume, float rate, Runnable onDone) {
-        speak(text, voiceId, volume, rate, 0, onDone);
+    void speak(String text, String voiceId, float volume, Runnable onDone) {
+        speak(text, voiceId, volume, 1.0f, 0, onDone);
     }
 
     /**
@@ -173,11 +173,18 @@ final class TtsEngine {
     }
 
     /**
-     * Plays the MP3 result through Android's MediaPlayer at the given speed {@code rate}.
-     * Use rate 1.0f when the rate is already encoded in the audio (e.g. via SSML prosody).
+     * Returns the duration in milliseconds of an MP3 produced by this engine.
+     * Valid only for {@link #AUDIO_FORMAT} (48 kbps CBR = 6000 bytes/second).
      */
-    void play(byte[] mp3, float volume, float rate, long id, Runnable onDone) {
-        play(mp3, volume, rate, 0, id, onDone);
+    static long mp3DurationMs(int byteCount) {
+        return byteCount * 1000L / 6000L;
+    }
+
+    /**
+     * Plays the MP3 result through Android's MediaPlayer at natural speed (rate=1.0).
+     */
+    void play(byte[] mp3, float volume, long id, Runnable onDone) {
+        play(mp3, volume, 1.0f, 0, id, onDone);
     }
 
     /**
