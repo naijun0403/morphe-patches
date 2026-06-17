@@ -72,7 +72,7 @@ public class VoiceOverTranslationPatch {
 
     private static final long SEEK_JUMP_THRESHOLD_MS = 2_900;
     private static final long TTS_LOOKAHEAD_MS = 400;
-    private static final int MAX_SPEED_START_TIME_EXPANSION = 3000;
+    private static final int MAX_SPEED_START_TIME_EXPANSION = 5000;
 
     // Minimum time into a segment to justify seeking within the audio instead of
     // playing from the start. Prevents tiny pops on small adjustments.
@@ -179,6 +179,7 @@ public class VoiceOverTranslationPatch {
 
             if (!Settings.VOT_ENABLED.get() || !sessionEnabled) return;
             if (PlayerType.getCurrent() == PlayerType.INLINE_MINIMAL) return;
+            balanceSegments();
             TtsPrefetcher.updateVideo(videoId, segments);
             loadTranscript(videoId);
         } catch (Exception ex) {
@@ -227,8 +228,7 @@ public class VoiceOverTranslationPatch {
         final long effectiveTimeMs = timeMs + TTS_LOOKAHEAD_MS;
         for (int i = 0, size = segments.size(); i < size; i++) {
             TranscriptSegment seg = segments.get(i);
-            final long expandedStartMs = getExpandedStartMs(i);
-            if (effectiveTimeMs >= expandedStartMs && timeMs < seg.endMs()) {
+            if (effectiveTimeMs >= seg.startMs() && timeMs < seg.endMs()) {
                 if (i != lastSpokenIndex) {
                     if (!ttsEngine.isSpeaking()) {
                         lastSpokenIndex = i;
@@ -260,8 +260,11 @@ public class VoiceOverTranslationPatch {
         if (!sessionEnabled) {
             stopTts();
             lastSpokenIndex = -1;
-        } else if (!currentVideoId.isEmpty() && segments.isEmpty() && !isLoading) {
-            loadTranscript(currentVideoId);
+        } else {
+            balanceSegments();
+            if (!currentVideoId.isEmpty() && segments.isEmpty() && !isLoading) {
+                loadTranscript(currentVideoId);
+            }
         }
         notifyStateChanged();
     }
@@ -315,6 +318,7 @@ public class VoiceOverTranslationPatch {
                                     stopTts();
                                 }
                                 segments = updated;
+                                balanceSegments();
                             }
                         },
                         () -> {
@@ -331,6 +335,7 @@ public class VoiceOverTranslationPatch {
                         // batch-0 snapshot (fetched) if onUpdate never ran (single batch or
                         // no translation needed).
                         if (segments.isEmpty()) segments = fetched;
+                        balanceSegments();
                         TtsPrefetcher.updateVideo(videoId, segments);
                         Logger.printDebug(() -> "Loaded: " + fetched.size() + " segments for :" + videoId);
                         notifyStateChanged();
@@ -432,13 +437,10 @@ public class VoiceOverTranslationPatch {
         String voice = resolveVoice(lang);
         if (voice == null) return;
 
-        final long expandedStartMs = getExpandedStartMs(index);
-        final long speakFromMs = Math.max(lastVideoTimeMs, expandedStartMs);
+        final long speakFromMs = Math.max(lastVideoTimeMs, seg.startMs());
 
-        // Extend the window into the gap before the next segment so TTS can play at a
-        // natural rate even when the segment window alone would require speeding up.
-        final long expandedEndMs = getExpandedEndMs(index);
-        final long availableMs = expandedEndMs - speakFromMs;
+        // Use the balanced segment bounds for the available window.
+        final long availableMs = seg.endMs() - speakFromMs;
 
         // Calculate if we should seek into the audio (e.g. after a short seek within segment).
         long startTimeMs = 0;
@@ -507,36 +509,68 @@ public class VoiceOverTranslationPatch {
         return cachedDuration > 0 ? cachedDuration : (long) seg.text().length() * ESTIMATED_MS_PER_CHAR;
     }
 
-    private static long getExpandedEndMs(int index) {
-        TranscriptSegment seg = segments.get(index);
-        return index + 1 < segments.size()
-                ? Math.max(seg.endMs(), segments.get(index + 1).startMs())
-                : seg.endMs();
+    private static void balanceSegments() {
+        if (segments.isEmpty()) return;
+        Utils.verifyOnMainThread();
+
+        final String lang = resolveTargetLang();
+        final String voice = resolveVoice(lang);
+        if (voice == null) return;
+
+        // Group segments into contiguous clusters (gap < 200ms).
+        List<List<Integer>> clusters = new ArrayList<>();
+        List<Integer> currentCluster = new ArrayList<>();
+        for (int i = 0, size = segments.size(); i < size; i++) {
+            if (!currentCluster.isEmpty()) {
+                long gap = segments.get(i).startMs() - segments.get(i - 1).endMs();
+                if (gap > 200) {
+                    clusters.add(currentCluster);
+                    currentCluster = new ArrayList<>();
+                }
+            }
+            currentCluster.add(i);
+        }
+        if (!currentCluster.isEmpty()) clusters.add(currentCluster);
+
+        for (List<Integer> cluster : clusters) {
+            balanceCluster(cluster, voice, lang);
+        }
     }
 
-    private static long getExpandedStartMs(int index) {
-        TranscriptSegment seg = segments.get(index);
-        long nominalStartMs = seg.startMs();
+    private static void balanceCluster(List<Integer> clusterIndices, String voice, String lang) {
+        int firstIdx = clusterIndices.get(0);
+        int lastIdx = clusterIndices.get(clusterIndices.size() - 1);
 
-        String lang = resolveTargetLang();
-        String voice = resolveVoice(lang);
-        if (voice == null) return nominalStartMs;
+        long clusterStart = segments.get(firstIdx).startMs();
+        long clusterEnd = segments.get(lastIdx).endMs();
 
-        // Prefer extending end time first to reach 1x rate.
-        long expandedEndMs = getExpandedEndMs(index);
-        long availableMsWithNormalStart = expandedEndMs - nominalStartMs;
-        long speechDurationMs = getSpeechDurationMs(seg, index, voice, lang);
+        // Total available time includes the gaps before and after the cluster.
+        long availableStart = firstIdx > 0 ? segments.get(firstIdx - 1).endMs() : 0;
+        long availableEnd = lastIdx + 1 < segments.size() ? segments.get(lastIdx + 1).startMs() : clusterEnd + 10_000;
 
-        if (speechDurationMs <= availableMsWithNormalStart) {
-            return nominalStartMs;
+        // Expand cluster start up to 3s if possible.
+        long expandedStart = Math.max(availableStart, clusterStart - MAX_SPEED_START_TIME_EXPANSION);
+
+        long totalAvailableMs = availableEnd - expandedStart;
+        long totalNaturalMs = 0;
+        for (int idx : clusterIndices) {
+            totalNaturalMs += getSpeechDurationMs(segments.get(idx), idx, voice, lang);
         }
 
-        // Need more time to reach 1x. Move start time earlier, up to 3 seconds.
-        long neededMs = speechDurationMs - availableMsWithNormalStart;
-        long expansionMs = Math.min(MAX_SPEED_START_TIME_EXPANSION, neededMs);
-        long prevEndMs = index > 0 ? segments.get(index - 1).endMs() : 0;
+        if (totalNaturalMs <= 0) return;
 
-        return Math.max(nominalStartMs - expansionMs, prevEndMs);
+        // Aim for a uniform rate across the cluster.
+        float clusterRate = Math.max(MIN_SPEECH_RATE, totalNaturalMs / (float) totalAvailableMs);
+        final float maxRate = Settings.VOT_MAX_SPEECH_RATE.get() / 10.0f;
+        clusterRate = Math.min(clusterRate, maxRate);
+
+        long currentPos = expandedStart;
+        for (int idx : clusterIndices) {
+            long naturalMs = getSpeechDurationMs(segments.get(idx), idx, voice, lang);
+            long allocatedMs = (long) (naturalMs / clusterRate);
+            segments.set(idx, new TranscriptSegment(currentPos, currentPos + allocatedMs, segments.get(idx).text()));
+            currentPos += allocatedMs;
+        }
     }
 
     /**
