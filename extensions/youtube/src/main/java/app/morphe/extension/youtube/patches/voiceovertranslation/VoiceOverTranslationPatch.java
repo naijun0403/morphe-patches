@@ -72,7 +72,7 @@ public class VoiceOverTranslationPatch {
 
     private static final long SEEK_JUMP_THRESHOLD_MS = 2_900;
     private static final long TTS_LOOKAHEAD_MS = 400;
-    private static final int MAX_TTS_SEGMENT_TIME_EXPANSION = 3000;
+    private static final int MAX_TTS_SEGMENT_TIME_EXPANSION = 5000;
 
     // Minimum time into a segment to justify seeking within the audio instead of
     // playing from the start. Prevents tiny pops on small adjustments.
@@ -548,7 +548,7 @@ public class VoiceOverTranslationPatch {
         long availableStart = firstIdx > 0 ? segments.get(firstIdx - 1).endMs() : 0;
         long availableEnd = lastIdx + 1 < segments.size() ? segments.get(lastIdx + 1).startMs() : clusterEnd + 10_000;
 
-        // Expand cluster start up to 3s if possible.
+        // Expand cluster start up to 5s if possible.
         long expandedStart = Math.max(availableStart, clusterStart - MAX_TTS_SEGMENT_TIME_EXPANSION);
 
         long totalAvailableMs = availableEnd - expandedStart;
@@ -565,11 +565,30 @@ public class VoiceOverTranslationPatch {
         clusterRate = Math.min(clusterRate, maxRate);
 
         long currentPos = expandedStart;
-        for (int idx : clusterIndices) {
-            long naturalMs = getSpeechDurationMs(segments.get(idx), idx, voice, lang);
+        for (int i = 0; i < clusterIndices.size(); i++) {
+            int idx = clusterIndices.get(i);
+            TranscriptSegment seg = segments.get(idx);
+            long naturalMs = getSpeechDurationMs(seg, idx, voice, lang);
+
+            // Limit how far earlier we can move the start time.
+            long earliestAllowedStart = seg.startMs() - MAX_TTS_SEGMENT_TIME_EXPANSION;
+            long newStart = Math.max(currentPos, earliestAllowedStart);
+
+            // If we hit the shift cap, recalculate the rate for the remaining segments
+            // so they don't drift further and further from their original positions.
+            if (newStart > currentPos && i < clusterIndices.size() - 1) {
+                long remainingAvailableMs = availableEnd - newStart;
+                long remainingNaturalMs = 0;
+                for (int j = i; j < clusterIndices.size(); j++) {
+                    remainingNaturalMs += getSpeechDurationMs(segments.get(clusterIndices.get(j)), clusterIndices.get(j), voice, lang);
+                }
+                clusterRate = Math.max(MIN_SPEECH_RATE, remainingNaturalMs / (float) remainingAvailableMs);
+                clusterRate = Math.min(clusterRate, maxRate);
+            }
+
             long allocatedMs = (long) (naturalMs / clusterRate);
-            segments.set(idx, new TranscriptSegment(currentPos, currentPos + allocatedMs, segments.get(idx).text()));
-            currentPos += allocatedMs;
+            segments.set(idx, new TranscriptSegment(newStart, newStart + allocatedMs, seg.text()));
+            currentPos = newStart + allocatedMs;
         }
     }
 
