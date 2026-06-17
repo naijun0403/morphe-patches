@@ -15,6 +15,7 @@ import androidx.annotation.Nullable;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.FileNotFoundException;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -166,7 +167,12 @@ final class TranscriptTranslator {
             return translateBatch(batch, targetLang);
         } catch (Exception ex) {
             String msg = ex.getMessage();
-            if (msg != null && (msg.contains("429") || msg.contains("401") || msg.contains("403"))) abortTranslation = true;
+            // FileNotFoundException from getInputStream() is Android's HttpURLConnection reporting
+            // a 4xx/5xx error when getResponseCode() incorrectly returned 200 in streaming mode.
+            if (ex instanceof FileNotFoundException
+                    || (msg != null && (msg.contains("429") || msg.contains("401") || msg.contains("403")))) {
+                abortTranslation = true;
+            }
             if (reportNextTranslationError) {
                 reportNextTranslationError = false;
                 VoiceOverTranslationPatch.logError(() -> "Translation failed: " + msg, ex);
@@ -302,16 +308,18 @@ final class TranscriptTranslator {
         String apiKey = Settings.VOT_OPENROUTER_API_KEY.get().trim();
         if (apiKey.isEmpty()) throw new Exception("OpenRouter API key is not set");
 
+        // Number each line so the model cannot silently merge or skip lines.
         StringBuilder joined = new StringBuilder();
-        for (TranscriptSegment seg : segments) {
-            if (joined.length() > 0) joined.append('\n');
-            joined.append(seg.text());
+        for (int i = 0, size = segments.size(); i < size; i++) {
+            if (i > 0) joined.append('\n');
+            joined.append(i + 1).append(": ").append(segments.get(i).text());
         }
 
         JSONObject systemMessage = new JSONObject()
                 .put("role", "system")
-                .put("content", "Translate the following subtitle lines to " + targetLang
-                        + ". Output ONLY the translated lines in the same order, one per line. Do not add explanations or extra text.");
+                .put("content", "Translate the following numbered subtitle lines to " + targetLang
+                        + ". Return each translation in the format \"N: translation\" using the same number. "
+                        + "Output exactly one line per input number. Do not merge, skip, or reorder lines.");
         JSONObject userMessage = new JSONObject()
                 .put("role", "user")
                 .put("content", joined.toString());
@@ -351,6 +359,34 @@ final class TranscriptTranslator {
                 .getString("content");
 
         Logger.printDebug(() -> "OpenRouter translation complete: " + targetLang);
-        return Arrays.asList(translation.split("\n", -1));
+
+        // Parse numbered lines ("N: text" or "N. text"); fall back to original for missing numbers.
+        List<String> result = new ArrayList<>(segments.size());
+        for (TranscriptSegment seg : segments) result.add(seg.text());
+
+        int matched = 0;
+        for (String line : translation.split("\n", -1)) {
+            line = line.trim();
+            int i = 0;
+            while (i < line.length() && Character.isDigit(line.charAt(i))) i++;
+            if (i == 0 || i >= line.length()) continue;
+            final char sep = line.charAt(i);
+            if (sep != ':' && sep != '.') continue;
+            try {
+                int num = Integer.parseInt(line.substring(0, i));
+                String text = line.substring(i + 1).trim();
+                if (num >= 1 && num <= segments.size() && !text.isEmpty()) {
+                    result.set(num - 1, text);
+                    matched++;
+                }
+            } catch (NumberFormatException ignored) {}
+        }
+
+        if (matched != segments.size()) {
+            final int m = matched, total = segments.size();
+            Logger.printDebug(() -> "OpenRouter line mismatch - expected: " + total
+                    + ", got: " + m + "; last: " + (total - m) + " segment(s) keep original text");
+        }
+        return result;
     }
 }
