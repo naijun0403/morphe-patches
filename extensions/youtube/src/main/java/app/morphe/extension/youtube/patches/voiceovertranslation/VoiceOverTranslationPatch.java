@@ -70,8 +70,9 @@ public class VoiceOverTranslationPatch {
         }
     }
 
-private static final long SEEK_JUMP_THRESHOLD_MS = 2_900;
+    private static final long SEEK_JUMP_THRESHOLD_MS = 2_900;
     private static final long TTS_LOOKAHEAD_MS = 400;
+    private static final int MAX_SPEED_START_TIME_EXPANSION = 3000;
 
     // Minimum time into a segment to justify seeking within the audio instead of
     // playing from the start. Prevents tiny pops on small adjustments.
@@ -226,7 +227,8 @@ private static final long SEEK_JUMP_THRESHOLD_MS = 2_900;
         final long effectiveTimeMs = timeMs + TTS_LOOKAHEAD_MS;
         for (int i = 0, size = segments.size(); i < size; i++) {
             TranscriptSegment seg = segments.get(i);
-            if (effectiveTimeMs >= seg.startMs() && timeMs < seg.endMs()) {
+            final long expandedStartMs = getExpandedStartMs(i);
+            if (effectiveTimeMs >= expandedStartMs && timeMs < seg.endMs()) {
                 if (i != lastSpokenIndex) {
                     if (!ttsEngine.isSpeaking()) {
                         lastSpokenIndex = i;
@@ -427,17 +429,15 @@ private static final long SEEK_JUMP_THRESHOLD_MS = 2_900;
         String lang = resolveTargetLang();
         final float volume = Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f;
 
-        String voice = Settings.VOT_USE_NATIVE_TTS.get()
-                ? TTS_ENGINE_SYSTEM
-                : VoiceCatalog.resolve(lang, Settings.VOT_TTS_VOICE_TYPE.get());
+        String voice = resolveVoice(lang);
         if (voice == null) return;
 
-        final long speakFromMs = Math.max(lastVideoTimeMs, seg.startMs());
+        final long expandedStartMs = getExpandedStartMs(index);
+        final long speakFromMs = Math.max(lastVideoTimeMs, expandedStartMs);
+
         // Extend the window into the gap before the next segment so TTS can play at a
         // natural rate even when the segment window alone would require speeding up.
-        final long expandedEndMs = index + 1 < segments.size()
-                ? Math.max(seg.endMs(), segments.get(index + 1).startMs())
-                : seg.endMs();
+        final long expandedEndMs = getExpandedEndMs(index);
         final long availableMs = expandedEndMs - speakFromMs;
 
         // Calculate if we should seek into the audio (e.g. after a short seek within segment).
@@ -458,11 +458,9 @@ private static final long SEEK_JUMP_THRESHOLD_MS = 2_900;
 
         // Natural TTS duration (exact if cached, estimated from char count otherwise).
         // Used for rate calculation and for tracking when duck should be released.
-        final long naturalDurationMs = TTS_ENGINE_SYSTEM.equals(voice) ? -1
-                : TtsCache.getDuration(currentVideoId, index, voice, seg.text(), lang);
-        final long speechDurationMs = naturalDurationMs > 0
-                ? naturalDurationMs
-                : (long) seg.text().length() * ESTIMATED_MS_PER_CHAR;
+        final long speechDurationMs = getSpeechDurationMs(seg, index, voice, lang);
+        final float rate = smoothRate(calculateSpeechRate(speechDurationMs, availableMs));
+        ttsEndVideoTimeMs = speakFromMs + (long) (speechDurationMs / rate);
 
         if (TTS_ENGINE_SYSTEM.equals(voice)) {
             ensureTts();
@@ -470,8 +468,6 @@ private static final long SEEK_JUMP_THRESHOLD_MS = 2_900;
                 Logger.printDebug(() -> "Native TTS not ready, skipping segment");
                 return;
             }
-            final float rate = smoothRate(calculateSpeechRate(speechDurationMs, availableMs));
-            ttsEndVideoTimeMs = speakFromMs + (long) (speechDurationMs / rate);
             requestDuck();
             tts.setSpeechRate(rate);
             Bundle params = new Bundle();
@@ -482,18 +478,15 @@ private static final long SEEK_JUMP_THRESHOLD_MS = 2_900;
             return;
         }
 
+        requestDuck();
         // Check cache for Edge TTS.
-        byte[] cached = TtsCache.get(currentVideoId, index, voice, seg.text(), lang);
-        final float rate = smoothRate(calculateSpeechRate(speechDurationMs, availableMs));
-        ttsEndVideoTimeMs = speakFromMs + (long) (speechDurationMs / rate);
+        byte[] cached = TtsCache.get(currentVideoId, index, voice, lang, seg.text());
         if (cached != null) {
-            requestDuck();
             final long playbackId = ttsEngine.markBusy();
             ttsEngine.play(cached, volume, rate, startTimeMs, playbackId, null);
             return;
         }
 
-        requestDuck();
         // Use unified Edge synthesis/playback in background.
         // Edge synthesis doesn't support seeking during synthesis, but play() will seek the result.
         ttsEngine.speak(seg.text(), voice, lang, volume, rate, startTimeMs, null);
@@ -507,6 +500,43 @@ private static final long SEEK_JUMP_THRESHOLD_MS = 2_900;
         final float maxRate = Settings.VOT_MAX_SPEECH_RATE.get() / 10.0f;
         if (availableMs <= 0) return maxRate;
         return Math.max(MIN_SPEECH_RATE, Math.min(maxRate, speechDurationMs / (float) availableMs));
+    }
+
+    private static long getSpeechDurationMs(TranscriptSegment seg, int index, String voice, String lang) {
+        long cachedDuration = TtsCache.getDuration(currentVideoId, index, voice, lang, seg.text());
+        return cachedDuration > 0 ? cachedDuration : (long) seg.text().length() * ESTIMATED_MS_PER_CHAR;
+    }
+
+    private static long getExpandedEndMs(int index) {
+        TranscriptSegment seg = segments.get(index);
+        return index + 1 < segments.size()
+                ? Math.max(seg.endMs(), segments.get(index + 1).startMs())
+                : seg.endMs();
+    }
+
+    private static long getExpandedStartMs(int index) {
+        TranscriptSegment seg = segments.get(index);
+        long nominalStartMs = seg.startMs();
+
+        String lang = resolveTargetLang();
+        String voice = resolveVoice(lang);
+        if (voice == null) return nominalStartMs;
+
+        // Prefer extending end time first to reach 1x rate.
+        long expandedEndMs = getExpandedEndMs(index);
+        long availableMsWithNormalStart = expandedEndMs - nominalStartMs;
+        long speechDurationMs = getSpeechDurationMs(seg, index, voice, lang);
+
+        if (speechDurationMs <= availableMsWithNormalStart) {
+            return nominalStartMs;
+        }
+
+        // Need more time to reach 1x. Move start time earlier, up to 3 seconds.
+        long neededMs = speechDurationMs - availableMsWithNormalStart;
+        long expansionMs = Math.min(MAX_SPEED_START_TIME_EXPANSION, neededMs);
+        long prevEndMs = index > 0 ? segments.get(index - 1).endMs() : 0;
+
+        return Math.max(nominalStartMs - expansionMs, prevEndMs);
     }
 
     /**
@@ -729,6 +759,12 @@ private static final long SEEK_JUMP_THRESHOLD_MS = 2_900;
         return Settings.VOT_CAPTION_LANGUAGE.isSetToDefault() // Default is app language.
                 ? AppLanguage.DEFAULT.getLanguage()
                 : Settings.VOT_CAPTION_LANGUAGE.get();
+    }
+
+    private static String resolveVoice(String lang) {
+        return Settings.VOT_USE_NATIVE_TTS.get()
+                ? TTS_ENGINE_SYSTEM
+                : VoiceCatalog.resolve(lang, Settings.VOT_TTS_VOICE_TYPE.get());
     }
 
     static void notifyHttpError(int statusCode) {

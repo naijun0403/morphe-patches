@@ -52,7 +52,7 @@ final class TtsCache {
     }
 
     static long getDuration(String videoId, int segmentIndex, String voice, String lang, String text) {
-        if ("system".equals(voice)) return -1;
+        if (TTS_ENGINE_SYSTEM.equals(voice)) return -1;
         Long d = durations.get(key(videoId, segmentIndex, voice, lang, text));
         return d != null ? d : -1;
     }
