@@ -326,6 +326,7 @@ final class TranscriptTranslator {
 
         JSONObject body = new JSONObject()
                 .put("model", model)
+                .put("temperature", 0)
                 .put("messages", new JSONArray().put(systemMessage).put(userMessage));
 
         byte[] bodyBytes = body.toString().getBytes(StandardCharsets.UTF_8);
