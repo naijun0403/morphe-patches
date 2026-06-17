@@ -162,7 +162,6 @@ public class VoiceOverTranslationModelPreference extends CustomDialogListPrefere
         editText.setSingleLine(true);
         editText.setTextSize(16);
         editText.setEnabled(isCustom);
-        editText.setTextColor(Utils.getAppForegroundColor());
 
         editText.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
