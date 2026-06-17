@@ -448,7 +448,10 @@ public class VoiceOverTranslationPatch {
         // Check cache for Edge TTS.
         byte[] cached = TtsCache.get(currentVideoId, index, voice, seg.text());
         if (cached != null) {
-            final float rate = smoothRate(calculateSpeechRate(seg.text(), availableMs));
+            long naturalDurationMs = TtsCache.getDuration(currentVideoId, index, voice, seg.text());
+            final float rate = smoothRate(naturalDurationMs > 0
+                    ? calculateSpeechRate(naturalDurationMs, availableMs)
+                    : calculateSpeechRate(seg.text(), availableMs));
             requestDuck();
             final long playbackId = ttsEngine.markBusy();
             ttsEngine.play(cached, volume, rate, startTimeMs, playbackId, VoiceOverTranslationPatch::abandonDuck);
@@ -463,15 +466,21 @@ public class VoiceOverTranslationPatch {
     }
 
     /**
-     * Returns a speech rate multiplier that fits the estimated natural duration of
-     * {@code text} into {@code availableMs}. Never slows below normal speed and is
-     * capped by the user-configured max rate so fast videos stay intelligible.
+     * Returns a speech rate multiplier that fits {@code speechDurationMs} into {@code availableMs}.
+     * Never slows below normal speed and is capped by the user-configured max rate.
      */
-    private static float calculateSpeechRate(String text, long availableMs) {
+    private static float calculateSpeechRate(long speechDurationMs, long availableMs) {
         final float maxRate = Settings.VOT_MAX_SPEECH_RATE.get() / 10.0f;
         if (availableMs <= 0) return maxRate;
-        final float rate = (float) (text.length() * ESTIMATED_MS_PER_CHAR) / availableMs;
-        return Math.max(MIN_SPEECH_RATE, Math.min(maxRate, rate));
+        return Math.max(MIN_SPEECH_RATE, Math.min(maxRate, speechDurationMs / (float) availableMs));
+    }
+
+    /**
+     * Estimates natural speech duration from character count and delegates to
+     * {@link #calculateSpeechRate(long, long)}. Used when exact duration is not yet known.
+     */
+    private static float calculateSpeechRate(String text, long availableMs) {
+        return calculateSpeechRate((long) text.length() * ESTIMATED_MS_PER_CHAR, availableMs);
     }
 
     /**
@@ -683,49 +692,6 @@ public class VoiceOverTranslationPatch {
         return Settings.VOT_CAPTION_LANGUAGE.isSetToDefault() // Default is app language.
                 ? AppLanguage.DEFAULT.getLanguage()
                 : Settings.VOT_CAPTION_LANGUAGE.get();
-    }
-
-    /**
-     * Called on the main thread when a prefetched TTS segment's natural audio duration is known.
-     * Adjusts segment end time to match actual speech length and propagates the delta to any
-     * directly adjacent (touching) successors, keeping the chain gapless.
-     */
-    static void onSegmentDurationKnown(String videoId, int index, long naturalDurationMs) {
-        Utils.verifyOnMainThread();
-        if (!videoId.equals(currentVideoId)) return;
-        if (index >= segments.size()) return;
-        if (index < lastSpokenIndex) return;
-
-        TranscriptSegment seg = segments.get(index);
-        long rawDelta = (seg.startMs() + naturalDurationMs) - seg.endMs();
-        if (Math.abs(rawDelta) < 50) return;
-
-        // Walk forward to find the end of the touching chain starting at index.
-        int chainEnd = index;
-        while (chainEnd + 1 < segments.size()
-                && segments.get(chainEnd).endMs() == segments.get(chainEnd + 1).startMs()) {
-            chainEnd++;
-        }
-
-        // Positive delta: cap so the chain does not push into the next non-touching segment.
-        final long delta;
-        if (rawDelta > 0 && chainEnd + 1 < segments.size()) {
-            long room = segments.get(chainEnd + 1).startMs() - segments.get(chainEnd).endMs();
-            delta = Math.min(rawDelta, room);
-            if (delta <= 0) return;
-        } else {
-            delta = rawDelta;
-        }
-
-        final long newEndMs = seg.endMs() + delta;
-        final int finalChainEnd = chainEnd;
-        Logger.printDebug(() -> "Adjusting segment " + index + " end by " + delta
-                + "ms, chain length " + (finalChainEnd - index + 1));
-        segments.set(index, new TranscriptSegment(seg.startMs(), newEndMs, seg.text()));
-        for (int j = index + 1; j <= finalChainEnd; j++) {
-            TranscriptSegment s = segments.get(j);
-            segments.set(j, new TranscriptSegment(s.startMs() + delta, s.endMs() + delta, s.text()));
-        }
     }
 
     static void notifyHttpError(int statusCode) {

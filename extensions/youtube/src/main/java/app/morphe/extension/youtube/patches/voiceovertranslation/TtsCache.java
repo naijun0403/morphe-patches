@@ -24,6 +24,8 @@ final class TtsCache {
 
     private static final Map<String, byte[]> cache = Collections.synchronizedMap(
             Utils.createSizeRestrictedMap(1000));
+    private static final Map<String, Long> durations = Collections.synchronizedMap(
+            Utils.createSizeRestrictedMap(1000));
 
     private static final String TEST_SAMPLES_DIR = "vot_voice_samples";
 
@@ -37,6 +39,15 @@ final class TtsCache {
 
     static synchronized void put(String videoId, int segmentIndex, String voice, String text, byte[] data) {
         cache.put(key(videoId, segmentIndex, voice, text), data);
+    }
+
+    static void putDuration(String videoId, int segmentIndex, String voice, String text, long durationMs) {
+        durations.put(key(videoId, segmentIndex, voice, text), durationMs);
+    }
+
+    static long getDuration(String videoId, int segmentIndex, String voice, String text) {
+        Long d = durations.get(key(videoId, segmentIndex, voice, text));
+        return d != null ? d : -1;
     }
 
     static byte[] getTestSampleFromDisk(String voiceId) {
