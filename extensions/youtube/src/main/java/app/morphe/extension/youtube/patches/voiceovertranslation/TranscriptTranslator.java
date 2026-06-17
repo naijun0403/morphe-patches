@@ -48,7 +48,9 @@ final class TranscriptTranslator {
     // sizes stay uniform regardless of how long the merged sentences are.
     private static final int MAX_BATCH_CHARS = 4_000;
     // Delay between consecutive background batches to reduce IP rate-limit pressure.
-    private static final int INTER_BATCH_DELAY_MS = 500;
+    private static final int GOOGLE_INTER_BATCH_DELAY_MS = 500;
+    // MyMemory enforces a per-minute request rate; a longer pause keeps us well under it.
+    private static final int MYMEMORY_INTER_BATCH_DELAY_MS = 2_000;
     // Same as arrays.xml value
     public static final String TRANSLATION_SERVICE_GOOGLE = "google";
     // Same as arrays.xml value
@@ -58,6 +60,9 @@ final class TranscriptTranslator {
     // video is reported via printException (visible to the user), while subsequent batch
     // failures in the same session are downgraded to debug to avoid toast spam.
     private static volatile boolean reportNextTranslationError;
+    // Set to true when any batch returns HTTP 429. Remaining batches are skipped because
+    // all subsequent requests will fail the same way until the quota/rate-limit window resets.
+    private static volatile boolean abortTranslation;
 
     /**
      * Progressive translation. The first batch is translated synchronously so the returned
@@ -79,6 +84,7 @@ final class TranscriptTranslator {
         List<List<TranscriptSegment>> batches = splitByCharBudget(segments,
                 isMyMemory ? MYMEMORY_MAX_CHARS : MAX_BATCH_CHARS);
         reportNextTranslationError = true;
+        abortTranslation = false;
 
         // Working copy that accumulates translated batches over the original text.
         List<TranscriptSegment> working = new ArrayList<>(segments);
@@ -94,9 +100,11 @@ final class TranscriptTranslator {
         // Snapshot to return before background batches start mutating the working copy.
         List<TranscriptSegment> initial = new ArrayList<>(working);
 
+        final int batchDelay = isMyMemory ? MYMEMORY_INTER_BATCH_DELAY_MS : GOOGLE_INTER_BATCH_DELAY_MS;
         Handler mainHandler = new Handler(Looper.getMainLooper());
         for (int batchIndex = 1, batchCount = batches.size(); batchIndex < batchCount; batchIndex++) {
             List<String> translated = translateBatchSafe(batches.get(batchIndex), targetLang);
+            if (abortTranslation) break;
             List<TranscriptSegment> snapshot;
 
             applyBatch(working, batches.get(batchIndex), offsets[batchIndex], translated);
@@ -118,7 +126,7 @@ final class TranscriptTranslator {
             }
 
             try {
-                Thread.sleep(INTER_BATCH_DELAY_MS);
+                Thread.sleep(batchDelay);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return initial;
@@ -153,9 +161,11 @@ final class TranscriptTranslator {
         try {
             return translateBatch(batch, targetLang);
         } catch (Exception ex) {
+            String msg = ex.getMessage();
+            if (msg != null && msg.contains("429")) abortTranslation = true;
             if (reportNextTranslationError) {
                 reportNextTranslationError = false;
-                VoiceOverTranslationPatch.logError(() -> "Translation failed: " + ex.getMessage(), ex);
+                VoiceOverTranslationPatch.logError(() -> "Translation failed: " + msg, ex);
             } else {
                 Logger.printDebug(() -> "Batch failed", ex);
             }
