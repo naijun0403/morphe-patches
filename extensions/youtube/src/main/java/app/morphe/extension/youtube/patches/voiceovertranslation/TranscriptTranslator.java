@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
@@ -91,6 +92,9 @@ final class TranscriptTranslator {
     private static volatile List<List<TranscriptSegment>> liveBatches;
     @Nullable
     private static volatile boolean[] liveBatchDone;
+    // Guards against stale mainHandler.post() callbacks from a prior session clobbering
+    // liveBatchDone after a new session has started.
+    private static final AtomicInteger liveSession = new AtomicInteger();
     // Index of the batch currently being translated, or -1 when idle.
     private static volatile int translatingBatchIndex = -1;
     // The original (untranslated) segments for the running session, indexed identically to the
@@ -217,6 +221,7 @@ final class TranscriptTranslator {
         liveBatchDone = toBoolArray(batchDone);
         liveOriginals = segments;
         translatingBatchIndex = -1;
+        final int mySession = liveSession.incrementAndGet();
 
         // First completed batch snapshot, returned as a fallback only if onUpdate never runs.
         List<TranscriptSegment> initial = null;
@@ -253,7 +258,6 @@ final class TranscriptTranslator {
 
                 // Republish so consumers see the updated batch layout (a split changes indices).
                 liveBatches = new ArrayList<>(batches);
-                liveBatchDone = toBoolArray(batchDone);
 
                 translatingBatchIndex = index;
                 final List<String> translated = translateBatchSafe(videoId, batch, targetLang,
@@ -272,11 +276,22 @@ final class TranscriptTranslator {
 
                 applyBatch(working, batch, finalOffset, translated);
                 batchDone.set(index, true);
-                liveBatchDone = toBoolArray(batchDone);
                 completed++;
 
+                // liveBatchDone must become visible on the main thread only after segments is
+                // updated; otherwise videoTimeChanged() can see done=true while segments still
+                // holds the original text and speak the untranslated audio (race after seek).
                 final List<TranscriptSegment> snapshot = new ArrayList<>(working);
-                if (onUpdate != null) mainHandler.post(() -> onUpdate.accept(snapshot));
+                final boolean[] newDone = toBoolArray(batchDone);
+                if (onUpdate != null) {
+                    mainHandler.post(() -> {
+                        if (mySession != liveSession.get()) return;
+                        onUpdate.accept(snapshot);
+                        liveBatchDone = newDone;
+                    });
+                } else {
+                    liveBatchDone = newDone;
+                }
                 if (initial == null) initial = snapshot;
 
                 // Skip remaining work when the result is no longer needed (video changed).
