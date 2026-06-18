@@ -626,10 +626,8 @@ final class TranscriptTranslator {
         final String targetLangName = Locale.forLanguageTag(targetLang).getDisplayLanguage(Locale.ENGLISH);
         JSONObject systemMessage = new JSONObject()
                 .put("role", "system")
-                .put("content", "Translate the following numbered subtitle lines to " + targetLangName
-                        + " (BCP 47 language code: " + targetLang + "). "
-                        + "Return each translation in the format \"N: translation\" using the same number. "
-                        + "Output exactly one line per input number. Do not merge, skip, or reorder lines.");
+                .put("content", "Translate each numbered line to " + targetLangName + " (" + targetLang + "). "
+                        + "Reply \"N: translation\". One line per number. Do not merge or skip.");
         JSONObject userMessage = new JSONObject()
                 .put("role", "user")
                 .put("content", joined.toString());
@@ -638,6 +636,7 @@ final class TranscriptTranslator {
                 .put("model", model)
                 .put("temperature", 0)
                 .put("stream", true)
+                .put("max_tokens", segments.size() * 20)
                 .put("messages", new JSONArray().put(systemMessage).put(userMessage));
 
         byte[] bodyBytes = body.toString().getBytes(StandardCharsets.UTF_8);
