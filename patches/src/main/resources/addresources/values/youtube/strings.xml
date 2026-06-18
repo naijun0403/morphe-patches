@@ -355,7 +355,7 @@ Tap here to open mymemory.translated.net"</string>
     <string name="morphe_vot_mymemory_email_summary">Optional. Enter your MyMemory email address to increase the daily limit from 5,000 to 50,000 characters. Leave empty to use the anonymous limit</string>
     <string name="morphe_vot_service_openrouter" translatable="false">OpenRouter</string>
     <string name="morphe_vot_paid_suffix">paid</string>
-    <string name="morphe_vot_openrouter_info_summary">"Paid AI translation via OpenRouter. Top up once and get thousands of translations. Mistral Nemo is the cheapest option; Gemma 3 27B offers the highest quality.
+    <string name="morphe_vot_openrouter_info_summary">"Paid AI translation via OpenRouter. Top up once and get thousands of translations. Mistral Nemo is the cheapest option; Gemma 4 26B A4B offers the highest quality.
 
 Tap here to open openrouter.ai"</string>
     <string name="morphe_vot_openrouter_api_key_title">OpenRouter API key</string>
