@@ -90,6 +90,19 @@ final class TranscriptTranslator {
     private static volatile boolean[] liveBatchDone;
     // Index of the batch currently being translated, or -1 when idle.
     private static volatile int translatingBatchIndex = -1;
+    // The original (untranslated) segments for the running session, indexed identically to the
+    // published snapshots, so callers can tell whether a given segment is still on its original
+    // text. Null while no translation is running.
+    @Nullable
+    private static volatile List<TranscriptSegment> liveOriginals;
+
+    // Cutting the in-flight streaming request on every seek means rapid scrubbing shreds batch
+    // after batch with nothing completing. The cut is debounced: it only fires once the play head
+    // has settled, so a deliberate seek stays responsive while scrubbing lets a batch finish.
+    private static final long SEEK_DEBOUNCE_MS = 700;
+    private static final Handler seekHandler = new Handler(Looper.getMainLooper());
+    private static volatile long pendingSeekTimeMs;
+    private static final Runnable seekCutter = TranscriptTranslator::applySeekCut;
 
     static void requestAbort() {
         abortTranslation = true;
@@ -104,16 +117,44 @@ final class TranscriptTranslator {
      * Cheap no-op when nothing is streaming (idle, or a non-streaming service).
      */
     static void onSeek(long timeMs) {
+        if (activeConnection == null) return; // Only an in-flight streaming request can be cut.
+        pendingSeekTimeMs = timeMs;
+        seekHandler.removeCallbacks(seekCutter);
+        seekHandler.postDelayed(seekCutter, SEEK_DEBOUNCE_MS);
+    }
+
+    private static void applySeekCut() {
         HttpURLConnection conn = activeConnection;
-        if (conn == null) return; // Only an in-flight streaming request can be cut mid-batch.
-        List<List<TranscriptSegment>> batches = liveBatches;
-        boolean[] done = liveBatchDone;
+        if (conn == null) return;
+        final List<List<TranscriptSegment>> batches = liveBatches;
+        final boolean[] done = liveBatchDone;
         if (batches == null || done == null) return;
-        final int target = findBatchAtTime(batches, timeMs);
-        if (target == translatingBatchIndex) return; // Seek stays inside the batch being translated.
+        final int target = findBatchAtTime(batches, pendingSeekTimeMs);
+        if (target == translatingBatchIndex) return; // Settled inside the batch being translated.
         if (target >= 0 && target < done.length && done[target]) return; // Target already translated.
         reprioritize = true;
         conn.disconnect();
+    }
+
+    /**
+     * @return true while a translation is running, the given segment is still on its original text,
+     *         and its batch has not finished, signaling the caller to wait rather than speak the
+     *         untranslated original. Returns false as soon as the segment's text changes (so a line
+     *         delivered early by the OpenRouter stream plays immediately), once its batch is done
+     *         even if the text was kept after a failed translation (so playback is never blocked
+     *         indefinitely), and when no translation is active.
+     */
+    static boolean isAwaitingTranslationAt(int segmentIndex, long segmentStartMs, String currentText) {
+        final List<TranscriptSegment> originals = liveOriginals;
+        if (originals == null) return false;
+        if (segmentIndex < 0 || segmentIndex >= originals.size()) return false;
+        // Text already differs from the original - translated by a completed batch or a streamed line.
+        if (!currentText.equals(originals.get(segmentIndex).text())) return false;
+        final List<List<TranscriptSegment>> batches = liveBatches;
+        final boolean[] done = liveBatchDone;
+        if (batches == null || done == null) return true;
+        final int index = findBatchAtTime(batches, segmentStartMs);
+        return index < 0 || index >= done.length || !done[index];
     }
 
     /**
@@ -170,9 +211,10 @@ final class TranscriptTranslator {
                 : isOpenRouter ? OPENROUTER_INTER_BATCH_DELAY_MS
                   : GOOGLE_INTER_BATCH_DELAY_MS;
 
-        // Publish session state so onSeek() can interrupt the in-flight batch on a large jump.
+        // Publish session state so onSeek()/isAwaitingTranslationAt() can see it.
         liveBatches = batches;
         liveBatchDone = batchDone;
+        liveOriginals = segments;
         translatingBatchIndex = -1;
 
         // First completed batch snapshot, returned as a fallback only if onUpdate never runs.
@@ -239,6 +281,7 @@ final class TranscriptTranslator {
         } finally {
             liveBatches = null;
             liveBatchDone = null;
+            liveOriginals = null;
             translatingBatchIndex = -1;
         }
     }

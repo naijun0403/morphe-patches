@@ -96,9 +96,6 @@ public class VoiceOverTranslationPatch {
 
     private static float lastSpeechRate = MIN_SPEECH_RATE;
     static volatile long lastVideoTimeMs;
-    // Non-null while translation is in progress. Holds the original (untranslated) segments so
-    // videoTimeChanged() can skip speaking a segment that hasn't been translated yet.
-    static volatile List<TranscriptSegment> pendingTranslationOriginals;
     // Estimated video timestamp when the currently-playing TTS audio finishes.
     // Duck is held until this time so TTS that extends into the gap before the
     // next segment does not prematurely restore the original audio volume.
@@ -181,7 +178,6 @@ public class VoiceOverTranslationPatch {
             lastVideoTimeMs = 0;
             lastSpokenIndex = -1;
             wasExplicitSeek = false;
-            pendingTranslationOriginals = null;
             if (videoId.equals(currentVideoId)) return;
 
             Logger.printDebug(() -> "newVideoLoaded");
@@ -251,9 +247,7 @@ public class VoiceOverTranslationPatch {
             TranscriptSegment seg = segments.get(i);
             if (effectiveTimeMs >= seg.startMs() && timeMs < seg.endMs()) {
                 if (i != lastSpokenIndex) {
-                    List<TranscriptSegment> originals = pendingTranslationOriginals;
-                    if (originals != null && i < originals.size()
-                            && seg.text().equals(originals.get(i).text())) {
+                    if (TranscriptTranslator.isAwaitingTranslationAt(i, seg.startMs(), seg.text())) {
                         final int segIdx = i;
                         Logger.printDebug(() -> "Waiting for translation at segment: " + segIdx);
                         break;
@@ -371,9 +365,6 @@ public class VoiceOverTranslationPatch {
                 logError(() -> "Transcript fetch failed", ex);
             } finally {
                 Utils.runOnMainThread(() -> {
-                    // Always clear so a failed or aborted translation doesn't permanently
-                    // block TTS from speaking (pendingTranslationOriginals check in videoTimeChanged).
-                    pendingTranslationOriginals = null;
                     isLoading = false;
                     // The video may have changed while this fetch was in flight - the isLoading
                     // gate blocked that load, so restart it for the current video.
@@ -471,14 +462,19 @@ public class VoiceOverTranslationPatch {
         // Use the balanced segment bounds for the available window.
         final long availableMs = seg.endMs() - speakFromMs;
 
+        // Natural TTS duration (exact if cached, estimated from char count otherwise).
+        // Used for rate calculation, seek clamping, and tracking when duck should be released.
+        final long speechDurationMs = getSpeechDurationMs(seg, index, voice, lang);
+
         // Calculate if we should seek into the audio (e.g. after a short seek within segment).
         long startTimeMs = 0;
         if (wasExplicitSeek) {
             final long timeIntoSegment = lastVideoTimeMs - seg.startMs();
             if (timeIntoSegment > SEEK_INTO_THRESHOLD_MS) {
-                // Approximate audio position. Ideally we'd use the speech rate, but since
-                // rate is baked into SSML for Edge, we assume normal speed for simplicity.
-                startTimeMs = timeIntoSegment;
+                // Approximate audio position. Ideally we'd use the speech rate, but since rate is
+                // baked into SSML for Edge, we assume normal speed. The TTS clip is usually shorter
+                // than the video segment, so clamp to its length to avoid seeking past the end.
+                startTimeMs = Math.min(timeIntoSegment, speechDurationMs);
             }
             final long startTimeMsFinal = startTimeMs;
             Logger.printDebug(() -> "Explicit seek resume. timeIntoSegment: " + timeIntoSegment
@@ -487,9 +483,6 @@ public class VoiceOverTranslationPatch {
             wasExplicitSeek = false;
         }
 
-        // Natural TTS duration (exact if cached, estimated from char count otherwise).
-        // Used for rate calculation and for tracking when duck should be released.
-        final long speechDurationMs = getSpeechDurationMs(seg, index, voice, lang);
         final float rate = smoothRate(calculateSpeechRate(speechDurationMs, availableMs));
         ttsEndVideoTimeMs = speakFromMs + (long) (speechDurationMs / rate);
 
