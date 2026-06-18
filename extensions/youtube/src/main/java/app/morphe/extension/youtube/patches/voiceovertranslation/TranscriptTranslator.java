@@ -122,6 +122,9 @@ final class TranscriptTranslator {
 
         final Handler mainHandler = new Handler(Looper.getMainLooper());
 
+        // Tracks which batches have been translated to support dynamic priority re-ordering.
+        final boolean[] batchDone = new boolean[batchesSize];
+
         // Translate the batch at the current video position first so TTS gets translated text
         // without waiting for all preceding batches. Critical when starting mid-video or seeking.
         final long currentTimeMs = VoiceOverTranslationPatch.lastVideoTimeMs;
@@ -133,6 +136,7 @@ final class TranscriptTranslator {
             applyBatch(working, priorityBatch, priorityOffset,
                     translateBatchSafe(videoId, priorityBatch, targetLang,
                             streamCallback(onUpdate, mainHandler, working, priorityBatch, priorityOffset)));
+            batchDone[priorityBatchIndex] = true;
             if (onUpdate != null && !isOpenRouter) {
                 List<TranscriptSegment> snap = new ArrayList<>(working);
                 mainHandler.post(() -> onUpdate.accept(snap));
@@ -142,6 +146,7 @@ final class TranscriptTranslator {
         final List<TranscriptSegment> batch0 = batches.get(0);
         applyBatch(working, batch0, 0, translateBatchSafe(videoId, batch0, targetLang,
                 streamCallback(onUpdate, mainHandler, working, batch0, 0)));
+        batchDone[0] = true;
         if (batchesSize == 1) return working;
 
         // Snapshot to return before background batches start mutating the working copy.
@@ -158,13 +163,37 @@ final class TranscriptTranslator {
 
         for (int batchIndex = 1; batchIndex < batchesSize; batchIndex++) {
             if (abortTranslation) break;
-            if (batchIndex == priorityBatchIndex) continue;
+            if (batchDone[batchIndex]) continue;
+
+            // Re-check priority between batches: if the user seeked forward while translation
+            // is in progress, translate the batch at the new position before continuing.
+            final long liveTimeMs = VoiceOverTranslationPatch.lastVideoTimeMs;
+            if (liveTimeMs > 0) {
+                final int livePriority = findBatchAtTime(batches, liveTimeMs);
+                if (livePriority > batchIndex && !batchDone[livePriority]) {
+                    final List<TranscriptSegment> liveBatch = batches.get(livePriority);
+                    final int liveOffset = offsets[livePriority];
+                    applyBatch(working, liveBatch, liveOffset,
+                            translateBatchSafe(videoId, liveBatch, targetLang,
+                                    streamCallback(onUpdate, mainHandler, working, liveBatch, liveOffset)));
+                    batchDone[livePriority] = true;
+                    if (onUpdate != null && !isOpenRouter) {
+                        List<TranscriptSegment> snap = new ArrayList<>(working);
+                        mainHandler.post(() -> onUpdate.accept(snap));
+                    }
+                    if (abortTranslation) break;
+                }
+            }
+
+            if (batchDone[batchIndex]) continue;
+
             List<TranscriptSegment> batchN = batches.get(batchIndex);
             final int batchOffset = offsets[batchIndex];
             List<String> translated = translateBatchSafe(videoId, batchN, targetLang,
                     streamCallback(onUpdate, mainHandler, working, batchN, batchOffset));
 
             applyBatch(working, batchN, batchOffset, translated);
+            batchDone[batchIndex] = true;
             List<TranscriptSegment> snapshot = new ArrayList<>(working);
             if (onUpdate != null) mainHandler.post(() -> onUpdate.accept(snapshot));
 
