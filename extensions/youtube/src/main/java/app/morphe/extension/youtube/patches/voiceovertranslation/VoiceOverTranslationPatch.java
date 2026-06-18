@@ -187,14 +187,14 @@ public class VoiceOverTranslationPatch {
 
             //noinspection ExtractMethodRecommender
             Handler mainHandler = new Handler(Looper.getMainLooper());
-            FutureTask<Boolean> cancelCheck = new FutureTask<>(() -> {
+            Runnable update = new FutureTask<>(() -> {
                 // Always reset so seek detection fires correctly on the first videoTimeChanged
                 // and so the first segment at the new position is spoken even when the same
                 // video is reopened at a different timestamp (e.g. chapter links, continue watching).
                 lastVideoTimeMs = 0;
                 lastSpokenIndex = -1;
                 wasExplicitSeek = false;
-                if (videoId.equals(currentVideoId)) return false;
+                if (videoId.equals(currentVideoId)) return;
 
                 Logger.printDebug(() -> "preloadTranslations newVideoLoaded");
                 TranscriptTranslator.requestAbort();
@@ -203,18 +203,16 @@ public class VoiceOverTranslationPatch {
                 segments = new ArrayList<>();
                 httpErrorDialogShownThisVideo = false;
 
-                if (!Settings.VOT_ENABLED.get() || !sessionEnabled) return false;
-                if (PlayerType.getCurrent() == PlayerType.INLINE_MINIMAL) return false;
+                if (!Settings.VOT_ENABLED.get() || !sessionEnabled) return;
+                if (PlayerType.getCurrent() == PlayerType.INLINE_MINIMAL) return;
                 TtsPrefetcher.updateVideo(videoId, segments);
                 loadTranscript(videoId);
-                return true;
-            });
-            mainHandler.post(cancelCheck);
+            }, null);
+            mainHandler.post(update);
 
             // Block until main thread finishes initial update.
-            // System TTS synthesizes on-device and has no prefetch step, so the latch would
-            // never release and blockUntilFirstSegmentLoads would always time out.
-            if (Settings.VOT_WAIT_FOR_TTS.get() && !Settings.VOT_USE_NATIVE_TTS.get() && cancelCheck.get()) {
+            // System TTS synthesizes on-device and does not use a latch so cannot block.
+            if (Settings.VOT_WAIT_FOR_TTS.get() && !Settings.VOT_USE_NATIVE_TTS.get()) {
                 TtsPrefetcher.blockUntilFirstSegmentLoads(videoId, 10_000);
             }
         } catch (Exception ex) {
