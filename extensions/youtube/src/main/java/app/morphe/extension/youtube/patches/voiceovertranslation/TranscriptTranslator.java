@@ -58,6 +58,7 @@ final class TranscriptTranslator {
     private static final int OPENROUTER_INTER_BATCH_DELAY_MS = 0;
     // OpenRouter LLM inference can take longer than the shared read timeout.
     private static final int OPENROUTER_READ_TIMEOUT_MS = 30_000;
+    private static final String OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
     // MyMemory enforces a per-minute request rate; a longer pause keeps us well under it.
     private static final int MYMEMORY_INTER_BATCH_DELAY_MS = 2_000;
     // Same as arrays.xml value
@@ -747,5 +748,41 @@ final class TranscriptTranslator {
         Logger.printDebug(() -> "OpenRouter translation complete: " + targetLang
                 + " fetchTime: " + (System.currentTimeMillis() - start) + "ms");
         return result;
+    }
+
+    static void fetchOpenRouterModelCost(@Nullable String model, Consumer<Float> onResult) {
+        if (model == null || model.isEmpty()) {
+            new Handler(Looper.getMainLooper()).post(() -> onResult.accept(null));
+            return;
+        }
+        new Thread(() -> {
+            try {
+                HttpURLConnection conn = (HttpURLConnection) new URL(OPENROUTER_MODELS_URL).openConnection();
+                conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
+                conn.setReadTimeout(READ_TIMEOUT_MS);
+                conn.setRequestProperty("Accept-Encoding", "identity");
+                if (conn.getResponseCode() != 200) {
+                    new Handler(Looper.getMainLooper()).post(() -> onResult.accept(null));
+                    return;
+                }
+                JSONArray data = new JSONObject(Requester.parseString(conn)).getJSONArray("data");
+                for (int i = 0; i < data.length(); i++) {
+                    JSONObject entry = data.getJSONObject(i);
+                    if (!model.equals(entry.optString("id"))) continue;
+                    JSONObject pricing = entry.optJSONObject("pricing");
+                    if (pricing == null) break;
+                    float promptPrice = (float) pricing.optDouble("prompt", 0);
+                    float completionPrice = (float) pricing.optDouble("completion", 0);
+                    // ~12 batches/hr (4 captions/min × 60 min / 20 captions per batch).
+                    // Per batch: ~435 prompt tokens (system message + captions) + ~375 completion tokens.
+                    float hourlyCost = 12 * (435 * promptPrice + 375 * completionPrice);
+                    new Handler(Looper.getMainLooper()).post(() -> onResult.accept(hourlyCost));
+                    return;
+                }
+            } catch (Exception e) {
+                Logger.printDebug(() -> "OpenRouter model cost fetch failed: " + e.getMessage());
+            }
+            new Handler(Looper.getMainLooper()).post(() -> onResult.accept(null));
+        }).start();
     }
 }

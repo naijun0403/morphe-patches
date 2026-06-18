@@ -368,6 +368,9 @@ Tap here to open openrouter.ai"</string>
     <string name="morphe_vot_openrouter_model_hint" translatable="false">e.g. mistralai/mistral-nemo</string>
     <string name="morphe_vot_openrouter_not_configured_title">OpenRouter not configured</string>
     <string name="morphe_vot_openrouter_not_configured_message">Enter your OpenRouter API key in settings before selecting this provider</string>
+    <string name="morphe_vot_cost_free">Free</string>
+    <!-- Hour abbreviation appended after a slash to form e.g. "~$0.003/hr" -->
+    <string name="morphe_vot_cost_hour_abbrev">hr</string>
     <string name="morphe_vot_tts_voice_type">Voice</string>
     <string name="morphe_vot_tts_system">System</string>
     <string name="morphe_vot_voice_gender_male_multilingual">Multilingual male</string>

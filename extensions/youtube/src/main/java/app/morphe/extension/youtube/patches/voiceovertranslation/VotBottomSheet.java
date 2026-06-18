@@ -121,6 +121,18 @@ public final class VotBottomSheet {
         content.addView(makeLanguageRow(context, str("morphe_vot_caption_language_title"), fg,
                 langEntries, langValues, mainRef));
         content.addView(translationRow);
+        if (TRANSLATION_SERVICE_OPENROUTER.equals(Settings.VOT_TRANSLATION_SERVICE.get())) {
+            TextView costView = new TextView(context);
+            costView.setTextSize(12);
+            costView.setTextColor(secondaryColor(fg));
+            LinearLayout.LayoutParams costLp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            costLp.setMargins(0, 0, 0, Dim.dp4);
+            costView.setLayoutParams(costLp);
+            content.addView(costView);
+            TranscriptTranslator.fetchOpenRouterModelCost(Settings.VOT_OPENROUTER_MODEL.get(),
+                    cost -> costView.setText(cost != null ? formatOpenRouterCostPerHour(cost) : ""));
+        }
         content.addView(engineRow);
         content.addView(makeDivider(context, fg));
         content.addView(makeSliderRow(context,
@@ -649,6 +661,15 @@ public final class VotBottomSheet {
 
     private static int secondaryColor(int fg) {
         return Color.argb(153, Color.red(fg), Color.green(fg), Color.blue(fg));
+    }
+
+    private static String formatOpenRouterCostPerHour(float cost) {
+        String perHour = "/" + str("morphe_vot_cost_hour_abbrev");
+        if (cost == 0) return str("morphe_vot_cost_free");
+        if (cost < 0.001f) return "< $0.001" + perHour;
+        if (cost < 0.01f) return String.format(Locale.US, "~$%.3f", cost) + perHour;
+        if (cost < 0.10f) return String.format(Locale.US, "~$%.2f", cost) + perHour;
+        return String.format(Locale.US, "~$%.1f", cost) + perHour;
     }
 
     @FunctionalInterface
