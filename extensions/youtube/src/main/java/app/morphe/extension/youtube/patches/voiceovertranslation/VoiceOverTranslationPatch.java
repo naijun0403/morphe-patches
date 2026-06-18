@@ -96,6 +96,9 @@ public class VoiceOverTranslationPatch {
 
     private static float lastSpeechRate = MIN_SPEECH_RATE;
     static volatile long lastVideoTimeMs;
+    // Non-null while translation is in progress. Holds the original (untranslated) segments so
+    // videoTimeChanged() can skip speaking a segment that hasn't been translated yet.
+    static volatile List<TranscriptSegment> pendingTranslationOriginals;
     // Estimated video timestamp when the currently-playing TTS audio finishes.
     // Duck is held until this time so TTS that extends into the gap before the
     // next segment does not prematurely restore the original audio volume.
@@ -178,6 +181,7 @@ public class VoiceOverTranslationPatch {
             lastVideoTimeMs = 0;
             lastSpokenIndex = -1;
             wasExplicitSeek = false;
+            pendingTranslationOriginals = null;
             if (videoId.equals(currentVideoId)) return;
 
             Logger.printDebug(() -> "newVideoLoaded");
@@ -236,6 +240,9 @@ public class VoiceOverTranslationPatch {
                 wasExplicitSeek = true;
                 stopTts();
                 lastSpokenIndex = -1;
+                // Re-target translation at the new position so a seek into an untranslated region
+                // is translated next instead of waiting for the sequential dispatch to reach it.
+                TranscriptTranslator.onSeek(timeMs);
             }
         }
 
@@ -244,6 +251,13 @@ public class VoiceOverTranslationPatch {
             TranscriptSegment seg = segments.get(i);
             if (effectiveTimeMs >= seg.startMs() && timeMs < seg.endMs()) {
                 if (i != lastSpokenIndex) {
+                    List<TranscriptSegment> originals = pendingTranslationOriginals;
+                    if (originals != null && i < originals.size()
+                            && seg.text().equals(originals.get(i).text())) {
+                        final int segIdx = i;
+                        Logger.printDebug(() -> "Waiting for translation at segment: " + segIdx);
+                        break;
+                    }
                     if (!ttsEngine.isSpeaking() || wasExplicitSeek) {
                         lastSpokenIndex = i;
                         speak(seg, i);
@@ -328,7 +342,7 @@ public class VoiceOverTranslationPatch {
                                         && lastSpokenIndex < segments.size()
                                         && lastSpokenIndex < updated.size()
                                         && !segments.get(lastSpokenIndex).text()
-                                                .equals(updated.get(lastSpokenIndex).text())) {
+                                        .equals(updated.get(lastSpokenIndex).text())) {
                                     stopTts();
                                 }
                                 segments = updated;
@@ -357,6 +371,9 @@ public class VoiceOverTranslationPatch {
                 logError(() -> "Transcript fetch failed", ex);
             } finally {
                 Utils.runOnMainThread(() -> {
+                    // Always clear so a failed or aborted translation doesn't permanently
+                    // block TTS from speaking (pendingTranslationOriginals check in videoTimeChanged).
+                    pendingTranslationOriginals = null;
                     isLoading = false;
                     // The video may have changed while this fetch was in flight - the isLoading
                     // gate blocked that load, so restart it for the current video.
@@ -616,17 +633,13 @@ public class VoiceOverTranslationPatch {
             requestDuck();
             updateDucking();
             final long id = ttsEngine.markBusy();
-            ttsEngine.play(cached, volume, id, () -> {
-                updateIsTestSpeaking(testId);
-            });
+            ttsEngine.play(cached, volume, id, () -> updateIsTestSpeaking(testId));
             return;
         }
 
         requestDuck();
         updateDucking();
-        ttsEngine.speak(getTestString(), voiceId, resolveTargetLang(), volume, () -> {
-            updateIsTestSpeaking(testId);
-        });
+        ttsEngine.speak(getTestString(), voiceId, resolveTargetLang(), volume, () -> updateIsTestSpeaking(testId));
     }
 
     private static void updateIsTestSpeaking(long testId) {

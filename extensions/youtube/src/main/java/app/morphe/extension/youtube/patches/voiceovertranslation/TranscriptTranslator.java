@@ -77,6 +77,19 @@ final class TranscriptTranslator {
     // Held while an OpenRouter request is in flight (connecting, waiting for response, or reading
     // the SSE stream) so requestAbort() can disconnect it and unblock the background thread.
     private static volatile HttpURLConnection activeConnection;
+    // Set true when a seek moves the play head into a different, not-yet-translated batch while
+    // a streaming request is in flight. The in-flight batch is abandoned (connection disconnected)
+    // and the dispatcher re-picks the batch nearest the new play head. Unlike abortTranslation this
+    // is not fatal - translation continues from the new position.
+    private static volatile boolean reprioritize;
+    // Session state published while translate() runs so onSeek() can map a timestamp to a batch and
+    // decide whether the in-flight request is worth cutting. Null while no translation is running.
+    @Nullable
+    private static volatile List<List<TranscriptSegment>> liveBatches;
+    @Nullable
+    private static volatile boolean[] liveBatchDone;
+    // Index of the batch currently being translated, or -1 when idle.
+    private static volatile int translatingBatchIndex = -1;
 
     static void requestAbort() {
         abortTranslation = true;
@@ -85,13 +98,40 @@ final class TranscriptTranslator {
     }
 
     /**
-     * Progressive translation. The first batch is translated synchronously so the returned
-     * list is immediately usable for playback; remaining batches are translated on background
-     * threads and published through {@code onUpdate} (called once per completed batch with a
-     * full snapshot of the segment list). Failed batches keep their original text.
+     * Called from the player thread on a large seek. If a batch other than the one being
+     * translated now sits under the play head and is still untranslated, the in-flight streaming
+     * request is cut so the dispatcher can immediately re-pick the batch at the new position.
+     * Cheap no-op when nothing is streaming (idle, or a non-streaming service).
+     */
+    static void onSeek(long timeMs) {
+        HttpURLConnection conn = activeConnection;
+        if (conn == null) return; // Only an in-flight streaming request can be cut mid-batch.
+        List<List<TranscriptSegment>> batches = liveBatches;
+        boolean[] done = liveBatchDone;
+        if (batches == null || done == null) return;
+        final int target = findBatchAtTime(batches, timeMs);
+        if (target == translatingBatchIndex) return; // Seek stays inside the batch being translated.
+        if (target >= 0 && target < done.length && done[target]) return; // Target already translated.
+        reprioritize = true;
+        conn.disconnect();
+    }
+
+    /**
+     * Progressive, play-head-driven translation. Batches are translated one at a time, always
+     * choosing the not-yet-done batch nearest the current play head (the batch under it first,
+     * then batches ahead, then batches behind). This keeps the audible region translated first
+     * whether playback starts at zero, resumes mid-video, or jumps after a seek.
      *
-     * <p>Timings and list size never change between updates - only segment text - so callers
-     * may keep indexing into the list across snapshots.
+     * <p>Each completed batch is published through {@code onUpdate} with a full snapshot of the
+     * segment list; streaming services (OpenRouter) additionally publish incremental line updates
+     * while a batch is in flight. Failed batches keep their original text.
+     *
+     * <p>A large seek into a different, untranslated batch cuts the in-flight streaming request
+     * (see {@link #onSeek(long)}) so the dispatcher re-targets the new position without waiting
+     * for the current batch to finish.
+     *
+     * <p>Timings and list size never change between updates - only segment text - so callers may
+     * keep indexing into the list across snapshots.
      */
     static List<TranscriptSegment> translate(String videoId,
                                              List<TranscriptSegment> segments,
@@ -106,120 +146,119 @@ final class TranscriptTranslator {
         final boolean isOpenRouter = service.equals(TRANSLATION_SERVICE_OPENROUTER);
         final int maxBatchChars = isMyMemory ? MYMEMORY_MAX_CHARS
                 : isOpenRouter ? OPENROUTER_MAX_BATCH_CHARS
-                : GOOGLE_MAX_BATCH_CHARS;
-        List<List<TranscriptSegment>> batches = splitByCharBudget(segments, maxBatchChars);
+                  : GOOGLE_MAX_BATCH_CHARS;
+        final List<List<TranscriptSegment>> batches = splitByCharBudget(segments, maxBatchChars);
         reportNextTranslationError = true;
         abortTranslation = false;
+        reprioritize = false;
 
         // Working copy that accumulates translated batches over the original text.
-        List<TranscriptSegment> working = new ArrayList<>(segments);
+        final List<TranscriptSegment> working = new ArrayList<>(segments);
 
         final int batchesSize = batches.size();
-        int[] offsets = new int[batchesSize];
+        final int[] offsets = new int[batchesSize];
         for (int b = 1; b < batchesSize; b++) {
             offsets[b] = offsets[b - 1] + batches.get(b - 1).size();
         }
 
         final Handler mainHandler = new Handler(Looper.getMainLooper());
 
-        // Tracks which batches have been translated to support dynamic priority re-ordering.
+        // Tracks which batches have been translated, driving both dispatch order and seek handling.
         final boolean[] batchDone = new boolean[batchesSize];
-
-        // Translate the batch at the current video position first so TTS gets translated text
-        // without waiting for all preceding batches. Critical when starting mid-video or seeking.
-        final long currentTimeMs = VoiceOverTranslationPatch.lastVideoTimeMs;
-        final int priorityBatchIndex = currentTimeMs > 0 ? findBatchAtTime(batches, currentTimeMs) : 0;
-
-        if (priorityBatchIndex > 0) {
-            final List<TranscriptSegment> priorityBatch = batches.get(priorityBatchIndex);
-            final int priorityOffset = offsets[priorityBatchIndex];
-            applyBatch(working, priorityBatch, priorityOffset,
-                    translateBatchSafe(videoId, priorityBatch, targetLang,
-                            streamCallback(onUpdate, mainHandler, working, priorityBatch, priorityOffset)));
-            batchDone[priorityBatchIndex] = true;
-            if (onUpdate != null && !isOpenRouter) {
-                List<TranscriptSegment> snap = new ArrayList<>(working);
-                mainHandler.post(() -> onUpdate.accept(snap));
-            }
-        }
-
-        final List<TranscriptSegment> batch0 = batches.get(0);
-        applyBatch(working, batch0, 0, translateBatchSafe(videoId, batch0, targetLang,
-                streamCallback(onUpdate, mainHandler, working, batch0, 0)));
-        batchDone[0] = true;
-        if (batchesSize == 1) return working;
-
-        // Snapshot to return before background batches start mutating the working copy.
-        List<TranscriptSegment> initial = new ArrayList<>(working);
 
         final int batchDelay = isMyMemory ? MYMEMORY_INTER_BATCH_DELAY_MS
                 : isOpenRouter ? OPENROUTER_INTER_BATCH_DELAY_MS
-                : GOOGLE_INTER_BATCH_DELAY_MS;
-        // For non-streaming services (Google, MyMemory), onUpdate hasn't fired yet for batch 0 —
-        // post it now so TTS can start. For OpenRouter the stream already posted incremental updates.
-        if (onUpdate != null && !isOpenRouter) {
-            mainHandler.post(() -> onUpdate.accept(initial));
-        }
+                  : GOOGLE_INTER_BATCH_DELAY_MS;
 
-        for (int batchIndex = 1; batchIndex < batchesSize; batchIndex++) {
-            if (abortTranslation) break;
-            if (batchDone[batchIndex]) continue;
+        // Publish session state so onSeek() can interrupt the in-flight batch on a large jump.
+        liveBatches = batches;
+        liveBatchDone = batchDone;
+        translatingBatchIndex = -1;
 
-            // Re-check priority between batches: if the user seeked forward while translation
-            // is in progress, translate the batch at the new position before continuing.
-            final long liveTimeMs = VoiceOverTranslationPatch.lastVideoTimeMs;
-            if (liveTimeMs > 0) {
-                final int livePriority = findBatchAtTime(batches, liveTimeMs);
-                if (livePriority > batchIndex && !batchDone[livePriority]) {
-                    final List<TranscriptSegment> liveBatch = batches.get(livePriority);
-                    final int liveOffset = offsets[livePriority];
-                    applyBatch(working, liveBatch, liveOffset,
-                            translateBatchSafe(videoId, liveBatch, targetLang,
-                                    streamCallback(onUpdate, mainHandler, working, liveBatch, liveOffset)));
-                    batchDone[livePriority] = true;
-                    if (onUpdate != null && !isOpenRouter) {
-                        List<TranscriptSegment> snap = new ArrayList<>(working);
-                        mainHandler.post(() -> onUpdate.accept(snap));
-                    }
-                    if (abortTranslation) break;
+        // First completed batch snapshot, returned as a fallback only if onUpdate never runs.
+        List<TranscriptSegment> initial = null;
+        int completed = 0;
+
+        try {
+            while (completed < batchesSize) {
+                if (abortTranslation) break;
+                reprioritize = false;
+
+                final long timeMs = VoiceOverTranslationPatch.lastVideoTimeMs;
+                final int index = pickNextBatch(batches, batchDone, timeMs);
+                if (index < 0) break;
+
+                final List<TranscriptSegment> batch = batches.get(index);
+                final int offset = offsets[index];
+
+                translatingBatchIndex = index;
+                final List<String> translated = translateBatchSafe(videoId, batch, targetLang,
+                        streamCallback(onUpdate, mainHandler, working, batch, offset));
+                translatingBatchIndex = -1;
+
+                // A seek cut this request short - drop the partial result and re-pick against the
+                // new play head without marking the batch done.
+                if (reprioritize && !abortTranslation) {
+                    Logger.printDebug(() -> "Reprioritizing translation after seek");
+                    continue;
                 }
-            }
+                if (abortTranslation) break;
 
-            if (batchDone[batchIndex]) continue;
+                applyBatch(working, batch, offset, translated);
+                batchDone[index] = true;
+                completed++;
 
-            List<TranscriptSegment> batchN = batches.get(batchIndex);
-            final int batchOffset = offsets[batchIndex];
-            List<String> translated = translateBatchSafe(videoId, batchN, targetLang,
-                    streamCallback(onUpdate, mainHandler, working, batchN, batchOffset));
+                final List<TranscriptSegment> snapshot = new ArrayList<>(working);
+                if (onUpdate != null) mainHandler.post(() -> onUpdate.accept(snapshot));
+                if (initial == null) initial = snapshot;
 
-            applyBatch(working, batchN, batchOffset, translated);
-            batchDone[batchIndex] = true;
-            List<TranscriptSegment> snapshot = new ArrayList<>(working);
-            if (onUpdate != null) mainHandler.post(() -> onUpdate.accept(snapshot));
+                // Skip remaining work when the result is no longer needed (video changed).
+                if (cancelled != null) {
+                    FutureTask<Boolean> cancelCheck = new FutureTask<>(cancelled::getAsBoolean);
+                    mainHandler.post(cancelCheck);
+                    try {
+                        if (cancelCheck.get()) {
+                            Logger.printDebug(() -> "Translate batch canceled for: " + targetLang);
+                            return initial;
+                        }
+                    } catch (ExecutionException | InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
 
-            // Skip remaining work when the result is no longer needed (video changed).
-            if (cancelled != null) {
-                FutureTask<Boolean> cancelCheck = new FutureTask<>(cancelled::getAsBoolean);
-                mainHandler.post(cancelCheck);
-                try {
-                    if (cancelCheck.get()) {
-                        Logger.printDebug(() -> "Translate batch canceled for: " + targetLang);
+                if (completed < batchesSize && batchDelay > 0) {
+                    try {
+                        Thread.sleep(batchDelay);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
                         return initial;
                     }
-                } catch (ExecutionException | InterruptedException e) {
-                    throw new RuntimeException(e);
                 }
             }
-
-            try {
-                Thread.sleep(batchDelay);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return initial;
-            }
+            return initial != null ? initial : working;
+        } finally {
+            liveBatches = null;
+            liveBatchDone = null;
+            translatingBatchIndex = -1;
         }
+    }
 
-        return initial;
+    /**
+     * Picks the not-yet-translated batch to translate next: the batch under the play head, then
+     * batches ahead of it (closest first), then batches behind it (closest first). Returns -1 when
+     * every batch is done. With timeMs 0 (playback from the start) this degrades to plain
+     * front-to-back order.
+     */
+    private static int pickNextBatch(List<List<TranscriptSegment>> batches, boolean[] done, long timeMs) {
+        final int size = batches.size();
+        final int current = findBatchAtTime(batches, timeMs);
+        for (int i = current; i < size; i++) {
+            if (!done[i]) return i;
+        }
+        for (int i = current - 1; i >= 0; i--) {
+            if (!done[i]) return i;
+        }
+        return -1;
     }
 
     /**
@@ -264,7 +303,7 @@ final class TranscriptTranslator {
         try {
             return translateBatch(videoId, batch, targetLang, onLineStreamed);
         } catch (Exception ex) {
-            if (abortTranslation) {
+            if (abortTranslation || reprioritize) {
                 Logger.printDebug(() -> "Translation aborted: " + ex.getMessage());
                 return null;
             }
@@ -343,6 +382,37 @@ final class TranscriptTranslator {
             }
         } catch (NumberFormatException ignored) {}
         return false;
+    }
+
+    /**
+     * Strips a leading line number ("3: ", "3. ", "3) ") if present, returning the remaining text.
+     */
+    private static String stripNumberPrefix(String line) {
+        int i = 0;
+        while (i < line.length() && Character.isDigit(line.charAt(i))) i++;
+        if (i > 0 && i < line.length()) {
+            final char sep = line.charAt(i);
+            if (sep == ':' || sep == '.' || sep == ')') {
+                return line.substring(i + 1).trim();
+            }
+        }
+        return line;
+    }
+
+    /**
+     * Maps unnumbered or mis-numbered model output to segments by position. Succeeds only when the
+     * stripped, non-empty line count matches the segment count exactly, so a merged or padded
+     * response (which cannot be mapped safely) is rejected rather than scrambled across segments.
+     */
+    @Nullable
+    private static List<String> positionalFallback(String raw, int segmentCount) {
+        List<String> lines = new ArrayList<>(segmentCount);
+        for (String line : raw.split("\n")) {
+            final String trimmed = line.trim();
+            if (trimmed.isEmpty()) continue;
+            lines.add(stripNumberPrefix(trimmed));
+        }
+        return lines.size() == segmentCount ? lines : null;
     }
 
     private static List<String> translateBatchGoogle(String videoId,
@@ -501,6 +571,8 @@ final class TranscriptTranslator {
         List<String> result = new ArrayList<>(segments.size());
         for (TranscriptSegment seg : segments) result.add(seg.text());
         int[] matched = {0};
+        // Full raw model output, kept so a positional fallback can run if numbered parsing fails.
+        final StringBuilder rawOutput = new StringBuilder();
 
         activeConnection = conn;
         try {
@@ -512,7 +584,8 @@ final class TranscriptTranslator {
             }
 
             // Read SSE stream. Each chunk is a "data: {...}" line; content deltas are accumulated
-            // into lineBuffer and flushed to result whenever a newline arrives.
+            // into lineBuffer and flushed to result whenever a newline arrives, and mirrored into
+            // rawOutput for the positional fallback.
             StringBuilder lineBuffer = new StringBuilder();
             try (BufferedReader reader = new BufferedReader(
                     new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
@@ -534,6 +607,7 @@ final class TranscriptTranslator {
                     if (delta == null) continue;
 
                     String content = delta.optString("content", "");
+                    rawOutput.append(content);
                     for (int ci = 0; ci < content.length(); ci++) {
                         final char c = content.charAt(ci);
                         if (c == '\n') {
@@ -562,6 +636,19 @@ final class TranscriptTranslator {
         }
 
         final int segmentSize = segments.size();
+        // Some models translate correctly but omit or mangle the line numbers, leaving most
+        // segments on their original text. When the stripped output lines up one-to-one with the
+        // inputs, recover it by mapping positionally instead of dropping the translation.
+        if (matched[0] != segmentSize) {
+            List<String> positional = positionalFallback(rawOutput.toString(), segmentSize);
+            if (positional != null) {
+                for (int i = 0; i < segmentSize; i++) result.set(i, positional.get(i));
+                matched[0] = segmentSize;
+                if (onLineStreamed != null) onLineStreamed.accept(new ArrayList<>(result));
+                Logger.printDebug(() -> "OpenRouter positional fallback applied: " + segmentSize + " lines");
+            }
+        }
+
         final int matchedFirst = matched[0];
         if (matchedFirst != segmentSize) {
             Logger.printDebug(() -> "OpenRouter line mismatch - expected: " + segmentSize
