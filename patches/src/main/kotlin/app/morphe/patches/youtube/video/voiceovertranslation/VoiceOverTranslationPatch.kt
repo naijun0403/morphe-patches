@@ -79,12 +79,10 @@ val voiceOverTranslationPatch = bytecodePatch(
                     SwitchPreference("morphe_vot_enabled"),
                     SwitchPreference("morphe_vot_wait_for_tts"),
                     ListPreference("morphe_vot_caption_language"),
-                    ListPreference("morphe_vot_translation_service"),
-                    NonInteractivePreference("morphe_vot_mymemory_info",
-                        titleKey = "morphe_vot_service_mymemory",
-                        tag = "app.morphe.extension.youtube.settings.preference.VoiceOverTranslationMyMemoryInfoPreference",
+                    NonInteractivePreference("morphe_vot_max_speech_rate",
+                        tag = "app.morphe.extension.shared.settings.preference.SeekBarPreference",
                         selectable = true),
-                    TextPreference("morphe_vot_mymemory_email"),
+                    ListPreference("morphe_vot_translation_service"),
                     NonInteractivePreference("morphe_vot_openrouter_info",
                         titleKey = "morphe_vot_service_openrouter",
                         tag = "app.morphe.extension.youtube.settings.preference.VoiceOverTranslationOpenRouterInfoPreference",
@@ -93,9 +91,12 @@ val voiceOverTranslationPatch = bytecodePatch(
                     TextPreference("morphe_vot_openrouter_model",
                         summaryKey = null,
                         tag = "app.morphe.extension.youtube.settings.preference.VoiceOverTranslationModelPreference"),
-                    NonInteractivePreference("morphe_vot_max_speech_rate",
-                        tag = "app.morphe.extension.shared.settings.preference.SeekBarPreference",
-                        selectable = true)
+                    NonInteractivePreference("morphe_vot_mymemory_info",
+                        titleKey = "morphe_vot_service_mymemory",
+                        tag = "app.morphe.extension.youtube.settings.preference.VoiceOverTranslationMyMemoryInfoPreference",
+                        selectable = true),
+                    TextPreference("morphe_vot_mymemory_email")
+
                 )
             )
         )
