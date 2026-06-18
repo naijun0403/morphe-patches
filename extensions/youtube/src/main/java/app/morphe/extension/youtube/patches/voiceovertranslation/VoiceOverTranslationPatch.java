@@ -19,6 +19,8 @@ import android.media.AudioAttributes;
 import android.media.AudioFocusRequest;
 import android.media.AudioManager;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
 import android.util.Pair;
@@ -29,12 +31,14 @@ import androidx.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.FutureTask;
 
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.ResourceUtils;
 import app.morphe.extension.shared.Utils;
 import app.morphe.extension.shared.settings.Setting;
 import app.morphe.extension.shared.ui.CustomDialog;
+import app.morphe.extension.youtube.patches.VideoInformation;
 import app.morphe.extension.youtube.settings.Settings;
 import app.morphe.extension.youtube.shared.PlayerType;
 import app.morphe.extension.youtube.shared.VideoState;
@@ -171,34 +175,49 @@ public class VoiceOverTranslationPatch {
     }
 
     /**
-     * Injection point.
+     * Injection point. Uses 'playback response' video ID hook to preload first video translations.
      */
-    public static void newVideoLoaded(String videoId) {
+    public static String preloadTranslations(String signature, String videoId, boolean isShortAndOpeningOrPlaying) {
         try {
-            Utils.verifyOnMainThread();
+            final boolean isShort = VideoInformation.playerParametersAreShort(signature);
+            if (isShort && isShortAndOpeningOrPlaying) {
+                return signature; // Feed Short scrolled past and is not opening.
+            }
 
-            // Always reset so seek detection fires correctly on the first videoTimeChanged
-            // and so the first segment at the new position is spoken even when the same
-            // video is reopened at a different timestamp (e.g. chapter links, continue watching).
-            lastVideoTimeMs = 0;
-            lastSpokenIndex = -1;
-            wasExplicitSeek = false;
-            if (videoId.equals(currentVideoId)) return;
+            //noinspection ExtractMethodRecommender
+            Handler mainHandler = new Handler(Looper.getMainLooper());
+            FutureTask<Boolean> cancelCheck = new FutureTask<>(() -> {
+                // Always reset so seek detection fires correctly on the first videoTimeChanged
+                // and so the first segment at the new position is spoken even when the same
+                // video is reopened at a different timestamp (e.g. chapter links, continue watching).
+                lastVideoTimeMs = 0;
+                lastSpokenIndex = -1;
+                wasExplicitSeek = false;
+                if (videoId.equals(currentVideoId)) return false;
 
-            Logger.printDebug(() -> "newVideoLoaded");
-            TranscriptTranslator.requestAbort();
-            stopTts();
-            currentVideoId = videoId;
-            segments = new ArrayList<>();
-            httpErrorDialogShownThisVideo = false;
+                Logger.printDebug(() -> "preloadTranslations newVideoLoaded");
+                TranscriptTranslator.requestAbort();
+                stopTts();
+                currentVideoId = videoId;
+                segments = new ArrayList<>();
+                httpErrorDialogShownThisVideo = false;
 
-            if (!Settings.VOT_ENABLED.get() || !sessionEnabled) return;
-            if (PlayerType.getCurrent() == PlayerType.INLINE_MINIMAL) return;
-            TtsPrefetcher.updateVideo(videoId, segments);
-            loadTranscript(videoId);
+                if (!Settings.VOT_ENABLED.get() || !sessionEnabled) return false;
+                if (PlayerType.getCurrent() == PlayerType.INLINE_MINIMAL) return false;
+                TtsPrefetcher.updateVideo(videoId, segments);
+                loadTranscript(videoId);
+                return true;
+            });
+            mainHandler.post(cancelCheck);
+
+            // Block until main thread finishes initial update.
+            if (Settings.VOT_WAIT_FOR_TTS.get() && cancelCheck.get()) {
+                TtsPrefetcher.blockUntilFirstSegmentLoads(videoId, 10_000);
+            }
         } catch (Exception ex) {
-            logError(() -> "newVideoLoaded failure", ex);
+            logError(() -> "preloadTranslations failure", ex);
         }
+        return signature;
     }
 
     /**

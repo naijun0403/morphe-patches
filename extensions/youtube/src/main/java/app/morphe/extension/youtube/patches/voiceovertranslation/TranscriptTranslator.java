@@ -187,7 +187,7 @@ final class TranscriptTranslator {
         if (segments.isEmpty()) return segments;
         Utils.verifyOffMainThread();
 
-        final String service = Settings.VOT_TRANSLATION_SERVICE.get();
+        String service = Settings.VOT_TRANSLATION_SERVICE.get();
         final boolean isMyMemory = service.equals(TRANSLATION_SERVICE_MY_MEMORY);
         final boolean isOpenRouter = service.equals(TRANSLATION_SERVICE_OPENROUTER);
         final int maxBatchChars = isMyMemory ? MYMEMORY_MAX_CHARS
@@ -196,15 +196,15 @@ final class TranscriptTranslator {
         // Mutable list so the picked batch can be split at the play head on every dispatch,
         // ensuring the streaming model translates the play-head segment first instead of
         // wasting its first lines on segments already behind it.
-        final List<List<TranscriptSegment>> batches =
+        List<List<TranscriptSegment>> batches =
                 new ArrayList<>(splitByCharBudget(segments, maxBatchChars));
         reportNextTranslationError = true;
         abortTranslation = false;
         reprioritize = false;
 
-        final List<TranscriptSegment> working = new ArrayList<>(segments);
+        List<TranscriptSegment> working = new ArrayList<>(segments);
 
-        final Handler mainHandler = new Handler(Looper.getMainLooper());
+        Handler mainHandler = new Handler(Looper.getMainLooper());
 
         // Growable so a dynamic split inserts an extra slot. Drives both dispatch order and
         // seek handling.
@@ -251,7 +251,7 @@ final class TranscriptTranslator {
                 }
                 firstBatchAfterReposition = false;
 
-                final List<TranscriptSegment> batch = batches.get(index);
+                List<TranscriptSegment> batch = batches.get(index);
                 int offset = 0;
                 for (int b = 0; b < index; b++) offset += batches.get(b).size();
                 final int finalOffset = offset;
@@ -281,7 +281,7 @@ final class TranscriptTranslator {
                 // liveBatchDone must become visible on the main thread only after segments is
                 // updated; otherwise videoTimeChanged() can see done=true while segments still
                 // holds the original text and speak the untranslated audio (race after seek).
-                final List<TranscriptSegment> snapshot = new ArrayList<>(working);
+                List<TranscriptSegment> snapshot = new ArrayList<>(working);
                 final boolean[] newDone = toBoolArray(batchDone);
                 if (onUpdate != null) {
                     mainHandler.post(() -> {
