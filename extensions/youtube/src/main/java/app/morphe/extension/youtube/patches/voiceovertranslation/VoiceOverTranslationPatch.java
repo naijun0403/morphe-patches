@@ -71,8 +71,8 @@ public class VoiceOverTranslationPatch {
 
     private static final long SEEK_JUMP_THRESHOLD_MS = 2_900;
     private static final long TTS_LOOKAHEAD_MS = 400;
-    private static final int MAX_START_TIME_EXPANSION = 3000;
-    private static final int MAX_END_TIME_EXPANSION = 6000;
+    private static final int MAX_START_TIME_EXPANSION = 2000;
+    private static final int MAX_END_TIME_EXPANSION = 5000;
 
     // Minimum time into a segment to justify seeking within the audio instead of
     // playing from the start. Prevents tiny pops on small adjustments.

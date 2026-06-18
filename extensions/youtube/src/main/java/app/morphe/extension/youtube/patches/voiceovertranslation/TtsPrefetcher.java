@@ -29,17 +29,17 @@ import app.morphe.extension.youtube.settings.Settings;
  */
 final class TtsPrefetcher {
 
-    // Adaptive delay tiers based on segment distance (number of segments) from play head.
-    private static final int DISTANCE_IMMEDIATE_SEGMENTS = 10;
-    private static final int DISTANCE_NEAR_SEGMENTS      = 50;
+    // Adaptive delay tiers based on segment distance (time) from play head.
+    private static final int DISTANCE_IMMEDIATE_MS = 15_000;
+    private static final int DISTANCE_NEAR_MS      = 60_000;
 
-    private static final int DELAY_IMMEDIATE_MS = 200;
-    private static final int DELAY_NEAR_MS      = 600;
-    private static final int DELAY_BACKGROUND_MS = 1500;
+    private static final int DELAY_IMMEDIATE_MS  = 200;
+    private static final int DELAY_NEAR_MS       = 1_000;
+    private static final int DELAY_BACKGROUND_MS = 3_000;
     private static final int DELAY_IDLE_MS       = 60_000;
 
     // Backoff constants for handling server-side rate limits/errors.
-    private static final int BACKOFF_MIN_MS      = 5000;
+    private static final int BACKOFF_MIN_MS      = 5_000;
     private static final int BACKOFF_MAX_MS      = 60_000; // Cap at 1 minute.
     private static final float BACKOFF_FACTOR    = 1.5f;
 
@@ -60,7 +60,7 @@ final class TtsPrefetcher {
 
     private static final TtsEngine engine = TtsEngine.INSTANCE;
 
-    private record NextFetch(int index, int distance) {}
+    private record NextFetch(int index, int distance, TranscriptSegment seg) {}
 
     static void updateVideo(String videoId, List<TranscriptSegment> segments) {
         synchronized (lock) {
@@ -144,14 +144,14 @@ final class TtsPrefetcher {
 
             NextFetch next = findNextToFetch(videoId, segments, timeMs, voice, voiceLang);
             if (next != null) {
-                //noinspection ExtractMethodRecommender
                 final int delay;
                 synchronized (lock) {
+                    final long distanceMs = Math.abs(next.seg.startMs() - timeMs);
                     if (currentBackoffMs > 0) {
                         delay = currentBackoffMs;
-                    } else if (next.distance <= DISTANCE_IMMEDIATE_SEGMENTS) {
+                    } else if (distanceMs <= DISTANCE_IMMEDIATE_MS) {
                         delay = DELAY_IMMEDIATE_MS;
-                    } else if (next.distance <= DISTANCE_NEAR_SEGMENTS) {
+                    } else if (distanceMs <= DISTANCE_NEAR_MS) {
                         delay = DELAY_NEAR_MS;
                     } else {
                         delay = DELAY_BACKGROUND_MS;
@@ -212,13 +212,13 @@ final class TtsPrefetcher {
 
         // Priority 1: Future segments, closest first.
         for (int i = 0; i < segmentsSize; i++) {
-            final TranscriptSegment seg = segments.get(i);
+            TranscriptSegment seg = segments.get(i);
             if (seg.startMs() >= timeMs) {
                 if (firstFutureIndex == segmentsSize) {
                     firstFutureIndex = i;
                 }
                 if (TtsCache.notCached(videoId, i, voice, lang, seg.text())) {
-                    return new NextFetch(i, i - firstFutureIndex);
+                    return new NextFetch(i, i - firstFutureIndex, seg);
                 }
             }
         }
@@ -227,7 +227,7 @@ final class TtsPrefetcher {
         for (int i = firstFutureIndex - 1; i >= 0; i--) {
             final TranscriptSegment seg = segments.get(i);
             if (TtsCache.notCached(videoId, i, voice, lang, seg.text())) {
-                return new NextFetch(i, firstFutureIndex - i);
+                return new NextFetch(i, firstFutureIndex - i, seg);
             }
         }
 
