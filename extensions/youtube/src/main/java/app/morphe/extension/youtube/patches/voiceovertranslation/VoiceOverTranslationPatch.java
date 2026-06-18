@@ -318,6 +318,11 @@ public class VoiceOverTranslationPatch {
         notifyStateChanged();
     }
 
+    public static void interruptSpeech() {
+        Utils.verifyOnMainThread();
+        stopTts();
+    }
+
     public static void reloadTranscript() {
         Utils.verifyOnMainThread();
         if (currentVideoId.isEmpty()) return;
