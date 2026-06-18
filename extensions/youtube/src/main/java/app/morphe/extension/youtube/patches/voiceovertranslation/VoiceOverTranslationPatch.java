@@ -31,8 +31,8 @@ import java.util.Locale;
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.ResourceUtils;
 import app.morphe.extension.shared.Utils;
-import app.morphe.extension.shared.ui.CustomDialog;
 import app.morphe.extension.shared.settings.Setting;
+import app.morphe.extension.shared.ui.CustomDialog;
 import app.morphe.extension.youtube.settings.Settings;
 import app.morphe.extension.youtube.shared.PlayerType;
 import app.morphe.extension.youtube.shared.VideoState;
@@ -71,8 +71,8 @@ public class VoiceOverTranslationPatch {
 
     private static final long SEEK_JUMP_THRESHOLD_MS = 2_900;
     private static final long TTS_LOOKAHEAD_MS = 400;
-    private static final int MAX_START_TIME_EXPANSION = 2000;
-    private static final int MAX_END_TIME_EXPANSION = 5000;
+    private static final int MAX_START_TIME_EXPANSION = 1000;
+    private static final int MAX_END_TIME_EXPANSION = 2000;
 
     // Minimum time into a segment to justify seeking within the audio instead of
     // playing from the start. Prevents tiny pops on small adjustments.
@@ -116,6 +116,7 @@ public class VoiceOverTranslationPatch {
     private static final AudioManager.OnAudioFocusChangeListener focusChangeListener = focusChange -> { };
     private static AudioFocusRequest focusRequest;
     private static boolean isDucking;
+    private static boolean duckDesired;
 
     private static TextToSpeech tts;
     private static boolean ttsReady;
@@ -180,7 +181,6 @@ public class VoiceOverTranslationPatch {
 
             if (!Settings.VOT_ENABLED.get() || !sessionEnabled) return;
             if (PlayerType.getCurrent() == PlayerType.INLINE_MINIMAL) return;
-            balanceSegments();
             TtsPrefetcher.updateVideo(videoId, segments);
             loadTranscript(videoId);
         } catch (Exception ex) {
@@ -242,7 +242,8 @@ public class VoiceOverTranslationPatch {
         // Not inside any segment - release duck once TTS has finished playing.
         // ttsEndVideoTimeMs keeps the duck alive while TTS speaks into the gap
         // before the next segment, preventing a brief volume flicker mid-utterance.
-        if (!isTestSpeaking && timeMs >= ttsEndVideoTimeMs) abandonDuck();
+        duckDesired = ttsEngine.isSpeaking() || isTestSpeaking || timeMs < ttsEndVideoTimeMs;
+        updateDucking();
     }
 
     public static boolean isTranslationActive() {
@@ -262,7 +263,6 @@ public class VoiceOverTranslationPatch {
             stopTts();
             lastSpokenIndex = -1;
         } else {
-            balanceSegments();
             if (!currentVideoId.isEmpty() && segments.isEmpty() && !isLoading) {
                 loadTranscript(currentVideoId);
             }
@@ -319,7 +319,6 @@ public class VoiceOverTranslationPatch {
                                     stopTts();
                                 }
                                 segments = updated;
-                                balanceSegments();
                             }
                         },
                         () -> {
@@ -336,7 +335,6 @@ public class VoiceOverTranslationPatch {
                         // batch-0 snapshot (fetched) if onUpdate never ran (single batch or
                         // no translation needed).
                         if (segments.isEmpty()) segments = fetched;
-                        balanceSegments();
                         TtsPrefetcher.updateVideo(videoId, segments);
                         Logger.printDebug(() -> "Loaded: " + fetched.size() + " segments for :" + videoId);
                         notifyStateChanged();
@@ -394,7 +392,7 @@ public class VoiceOverTranslationPatch {
                             long tId = Long.parseLong(parts[0]);
                             long pId = Long.parseLong(parts[1]);
                             ttsEngine.clearBusy(pId);
-                            abandonDuckAfterTest(tId);
+                            if (tId == currentTestId) isTestSpeaking = false;
                         } catch (Exception ex) {
                             logError(() -> "Utterance listener onDone failure", ex);
                         }
@@ -472,6 +470,7 @@ public class VoiceOverTranslationPatch {
                 return;
             }
             requestDuck();
+            updateDucking();
             tts.setSpeechRate(rate);
             Bundle params = new Bundle();
             params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume);
@@ -482,6 +481,7 @@ public class VoiceOverTranslationPatch {
         }
 
         requestDuck();
+        updateDucking();
         // Check cache for Edge TTS.
         byte[] cached = TtsCache.get(currentVideoId, index, voice, lang, seg.text());
         if (cached != null) {
@@ -508,94 +508,6 @@ public class VoiceOverTranslationPatch {
     private static long getSpeechDurationMs(TranscriptSegment seg, int index, String voice, String lang) {
         final long cachedDuration = TtsCache.getDuration(currentVideoId, index, voice, lang, seg.text());
         return cachedDuration > 0 ? cachedDuration : (long) seg.text().length() * ESTIMATED_MS_PER_CHAR;
-    }
-
-    private static void balanceSegments() {
-        if (segments.isEmpty()) return;
-        Utils.verifyOnMainThread();
-
-        String lang = resolveTargetLang();
-        String voice = resolveVoice(lang);
-        if (voice == null) return;
-
-        // Group segments into contiguous clusters (gap < MAX_START_TIME_EXPANSION).
-        //noinspection ExtractMethodRecommender
-        List<List<Integer>> clusters = new ArrayList<>();
-        List<Integer> currentCluster = new ArrayList<>();
-        for (int i = 0, size = segments.size(); i < size; i++) {
-            if (!currentCluster.isEmpty()) {
-                final long gap = segments.get(i).startMs() - segments.get(i - 1).endMs();
-                if (gap > MAX_START_TIME_EXPANSION) {
-                    clusters.add(currentCluster);
-                    currentCluster = new ArrayList<>();
-                }
-            }
-            currentCluster.add(i);
-        }
-        if (!currentCluster.isEmpty()) clusters.add(currentCluster);
-
-        for (List<Integer> cluster : clusters) {
-            balanceCluster(cluster, voice, lang);
-        }
-    }
-
-    private static void balanceCluster(List<Integer> clusterIndices, String voice, String lang) {
-        final int firstIdx = clusterIndices.get(0);
-        final int lastIdx = clusterIndices.get(clusterIndices.size() - 1);
-
-        final long clusterStart = segments.get(firstIdx).startMs();
-        final long clusterEnd = segments.get(lastIdx).endMs();
-
-        // Total available time includes the gaps before and after the cluster.
-        final long availableStart = firstIdx > 0 ? segments.get(firstIdx - 1).endMs() : 0;
-        long availableEnd = lastIdx + 1 < segments.size() ? segments.get(lastIdx + 1).startMs() : clusterEnd + MAX_END_TIME_EXPANSION;
-
-        // Also cap availableEnd so we don't extend the cluster's end time too far into a massive gap.
-        availableEnd = Math.min(availableEnd, clusterEnd + MAX_END_TIME_EXPANSION);
-
-        // Expand cluster start
-        final long expandedStart = Math.max(availableStart, clusterStart - MAX_START_TIME_EXPANSION);
-
-        final long totalAvailableMs = availableEnd - expandedStart;
-        long totalNaturalMs = 0;
-        for (int idx : clusterIndices) {
-            totalNaturalMs += getSpeechDurationMs(segments.get(idx), idx, voice, lang);
-        }
-
-        if (totalNaturalMs <= 0) return;
-
-        // Aim for a uniform rate across the cluster.
-        float clusterRate = Math.max(MIN_SPEECH_RATE, totalNaturalMs / (float) totalAvailableMs);
-        final float maxRate = Settings.VOT_MAX_SPEECH_RATE.get() / 10.0f;
-        clusterRate = Math.min(clusterRate, maxRate);
-
-        long currentPos = expandedStart;
-        for (int i = 0, clusterIndicesSize = clusterIndices.size(); i < clusterIndicesSize; i++) {
-            final int idx = clusterIndices.get(i);
-            TranscriptSegment seg = segments.get(idx);
-            long naturalMs = getSpeechDurationMs(seg, idx, voice, lang);
-
-            // Limit how far earlier we can move the start time.
-            final long earliestAllowedStart = seg.startMs() - MAX_START_TIME_EXPANSION;
-            final long newStart = Math.max(currentPos, earliestAllowedStart);
-
-            // If we hit the shift cap, recalculate the rate for the remaining segments
-            // so they don't drift further and further from their original positions.
-            if (newStart > currentPos && i < clusterIndicesSize - 1) {
-                final long remainingAvailableMs = availableEnd - newStart;
-                long remainingNaturalMs = 0;
-                for (int j = i; j < clusterIndices.size(); j++) {
-                    remainingNaturalMs += getSpeechDurationMs(segments.get(clusterIndices.get(j)),
-                            clusterIndices.get(j), voice, lang);
-                }
-                clusterRate = Math.max(MIN_SPEECH_RATE, remainingNaturalMs / (float) remainingAvailableMs);
-                clusterRate = Math.min(clusterRate, maxRate);
-            }
-
-            final long allocatedMs = (long) (naturalMs / clusterRate);
-            segments.set(idx, new TranscriptSegment(newStart, newStart + allocatedMs, seg.text()));
-            currentPos = newStart + allocatedMs;
-        }
     }
 
     /**
@@ -675,6 +587,7 @@ public class VoiceOverTranslationPatch {
             }
             updateTtsLanguage();
             requestDuck();
+            updateDucking();
             Bundle params = new Bundle();
             params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume);
             tts.setSpeechRate(1.0f);
@@ -688,13 +601,24 @@ public class VoiceOverTranslationPatch {
         byte[] cached = TtsCache.get(TEST_VIDEO_ID, TEST_SEGMENT_INDEX, voiceId, lang, getTestString());
         if (cached != null) {
             requestDuck();
+            updateDucking();
             final long id = ttsEngine.markBusy();
-            ttsEngine.play(cached, volume, id, () -> abandonDuckAfterTest(testId));
+            ttsEngine.play(cached, volume, id, () -> {
+                updateIsTestSpeaking(testId);
+            });
             return;
         }
 
         requestDuck();
-        ttsEngine.speak(getTestString(), voiceId, resolveTargetLang(), volume, () -> abandonDuckAfterTest(testId));
+        updateDucking();
+        ttsEngine.speak(getTestString(), voiceId, resolveTargetLang(), volume, () -> {
+            updateIsTestSpeaking(testId);
+        });
+    }
+
+    private static void updateIsTestSpeaking(long testId) {
+        Utils.verifyOnMainThread();
+        if (testId == currentTestId) isTestSpeaking = false;
     }
 
     /**
@@ -764,46 +688,44 @@ public class VoiceOverTranslationPatch {
      */
     private static void requestDuck() {
         Utils.verifyOnMainThread();
-        Logger.printDebug(() -> "requestDuck");
-        if (isDucking) return;
-        isDucking = true;
-        focusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
-                .setAudioAttributes(new AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .build())
-                .setWillPauseWhenDucked(false)
-                .setOnAudioFocusChangeListener(focusChangeListener)
-                .build();
-        getAudioManager().requestAudioFocus(focusRequest);
+        duckDesired = true;
     }
 
     /**
      * Releases the transient audio focus so ExoPlayer restores its media volume.
-     * No-op if ducking is not active or a test is still playing.
+     * No-op if ducking is not active.
      */
     private static void abandonDuck() {
         Utils.verifyOnMainThread();
-        Logger.printDebug(() -> "abandonDuck isTestSpeaking: " + isTestSpeaking
-                + " isDucking: " + isDucking);
-        if (isTestSpeaking) return;
-        if (!isDucking) return;
-
-        isDucking = false;
-        if (audioManager == null) return;
-        if (focusRequest != null) {
-            Logger.printDebug(() -> "abandonDuck requesting focus");
-            audioManager.abandonAudioFocusRequest(focusRequest);
-            focusRequest = null;
-        }
+        duckDesired = false;
     }
 
-    private static void abandonDuckAfterTest(long id) {
+    private static void updateDucking() {
         Utils.verifyOnMainThread();
-        Logger.printDebug(() -> "abandonDuckAfterTest: " + id);
-        if (id != currentTestId) return;
-        isTestSpeaking = false;
-        abandonDuck();
+        if (duckDesired == isDucking) return;
+
+        if (duckDesired) {
+            Logger.printDebug(() -> "ducking enabled");
+            isDucking = true;
+            focusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+                    .setAudioAttributes(new AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                            .build())
+                    .setWillPauseWhenDucked(false)
+                    .setOnAudioFocusChangeListener(focusChangeListener)
+                    .build();
+            getAudioManager().requestAudioFocus(focusRequest);
+        } else {
+            Logger.printDebug(() -> "ducking disabled");
+            isDucking = false;
+            if (audioManager == null) return;
+            if (focusRequest != null) {
+                Logger.printDebug(() -> "updateDucking requesting focus");
+                audioManager.abandonAudioFocusRequest(focusRequest);
+                focusRequest = null;
+            }
+        }
     }
 
     private static AudioManager getAudioManager() {

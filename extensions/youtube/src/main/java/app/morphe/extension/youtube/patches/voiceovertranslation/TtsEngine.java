@@ -14,6 +14,7 @@ import android.media.PlaybackParams;
 import android.util.Base64;
 
 import androidx.annotation.GuardedBy;
+import androidx.annotation.Nullable;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -183,14 +184,14 @@ final class TtsEngine {
     /**
      * Plays the MP3 result through Android's MediaPlayer at natural speed (rate=1.0).
      */
-    void play(byte[] mp3, float volume, long id, Runnable onDone) {
+    void play(byte[] mp3, float volume, long id, @Nullable Runnable onDone) {
         play(mp3, volume, 1.0f, 0, id, onDone);
     }
 
     /**
      * Plays the MP3 result through Android's MediaPlayer starting at {@code startTimeMs}.
      */
-    void play(byte[] mp3, float volume, float rate, long startTimeMs, long id, Runnable onDone) {
+    void play(byte[] mp3, float volume, float rate, long startTimeMs, long id, @Nullable Runnable onDone) {
         Utils.verifyOnMainThread();
 
         // Reject audio that completed synthesis after stop() was called (e.g. post-seek).
