@@ -496,6 +496,7 @@ public class VoiceOverTranslationPatch {
                 Logger.printDebug(() -> "Native TTS not ready, skipping segment");
                 return;
             }
+            updateTtsLanguage();
             requestDuck();
             updateDucking();
             tts.setSpeechRate(rate);
