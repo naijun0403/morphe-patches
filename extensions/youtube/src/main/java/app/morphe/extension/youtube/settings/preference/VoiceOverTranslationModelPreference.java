@@ -191,7 +191,8 @@ public class VoiceOverTranslationModelPreference extends CustomDialogListPrefere
             listLayout.addView(row);
         }
 
-        // If a custom model is already saved, fetch its cost on open.
+        // Custom cost: fetch immediately on open for the already-saved model, then on each edit
+        // with debounce (see syncListSelection below).
         if (isCustom && !currentModel.isEmpty()) {
             VoiceOverTranslationPatch.fetchOpenRouterModelCost(currentModel,
                     cost -> customCostView[0].setText(cost != null ? VoiceOverTranslationPatch.formatOpenRouterCostPerHour(cost) : ""));
@@ -204,7 +205,7 @@ public class VoiceOverTranslationModelPreference extends CustomDialogListPrefere
         Function<String, Void> syncListSelection = typedValue -> {
             currentSelection[0] = isPreset(typedValue) ? typedValue : CUSTOM_SENTINEL;
             refreshChecks.run();
-            // Debounce cost lookup so we don't fire a request on every keystroke.
+            // Debounce so the OpenRouter /models endpoint is not hit on every keystroke.
             if (pendingCostFetch[0] != null) costHandler.removeCallbacks(pendingCostFetch[0]);
             if (!isPreset(typedValue) && !typedValue.isEmpty()) {
                 customCostView[0].setText("");
