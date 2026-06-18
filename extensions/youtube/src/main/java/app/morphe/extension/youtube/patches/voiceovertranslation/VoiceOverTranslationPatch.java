@@ -211,7 +211,9 @@ public class VoiceOverTranslationPatch {
             mainHandler.post(cancelCheck);
 
             // Block until main thread finishes initial update.
-            if (Settings.VOT_WAIT_FOR_TTS.get() && cancelCheck.get()) {
+            // System TTS synthesizes on-device and has no prefetch step, so the latch would
+            // never release and blockUntilFirstSegmentLoads would always time out.
+            if (Settings.VOT_WAIT_FOR_TTS.get() && !Settings.VOT_USE_NATIVE_TTS.get() && cancelCheck.get()) {
                 TtsPrefetcher.blockUntilFirstSegmentLoads(videoId, 10_000);
             }
         } catch (Exception ex) {
