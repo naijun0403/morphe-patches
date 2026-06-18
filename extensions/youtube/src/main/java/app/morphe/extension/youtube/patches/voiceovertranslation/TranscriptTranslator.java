@@ -53,6 +53,8 @@ final class TranscriptTranslator {
     private static final int GOOGLE_MAX_BATCH_CHARS = 4_000;
     // Smaller batches for OpenRouter so the first batch completes faster and TTS starts sooner.
     private static final int OPENROUTER_MAX_BATCH_CHARS = 1_500;
+    // Character budget for the first batch dispatched after a start or seek.
+    private static final int OPENROUTER_FIRST_BATCH_CHARS = 350;
     // Delay between consecutive background batches to reduce IP rate-limit pressure.
     private static final int GOOGLE_INTER_BATCH_DELAY_MS = 500;
     private static final int OPENROUTER_INTER_BATCH_DELAY_MS = 0;
@@ -100,7 +102,7 @@ final class TranscriptTranslator {
     // Cutting the in-flight streaming request on every seek means rapid scrubbing shreds batch
     // after batch with nothing completing. The cut is debounced: it only fires once the play head
     // has settled, so a deliberate seek stays responsive while scrubbing lets a batch finish.
-    private static final long SEEK_DEBOUNCE_MS = 700;
+    private static final long SEEK_DEBOUNCE_MS = 350;
     private static final Handler seekHandler = new Handler(Looper.getMainLooper());
     private static volatile long pendingSeekTimeMs;
     private static final Runnable seekCutter = TranscriptTranslator::applySeekCut;
@@ -219,6 +221,8 @@ final class TranscriptTranslator {
         // First completed batch snapshot, returned as a fallback only if onUpdate never runs.
         List<TranscriptSegment> initial = null;
         int completed = 0;
+        // True while the next dispatched batch is the first one after a start or seek.
+        boolean firstBatchAfterReposition = true;
 
         try {
             while (completed < batchDone.size()) {
@@ -235,6 +239,12 @@ final class TranscriptTranslator {
                 // and the play head moves past it before its translation arrives.
                 index = splitBatchAtPlayhead(batches, batchDone, index, timeMs);
                 if (index < 0) break;
+
+                // Cap the first OpenRouter batch to a small budget; other services run unchanged.
+                if (isOpenRouter && firstBatchAfterReposition) {
+                    capFirstBatch(batches, batchDone, index);
+                }
+                firstBatchAfterReposition = false;
 
                 final List<TranscriptSegment> batch = batches.get(index);
                 int offset = 0;
@@ -254,6 +264,8 @@ final class TranscriptTranslator {
                 // new play head without marking the batch done.
                 if (reprioritize && !abortTranslation) {
                     Logger.printDebug(() -> "Reprioritizing translation after seek");
+                    // Re-arm the small first batch for the new position.
+                    firstBatchAfterReposition = true;
                     continue;
                 }
                 if (abortTranslation) break;
@@ -331,6 +343,30 @@ final class TranscriptTranslator {
         batches.add(index + 1, after);
         batchDone.add(index + 1, false);
         return index + 1;
+    }
+
+    /**
+     * Splits the batch at {@code index} so it stays within {@link #OPENROUTER_FIRST_BATCH_CHARS},
+     * moving the overflow into a follow-up batch. Always keeps at least the first segment. No-op
+     * when the batch already fits or has a single segment.
+     */
+    private static void capFirstBatch(List<List<TranscriptSegment>> batches,
+                                      List<Boolean> batchDone, int index) {
+        final List<TranscriptSegment> batch = batches.get(index);
+        if (batch.size() <= 1) return;
+        int chars = 0;
+        int splitAt = 0;
+        for (int i = 0; i < batch.size(); i++) {
+            chars += batch.get(i).text().length() + 1;
+            splitAt = i + 1;
+            if (chars >= OPENROUTER_FIRST_BATCH_CHARS) break;
+        }
+        if (splitAt >= batch.size()) return; // Whole batch already within budget.
+        final List<TranscriptSegment> head = new ArrayList<>(batch.subList(0, splitAt));
+        final List<TranscriptSegment> tail = new ArrayList<>(batch.subList(splitAt, batch.size()));
+        batches.set(index, head);
+        batches.add(index + 1, tail);
+        batchDone.add(index + 1, false);
     }
 
     /**
@@ -462,7 +498,7 @@ final class TranscriptTranslator {
         while (i < line.length() && Character.isDigit(line.charAt(i))) i++;
         if (i == 0 || i >= line.length()) return false;
         final char sep = line.charAt(i);
-        if (sep != ':' && sep != '.') return false;
+        if (sep != ':' && sep != '.' && sep != ')') return false;
         try {
             int num = Integer.parseInt(line.substring(0, i));
             String text = line.substring(i + 1).trim();
@@ -471,6 +507,21 @@ final class TranscriptTranslator {
                 return true;
             }
         } catch (NumberFormatException ignored) {}
+        return false;
+    }
+
+    /**
+     * Streams one completed line into its segment slot by line number. Unnumbered lines are left
+     * for the end-of-stream positional fallback, so a line is never placed at a guessed position
+     * while the batch is still in flight.
+     *
+     * @return true if the line was assigned to a segment slot.
+     */
+    private static boolean applyStreamedLine(String line, List<String> result, int segmentCount, int[] matched) {
+        if (parseLine(line, result, segmentCount)) {
+            matched[0]++;
+            return true;
+        }
         return false;
     }
 
@@ -634,11 +685,15 @@ final class TranscriptTranslator {
                 .put("role", "user")
                 .put("content", joined.toString());
 
+        // Route to the provider with the lowest time to first token.
+        JSONObject provider = new JSONObject()
+                .put("sort", "latency");
         JSONObject body = new JSONObject()
                 .put("model", model)
                 .put("temperature", 0)
                 .put("stream", true)
                 .put("max_tokens", segments.size() * 30)
+                .put("provider", provider)
                 .put("messages", new JSONArray().put(systemMessage).put(userMessage));
 
         byte[] bodyBytes = body.toString().getBytes(StandardCharsets.UTF_8);
@@ -702,9 +757,9 @@ final class TranscriptTranslator {
                         if (c == '\n') {
                             final String line = lineBuffer.toString().trim();
                             lineBuffer.setLength(0);
-                            if (!line.isEmpty() && parseLine(line, result, segments.size())) {
-                                matched[0]++;
-                                if (onLineStreamed != null) onLineStreamed.accept(new ArrayList<>(result));
+                            if (applyStreamedLine(line, result, segments.size(), matched)
+                                    && onLineStreamed != null) {
+                                onLineStreamed.accept(new ArrayList<>(result));
                             }
                         } else {
                             lineBuffer.append(c);
@@ -714,9 +769,9 @@ final class TranscriptTranslator {
                 // Flush any remaining content that arrived without a trailing newline.
                 if (lineBuffer.length() > 0) {
                     final String line = lineBuffer.toString().trim();
-                    if (!line.isEmpty() && parseLine(line, result, segments.size())) {
-                        matched[0]++;
-                        if (onLineStreamed != null) onLineStreamed.accept(new ArrayList<>(result));
+                    if (applyStreamedLine(line, result, segments.size(), matched)
+                            && onLineStreamed != null) {
+                        onLineStreamed.accept(new ArrayList<>(result));
                     }
                 }
             }
