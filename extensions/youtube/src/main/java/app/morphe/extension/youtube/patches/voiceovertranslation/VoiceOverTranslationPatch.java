@@ -24,6 +24,8 @@ import android.speech.tts.UtteranceProgressListener;
 import android.util.Pair;
 import android.widget.LinearLayout;
 
+import androidx.annotation.Nullable;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -113,7 +115,15 @@ public class VoiceOverTranslationPatch {
 
     private static AudioManager audioManager;
     // Kept as a field so abandonAudioFocus() uses the same listener instance as requestAudioFocus().
-    private static final AudioManager.OnAudioFocusChangeListener focusChangeListener = focusChange -> { };
+    private static final AudioManager.OnAudioFocusChangeListener focusChangeListener = focusChange -> {
+        if (focusChange == AudioManager.AUDIOFOCUS_LOSS
+                || focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT
+                || focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK) {
+            Logger.printDebug(() -> "Ducking focus lost: " + focusChange);
+            isDucking = false;
+            updateDucking();
+        }
+    };
     private static AudioFocusRequest focusRequest;
     private static boolean isDucking;
     private static boolean duckDesired;
@@ -236,10 +246,10 @@ public class VoiceOverTranslationPatch {
                         speak(seg, i);
                     }
                 }
-                return;
+                break;
             }
         }
-        // Not inside any segment - release duck once TTS has finished playing.
+        // Not inside any segment (or just finished one) - release duck once TTS has finished playing.
         // ttsEndVideoTimeMs keeps the duck alive while TTS speaks into the gap
         // before the next segment, preventing a brief volume flicker mid-utterance.
         duckDesired = ttsEngine.isSpeaking() || isTestSpeaking || timeMs < ttsEndVideoTimeMs;
@@ -706,22 +716,27 @@ public class VoiceOverTranslationPatch {
 
         if (duckDesired) {
             Logger.printDebug(() -> "ducking enabled");
-            isDucking = true;
-            focusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
-                    .setAudioAttributes(new AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
-                            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                            .build())
-                    .setWillPauseWhenDucked(false)
-                    .setOnAudioFocusChangeListener(focusChangeListener)
-                    .build();
-            getAudioManager().requestAudioFocus(focusRequest);
+            if (focusRequest == null) {
+                focusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+                        .setAudioAttributes(new AudioAttributes.Builder()
+                                .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
+                                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                                .build())
+                        .setWillPauseWhenDucked(false)
+                        .setOnAudioFocusChangeListener(focusChangeListener)
+                        .build();
+            }
+            int result = getAudioManager().requestAudioFocus(focusRequest);
+            isDucking = result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
+            if (!isDucking) {
+                logError(() -> "Failed to request audio focus: " + result, null);
+            }
         } else {
             Logger.printDebug(() -> "ducking disabled");
             isDucking = false;
             if (audioManager == null) return;
             if (focusRequest != null) {
-                Logger.printDebug(() -> "updateDucking requesting focus");
+                Logger.printDebug(() -> "abandoning focus request");
                 audioManager.abandonAudioFocusRequest(focusRequest);
                 focusRequest = null;
             }
@@ -800,7 +815,7 @@ public class VoiceOverTranslationPatch {
         }
     }
 
-    static void logError(Logger.LogMessage message, Exception ex) {
+    static void logError(Logger.LogMessage message, @Nullable Exception ex) {
         if (DEBUG.get()) Logger.printException(message, ex);
         else Logger.printInfo(message, ex);
     }
