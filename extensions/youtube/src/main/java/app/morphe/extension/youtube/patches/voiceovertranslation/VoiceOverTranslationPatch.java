@@ -32,7 +32,6 @@ import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.ResourceUtils;
 import app.morphe.extension.shared.Utils;
 import app.morphe.extension.shared.ui.CustomDialog;
-import app.morphe.extension.shared.settings.AppLanguage;
 import app.morphe.extension.shared.settings.Setting;
 import app.morphe.extension.youtube.settings.Settings;
 import app.morphe.extension.youtube.shared.PlayerType;
@@ -232,7 +231,7 @@ public class VoiceOverTranslationPatch {
             TranscriptSegment seg = segments.get(i);
             if (effectiveTimeMs >= seg.startMs() && timeMs < seg.endMs()) {
                 if (i != lastSpokenIndex) {
-                    if (!ttsEngine.isSpeaking()) {
+                    if (!ttsEngine.isSpeaking() || wasExplicitSeek) {
                         lastSpokenIndex = i;
                         speak(seg, i);
                     }

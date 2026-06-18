@@ -217,6 +217,10 @@ final class TranscriptTranslator {
         try {
             return translateBatch(videoId, batch, targetLang, onLineStreamed);
         } catch (Exception ex) {
+            if (abortTranslation) {
+                Logger.printDebug(() -> "Translation aborted: " + ex.getMessage());
+                return null;
+            }
             String msg = ex.getMessage();
             // FileNotFoundException from getInputStream() is Android's HttpURLConnection reporting
             // a 4xx/5xx error when getResponseCode() incorrectly returned 200 in streaming mode.
