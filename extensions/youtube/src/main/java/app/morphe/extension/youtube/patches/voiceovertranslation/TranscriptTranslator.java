@@ -278,8 +278,11 @@ final class TranscriptTranslator {
 
                 // Re-queue segments the model failed to translate as a new undone batch so they
                 // are retried instead of permanently staying in the original language.
+                // The original batch is shrunk to the head so offset calculations for all
+                // subsequent batches (including the tail) stay correct.
                 if (translated != null && translated.size() < batch.size()) {
                     List<TranscriptSegment> tail = new ArrayList<>(batch.subList(translated.size(), batch.size()));
+                    batches.set(index, new ArrayList<>(batch.subList(0, translated.size())));
                     batches.add(index + 1, tail);
                     batchDone.add(index + 1, false);
                 }
