@@ -200,7 +200,10 @@ public class VoiceOverTranslationPatch {
      * Injection point.
      */
     public static void videoTimeChanged(long timeMs) {
-        if (!Settings.VOT_ENABLED.get() || !sessionEnabled) return; // Feature or session disabled.
+        if (!Settings.VOT_ENABLED.get() || !sessionEnabled) {
+            updateDucking();
+            return; // Feature or session disabled.
+        }
         Utils.verifyOnMainThread();
 
         PlayerType currentPlayerType = PlayerType.getCurrent();
