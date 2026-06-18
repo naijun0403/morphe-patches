@@ -626,7 +626,8 @@ final class TranscriptTranslator {
         final String targetLangName = Locale.forLanguageTag(targetLang).getDisplayLanguage(Locale.ENGLISH);
         JSONObject systemMessage = new JSONObject()
                 .put("role", "system")
-                .put("content", "Translate each numbered line to " + targetLangName + " (" + targetLang + "). "
+                .put("content", "Translate numbered YouTube caption lines to " + targetLangName + " (" + targetLang + "). "
+                        + "The text may have misspellings or noise - translate the intent. "
                         + "Prefix each translation with its original line number and a colon. One line per number. Do not merge or skip.");
         JSONObject userMessage = new JSONObject()
                 .put("role", "user")
