@@ -137,12 +137,10 @@ final class TranscriptTranslator {
     }
 
     /**
-     * @return true while a translation is running, the given segment is still on its original text,
-     *         and its batch has not finished, signaling the caller to wait rather than speak the
-     *         untranslated original. Returns false as soon as the segment's text changes (so a line
-     *         delivered early by the OpenRouter stream plays immediately), once its batch is done
-     *         even if the text was kept after a failed translation (so playback is never blocked
-     *         indefinitely), and when no translation is active.
+     * @return true while the caller should wait rather than speak the untranslated original.
+     *         Returns false in three cases: the segment's text has changed (translated by a
+     *         completed batch or an early streamed line); its batch is done (a failure that
+     *         kept the original text still unblocks playback); no translation is running.
      */
     static boolean isAwaitingTranslationAt(int segmentIndex, long segmentStartMs, String currentText) {
         final List<TranscriptSegment> originals = liveOriginals;
@@ -188,7 +186,11 @@ final class TranscriptTranslator {
         final int maxBatchChars = isMyMemory ? MYMEMORY_MAX_CHARS
                 : isOpenRouter ? OPENROUTER_MAX_BATCH_CHARS
                   : GOOGLE_MAX_BATCH_CHARS;
-        final List<List<TranscriptSegment>> batches = splitByCharBudget(segments, maxBatchChars);
+        // Mutable list so the picked batch can be split at the play head on every dispatch,
+        // ensuring the streaming model translates the play-head segment first instead of
+        // wasting its first lines on segments already behind it.
+        final List<List<TranscriptSegment>> batches =
+                new ArrayList<>(splitByCharBudget(segments, maxBatchChars));
         reportNextTranslationError = true;
         abortTranslation = false;
         reprioritize = false;
@@ -196,24 +198,21 @@ final class TranscriptTranslator {
         // Working copy that accumulates translated batches over the original text.
         final List<TranscriptSegment> working = new ArrayList<>(segments);
 
-        final int batchesSize = batches.size();
-        final int[] offsets = new int[batchesSize];
-        for (int b = 1; b < batchesSize; b++) {
-            offsets[b] = offsets[b - 1] + batches.get(b - 1).size();
-        }
-
         final Handler mainHandler = new Handler(Looper.getMainLooper());
 
-        // Tracks which batches have been translated, driving both dispatch order and seek handling.
-        final boolean[] batchDone = new boolean[batchesSize];
+        // Growable so a dynamic split inserts an extra slot. Drives both dispatch order and
+        // seek handling.
+        final List<Boolean> batchDone = new ArrayList<>(batches.size());
+        for (int i = 0; i < batches.size(); i++) batchDone.add(false);
 
         final int batchDelay = isMyMemory ? MYMEMORY_INTER_BATCH_DELAY_MS
                 : isOpenRouter ? OPENROUTER_INTER_BATCH_DELAY_MS
                   : GOOGLE_INTER_BATCH_DELAY_MS;
 
-        // Publish session state so onSeek()/isAwaitingTranslationAt() can see it.
-        liveBatches = batches;
-        liveBatchDone = batchDone;
+        // Publish session state so onSeek()/isAwaitingTranslationAt() can see it. Snapshots
+        // (not the mutable list) so main-thread readers never observe a mid-split state.
+        liveBatches = new ArrayList<>(batches);
+        liveBatchDone = toBoolArray(batchDone);
         liveOriginals = segments;
         translatingBatchIndex = -1;
 
@@ -222,20 +221,33 @@ final class TranscriptTranslator {
         int completed = 0;
 
         try {
-            while (completed < batchesSize) {
+            while (completed < batchDone.size()) {
                 if (abortTranslation) break;
                 reprioritize = false;
 
                 final long timeMs = VoiceOverTranslationPatch.videoPositionHint;
-                final int index = pickNextBatch(batches, batchDone, timeMs);
+                int index = pickNextBatch(batches, batchDone, timeMs);
+                if (index < 0) break;
+
+                // Split the picked batch at the play head when the play head sits in its middle,
+                // so the streaming model's first output line is for the audible segment. Without
+                // this, a seek mid-batch leaves the play-head segment near the END of the stream
+                // and the play head moves past it before its translation arrives.
+                index = splitBatchAtPlayhead(batches, batchDone, index, timeMs);
                 if (index < 0) break;
 
                 final List<TranscriptSegment> batch = batches.get(index);
-                final int offset = offsets[index];
+                int offset = 0;
+                for (int b = 0; b < index; b++) offset += batches.get(b).size();
+                final int finalOffset = offset;
+
+                // Republish so consumers see the updated batch layout (a split changes indices).
+                liveBatches = new ArrayList<>(batches);
+                liveBatchDone = toBoolArray(batchDone);
 
                 translatingBatchIndex = index;
                 final List<String> translated = translateBatchSafe(videoId, batch, targetLang,
-                        streamCallback(onUpdate, mainHandler, working, batch, offset));
+                        streamCallback(onUpdate, mainHandler, working, batch, finalOffset));
                 translatingBatchIndex = -1;
 
                 // A seek cut this request short - drop the partial result and re-pick against the
@@ -246,8 +258,9 @@ final class TranscriptTranslator {
                 }
                 if (abortTranslation) break;
 
-                applyBatch(working, batch, offset, translated);
-                batchDone[index] = true;
+                applyBatch(working, batch, finalOffset, translated);
+                batchDone.set(index, true);
+                liveBatchDone = toBoolArray(batchDone);
                 completed++;
 
                 final List<TranscriptSegment> snapshot = new ArrayList<>(working);
@@ -268,8 +281,9 @@ final class TranscriptTranslator {
                     }
                 }
 
-                if (completed < batchesSize && batchDelay > 0) {
+                if (completed < batchDone.size() && batchDelay > 0) {
                     try {
+                        //noinspection BusyWait
                         Thread.sleep(batchDelay);
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
@@ -286,20 +300,53 @@ final class TranscriptTranslator {
         }
     }
 
+    private static boolean[] toBoolArray(List<Boolean> source) {
+        boolean[] dst = new boolean[source.size()];
+        for (int i = 0; i < source.size(); i++) dst[i] = source.get(i);
+        return dst;
+    }
+
+    /**
+     * If the play head sits inside the picked batch (not at its first segment), split the batch so
+     * the new batch starts with the play-head segment. The "before" portion stays as a separate
+     * batch that the dispatcher will pick up later. Returns the index of the batch to translate
+     * now (which becomes index+1 after the split).
+     */
+    private static int splitBatchAtPlayhead(List<List<TranscriptSegment>> batches,
+                                            List<Boolean> batchDone, int index, long timeMs) {
+        if (timeMs <= 0) return index;
+        final List<TranscriptSegment> batch = batches.get(index);
+        if (batch.size() <= 1) return index;
+        int splitAt = -1;
+        for (int i = 0; i < batch.size(); i++) {
+            if (batch.get(i).endMs() > timeMs) {
+                if (i > 0) splitAt = i;
+                break;
+            }
+        }
+        if (splitAt <= 0) return index;
+        final List<TranscriptSegment> before = new ArrayList<>(batch.subList(0, splitAt));
+        final List<TranscriptSegment> after = new ArrayList<>(batch.subList(splitAt, batch.size()));
+        batches.set(index, before);
+        batches.add(index + 1, after);
+        batchDone.add(index + 1, false);
+        return index + 1;
+    }
+
     /**
      * Picks the not-yet-translated batch to translate next: the batch under the play head, then
      * batches ahead of it (closest first), then batches behind it (closest first). Returns -1 when
      * every batch is done. With timeMs 0 (playback from the start) this degrades to plain
      * front-to-back order.
      */
-    private static int pickNextBatch(List<List<TranscriptSegment>> batches, boolean[] done, long timeMs) {
+    private static int pickNextBatch(List<List<TranscriptSegment>> batches, List<Boolean> done, long timeMs) {
         final int size = batches.size();
         final int current = findBatchAtTime(batches, timeMs);
         for (int i = current; i < size; i++) {
-            if (!done[i]) return i;
+            if (!done.get(i)) return i;
         }
         for (int i = current - 1; i >= 0; i--) {
-            if (!done[i]) return i;
+            if (!done.get(i)) return i;
         }
         return -1;
     }
