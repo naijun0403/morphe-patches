@@ -636,7 +636,7 @@ final class TranscriptTranslator {
                 .put("model", model)
                 .put("temperature", 0)
                 .put("stream", true)
-                .put("max_tokens", segments.size() * 20)
+                .put("max_tokens", segments.size() * 30)
                 .put("messages", new JSONArray().put(systemMessage).put(userMessage));
 
         byte[] bodyBytes = body.toString().getBytes(StandardCharsets.UTF_8);
