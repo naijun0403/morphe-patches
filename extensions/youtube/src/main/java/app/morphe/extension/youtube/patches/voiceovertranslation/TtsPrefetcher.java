@@ -185,9 +185,7 @@ final class TtsPrefetcher {
     }
 
 
-    /**
-     * @return false, if the wait was interrupted.
-     */
+    /** @return true if interrupted (caller should stop the loop). */
     private static boolean waitOnLock(long millis) {
         synchronized (lock) {
             waiting = true;

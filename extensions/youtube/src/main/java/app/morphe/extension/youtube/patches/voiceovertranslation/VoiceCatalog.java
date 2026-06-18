@@ -85,12 +85,10 @@ final class VoiceCatalog {
             String userLang = deviceLocale.getLanguage();
             String userCountry = deviceLocale.getCountry();
 
-            // Prioritize native language match
             final boolean thisLangMatch = this.languageTag.equalsIgnoreCase(userLang);
             final boolean otherLangMatch = other.languageTag.equalsIgnoreCase(userLang);
             if (thisLangMatch != otherLangMatch) return thisLangMatch ? -1 : 1;
 
-            // Prioritize country match
             if (!userCountry.isEmpty()) {
                 final boolean thisCountryMatch = this.countryTag.equalsIgnoreCase(userCountry);
                 final boolean otherCountryMatch = other.countryTag.equalsIgnoreCase(userCountry);
@@ -463,7 +461,6 @@ final class VoiceCatalog {
             }
         }
 
-        // Add multilingual voices to every language list that was created.
         for (Map.Entry<String, List<Voice>> entry : VOICES_BY_LANG.entrySet()) {
             String lang = entry.getKey();
             List<Voice> voices = entry.getValue();

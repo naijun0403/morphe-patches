@@ -195,7 +195,6 @@ final class TranscriptTranslator {
         abortTranslation = false;
         reprioritize = false;
 
-        // Working copy that accumulates translated batches over the original text.
         final List<TranscriptSegment> working = new ArrayList<>(segments);
 
         final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -542,7 +541,7 @@ final class TranscriptTranslator {
         }
 
         // Response: [[["translated","original",...],...],null,"src_lang",...]
-        // Concatenate sentence translations; newline separators from joined input are preserved.
+        // Google splits into sentences; concatenating restores the newline-delimited lines we sent.
         JSONArray sentences = new JSONArray(Requester.parseString(conn)).getJSONArray(0);
         StringBuilder translatedJoined = new StringBuilder();
         for (int i = 0, length = sentences.length(); i < length; i++) {
@@ -673,9 +672,8 @@ final class TranscriptTranslator {
                         + " response: " + Requester.parseString(conn));
             }
 
-            // Read SSE stream. Each chunk is a "data: {...}" line; content deltas are accumulated
-            // into lineBuffer and flushed to result whenever a newline arrives, and mirrored into
-            // rawOutput for the positional fallback.
+            // SSE: each "data: {...}" event carries a content delta; rawOutput mirrors it for
+            // the positional fallback in case numbered parsing yields no matches.
             StringBuilder lineBuffer = new StringBuilder();
             try (BufferedReader reader = new BufferedReader(
                     new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {

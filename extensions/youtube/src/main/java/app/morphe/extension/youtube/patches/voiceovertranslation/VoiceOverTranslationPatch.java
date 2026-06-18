@@ -238,7 +238,6 @@ public class VoiceOverTranslationPatch {
         if (prevVideoTimeMs > 0) {
             final long timeSinceLastUpdate = Math.abs(timeMs - prevVideoTimeMs);
             if (timeSinceLastUpdate > SEEK_JUMP_THRESHOLD_MS) {
-                // Large jump outside current segment area - stop everything.
                 // Small jumps within the same segment are handled by speak()'s startTime logic.
                 Logger.printDebug(() -> "videoTimeChanged jump detected: " + timeSinceLastUpdate + "ms");
                 wasExplicitSeek = true;
@@ -268,9 +267,8 @@ public class VoiceOverTranslationPatch {
                 break;
             }
         }
-        // Not inside any segment (or just finished one) - release duck once TTS has finished playing.
-        // ttsEndVideoTimeMs keeps the duck alive while TTS speaks into the gap
-        // before the next segment, preventing a brief volume flicker mid-utterance.
+        // ttsEndVideoTimeMs keeps the duck alive while TTS speaks into the gap before the next
+        // segment, preventing a brief volume flicker mid-utterance.
         duckDesired = ttsEngine.isSpeaking() || isTestSpeaking || timeMs < ttsEndVideoTimeMs;
         updateDucking();
     }
@@ -467,11 +465,9 @@ public class VoiceOverTranslationPatch {
 
         final long speakFromMs = Math.max(lastVideoTimeMs, seg.startMs());
 
-        // Use the balanced segment bounds for the available window.
         final long availableMs = seg.endMs() - speakFromMs;
 
-        // Natural TTS duration (exact if cached, estimated from char count otherwise).
-        // Used for rate calculation, seek clamping, and tracking when duck should be released.
+        // Exact if cached, otherwise estimated from char count.
         final long speechDurationMs = getSpeechDurationMs(seg, index, voice, lang);
 
         // Calculate if we should seek into the audio (e.g. after a short seek within segment).
@@ -513,7 +509,6 @@ public class VoiceOverTranslationPatch {
 
         requestDuck();
         updateDucking();
-        // Check cache for Edge TTS.
         byte[] cached = TtsCache.get(currentVideoId, index, voice, lang, seg.text());
         if (cached != null) {
             final long playbackId = ttsEngine.markBusy();
@@ -521,8 +516,7 @@ public class VoiceOverTranslationPatch {
             return;
         }
 
-        // Use unified Edge synthesis/playback in background.
-        // Edge synthesis doesn't support seeking during synthesis, but play() will seek the result.
+        // Edge synthesis doesn't support seeking during synthesis; play() will seek the result.
         ttsEngine.speak(seg.text(), voice, lang, volume, rate, startTimeMs, null);
     }
 

@@ -142,7 +142,7 @@ public final class VotBottomSheet {
         dialog.show();
     }
 
-    // Creates a label + value row; value TextView is stored in the row tag for refreshing.
+    // Value TextView is stored in the row tag so callers can refresh it without rebuilding the row.
     private static LinearLayout makeValueRow(Context context, int fg, String label) {
         LinearLayout row = new LinearLayout(context);
         row.setOrientation(LinearLayout.HORIZONTAL);
@@ -195,7 +195,6 @@ public final class VotBottomSheet {
             valueView.setText(defaultVoice != null ? defaultVoice.dialogDisplayName : str("morphe_vot_tts_system"));
         }
 
-        // Dim and disable when no Edge voice is available for the current language.
         final boolean edgeAvailable = VoiceCatalog.resolve(lang, null) != null;
         row.setAlpha(edgeAvailable ? 1f : 0.4f);
         row.setClickable(edgeAvailable);

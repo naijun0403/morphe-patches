@@ -51,7 +51,6 @@ final class TranscriptFetcher {
 
         if (!segments.isEmpty()) {
             String targetLangCode = VoiceOverTranslationPatch.resolveTargetLang();
-            // Skip translation when the caption track is already in the target language.
             if (!isSameSpokenLanguage(targetLangCode, lastSourceLang)) {
                 segments = TranscriptTranslator.translate(videoId, segments, targetLangCode, onUpdate, cancelled);
             }
@@ -269,20 +268,17 @@ final class TranscriptFetcher {
             }
         }
 
-        // Adjust timings to ensure contiguity for small gaps and resolve overlaps.
         // dDurationMs is display time: with ASR a line stays on screen while the next
         // line is already spoken, so ranges overlap. Clamp each end to the next start
         // so segments represent actual speech time instead of caption visibility.
-        // Small gaps are also closed to ensure smooth TTS flow.
+        // Small gaps are closed so TTS flows without pauses between segments.
         for (int i = 0, last = lines.size() - 1; i < last; i++) {
             TranscriptSegment cur = lines.get(i);
             TranscriptSegment next = lines.get(i + 1);
 
             if (cur.endMs() > next.startMs()) {
-                // Overlap: shrink current segment's end.
                 lines.set(i, new TranscriptSegment(cur.startMs(), next.startMs(), cur.text()));
             } else if (next.startMs() - cur.endMs() <= CLOSE_GAP_THRESHOLD_MS) {
-                // Small gap: expand each segment time duration to take up the gap.
                 final long mid = (cur.endMs() + next.startMs()) / 2;
                 lines.set(i, new TranscriptSegment(cur.startMs(), mid, cur.text()));
                 lines.set(i + 1, new TranscriptSegment(mid, next.endMs(), next.text()));
