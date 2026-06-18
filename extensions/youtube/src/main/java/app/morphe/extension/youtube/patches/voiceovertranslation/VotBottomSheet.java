@@ -265,7 +265,7 @@ public final class VotBottomSheet {
                 rowLayout.addView(textContainer, idx);
 
                 TranscriptTranslator.fetchOpenRouterModelCost(Settings.VOT_OPENROUTER_MODEL.get(),
-                        cost -> costView.setText(cost != null ? formatOpenRouterCostPerHour(cost) : ""));
+                        cost -> costView.setText(cost != null ? VoiceOverTranslationPatch.formatOpenRouterCostPerHour(cost) : ""));
             }
 
             row.setOnClickListener(v -> {
@@ -695,15 +695,6 @@ public final class VotBottomSheet {
 
     private static int secondaryColor(int fg) {
         return Color.argb(153, Color.red(fg), Color.green(fg), Color.blue(fg));
-    }
-
-    private static String formatOpenRouterCostPerHour(float cost) {
-        String perHour = "/" + str("morphe_vot_cost_hour_abbrev");
-        if (cost == 0) return str("morphe_vot_cost_free");
-        if (cost < 0.001f) return "< $0.001" + perHour;
-        if (cost < 0.01f) return String.format(Locale.US, "~$%.3f", cost) + perHour;
-        if (cost < 0.10f) return String.format(Locale.US, "~$%.2f", cost) + perHour;
-        return String.format(Locale.US, "~$%.1f", cost) + perHour;
     }
 
     @FunctionalInterface

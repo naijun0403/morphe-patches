@@ -1,24 +1,36 @@
+/*
+ * Copyright 2026 Morphe.
+ * https://github.com/MorpheApp/morphe-patches
+ *
+ * See the included NOTICE file for GPLv3 §7(b) and §7(c) terms that apply to this code.
+ */
+
 package app.morphe.extension.youtube.settings.preference;
 
 import static app.morphe.extension.shared.StringRef.str;
 
 import android.app.Dialog;
 import android.content.Context;
+import android.graphics.Color;
 import android.graphics.drawable.ShapeDrawable;
 import android.graphics.drawable.shapes.RoundRectShape;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.AttributeSet;
 import android.util.Pair;
+import android.view.LayoutInflater;
+import android.view.View;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.ListView;
+import android.widget.TextView;
 
 import androidx.annotation.Nullable;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
 
@@ -26,6 +38,7 @@ import app.morphe.extension.shared.Utils;
 import app.morphe.extension.shared.settings.preference.CustomDialogListPreference;
 import app.morphe.extension.shared.ui.CustomDialog;
 import app.morphe.extension.shared.ui.Dim;
+import app.morphe.extension.youtube.patches.voiceovertranslation.VoiceOverTranslationPatch;
 import app.morphe.extension.youtube.settings.Settings;
 
 @SuppressWarnings({"unused", "deprecation"})
@@ -40,7 +53,6 @@ public class VoiceOverTranslationModelPreference extends CustomDialogListPrefere
     );
 
     private EditText editText;
-    private ListPreferenceArrayAdapter adapter;
 
     public VoiceOverTranslationModelPreference(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         super(context, attrs, defStyleAttr, defStyleRes);
@@ -89,47 +101,122 @@ public class VoiceOverTranslationModelPreference extends CustomDialogListPrefere
         Context context = getContext();
         String currentModel = Settings.VOT_OPENROUTER_MODEL.get();
         boolean isCustom = !isPreset(currentModel);
-        String initialSelection = isCustom ? CUSTOM_SENTINEL : currentModel;
+
+        final int fg = Utils.getAppForegroundColor();
+        final int secondaryFg = Color.argb(153, Color.red(fg), Color.green(fg), Color.blue(fg));
+        final int checkmarkRes = Utils.appIsUsingBoldIcons() ? DRAWABLE_CHECKMARK_BOLD : DRAWABLE_CHECKMARK;
+        final LayoutInflater inflater = LayoutInflater.from(context);
 
         LinearLayout contentLayout = new LinearLayout(context);
         contentLayout.setOrientation(LinearLayout.VERTICAL);
 
-        ListView listView = new ListView(context);
-        listView.setId(android.R.id.list);
-        listView.setChoiceMode(ListView.CHOICE_MODE_SINGLE);
+        LinearLayout listLayout = new LinearLayout(context);
+        listLayout.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams listParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        listParams.bottomMargin = Dim.dp16;
+        contentLayout.addView(listLayout, listParams);
 
-        adapter = new ListPreferenceArrayAdapter(
-                context, LAYOUT_MORPHE_CUSTOM_LIST_ITEM_CHECKED,
-                getEntries(), getEntryValues(), initialSelection);
-        listView.setAdapter(adapter);
+        CharSequence[] entries = getEntries();
+        CharSequence[] entryValues = getEntryValues();
+        final String[] currentSelection = {isCustom ? CUSTOM_SENTINEL : currentModel};
+        final List<Runnable> selectionUpdaters = new ArrayList<>();
+        final Runnable refreshChecks = () -> { for (Runnable u : selectionUpdaters) u.run(); };
+
+        final TextView[] customCostView = {null};
+
+        for (int i = 0; i < entries.length; i++) {
+            final String value = entryValues[i].toString();
+            final boolean isPresetEntry = !value.equals(CUSTOM_SENTINEL);
+
+            View row = inflater.inflate(LAYOUT_MORPHE_CUSTOM_LIST_ITEM_CHECKED, listLayout, false);
+
+            ImageView check = row.findViewById(ID_MORPHE_CHECK_ICON);
+            check.setImageResource(checkmarkRes);
+            check.setColorFilter(fg);
+            View checkPlaceholder = row.findViewById(ID_MORPHE_CHECK_ICON_PLACEHOLDER);
+
+            boolean initialSelected = value.equals(currentSelection[0]);
+            check.setVisibility(initialSelected ? View.VISIBLE : View.GONE);
+            checkPlaceholder.setVisibility(initialSelected ? View.GONE : View.VISIBLE);
+            selectionUpdaters.add(() -> {
+                boolean selected = value.equals(currentSelection[0]);
+                check.setVisibility(selected ? View.VISIBLE : View.GONE);
+                checkPlaceholder.setVisibility(selected ? View.GONE : View.VISIBLE);
+            });
+
+            TextView itemText = row.findViewById(ID_MORPHE_ITEM_TEXT);
+            itemText.setText(entries[i]);
+            itemText.setTextColor(fg);
+
+            LinearLayout.LayoutParams existingLp = (LinearLayout.LayoutParams) itemText.getLayoutParams();
+            LinearLayout textContainer = new LinearLayout(context);
+            textContainer.setOrientation(LinearLayout.VERTICAL);
+            textContainer.setLayoutParams(existingLp);
+            itemText.setLayoutParams(new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+            LinearLayout rowLayout = (LinearLayout) row;
+            int idx = rowLayout.indexOfChild(itemText);
+            rowLayout.removeView(itemText);
+            textContainer.addView(itemText);
+
+            TextView costView = new TextView(context);
+            costView.setTextColor(secondaryFg);
+            costView.setTextSize(12);
+            textContainer.addView(costView);
+            rowLayout.addView(textContainer, idx);
+
+            if (isPresetEntry) {
+                VoiceOverTranslationPatch.fetchOpenRouterModelCost(value,
+                        cost -> costView.setText(cost != null ? VoiceOverTranslationPatch.formatOpenRouterCostPerHour(cost) : ""));
+            } else {
+                customCostView[0] = costView;
+            }
+
+            row.setOnClickListener(v -> {
+                currentSelection[0] = value;
+                if (value.equals(CUSTOM_SENTINEL)) {
+                    String saved = Settings.VOT_OPENROUTER_MODEL.get();
+                    editText.setText(isPreset(saved) ? "" : saved);
+                    editText.setEnabled(true);
+                    editText.requestFocus();
+                } else {
+                    editText.setText(value);
+                    editText.setEnabled(false);
+                }
+                editText.setSelection(editText.getText().length());
+                refreshChecks.run();
+            });
+
+            listLayout.addView(row);
+        }
+
+        // If a custom model is already saved, fetch its cost on open.
+        if (isCustom && !currentModel.isEmpty()) {
+            VoiceOverTranslationPatch.fetchOpenRouterModelCost(currentModel,
+                    cost -> customCostView[0].setText(cost != null ? VoiceOverTranslationPatch.formatOpenRouterCostPerHour(cost) : ""));
+        }
+
+        //noinspection ExtractMethodRecommender
+        final Handler costHandler = new Handler(Looper.getMainLooper());
+        final Runnable[] pendingCostFetch = {null};
 
         Function<String, Void> syncListSelection = typedValue -> {
-            String selection = isPreset(typedValue) ? typedValue : CUSTOM_SENTINEL;
-            adapter.setSelectedValue(selection);
-            adapter.notifyDataSetChanged();
+            currentSelection[0] = isPreset(typedValue) ? typedValue : CUSTOM_SENTINEL;
+            refreshChecks.run();
+            // Debounce cost lookup so we don't fire a request on every keystroke.
+            if (pendingCostFetch[0] != null) costHandler.removeCallbacks(pendingCostFetch[0]);
+            if (!isPreset(typedValue) && !typedValue.isEmpty()) {
+                customCostView[0].setText("");
+                pendingCostFetch[0] = () -> VoiceOverTranslationPatch.fetchOpenRouterModelCost(
+                        typedValue, cost -> customCostView[0].setText(
+                                cost != null ? VoiceOverTranslationPatch.formatOpenRouterCostPerHour(cost) : ""));
+                costHandler.postDelayed(pendingCostFetch[0], 800);
+            } else {
+                customCostView[0].setText("");
+            }
             return null;
         };
-
-        listView.setOnItemClickListener((parent, view, position, id) -> {
-            String selectedValue = getEntryValues()[position].toString();
-            if (selectedValue.equals(CUSTOM_SENTINEL)) {
-                String saved = Settings.VOT_OPENROUTER_MODEL.get();
-                editText.setText(isPreset(saved) ? "" : saved);
-                editText.setEnabled(true);
-                editText.requestFocus();
-            } else {
-                editText.setText(selectedValue);
-                editText.setEnabled(false);
-            }
-            editText.setSelection(editText.getText().length());
-            adapter.setSelectedValue(selectedValue);
-            adapter.notifyDataSetChanged();
-        });
-
-        LinearLayout.LayoutParams listParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1.0f);
-        listParams.bottomMargin = Dim.dp16;
-        contentLayout.addView(listView, listParams);
 
         editText = createEditText(context, currentModel, isCustom, syncListSelection);
         contentLayout.addView(editText);
@@ -148,7 +235,7 @@ public class VoiceOverTranslationModelPreference extends CustomDialogListPrefere
         );
 
         LinearLayout.LayoutParams contentParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1.0f);
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         dialogPair.second.addView(contentLayout, dialogPair.second.getChildCount() - 1, contentParams);
         dialogPair.first.show();
     }

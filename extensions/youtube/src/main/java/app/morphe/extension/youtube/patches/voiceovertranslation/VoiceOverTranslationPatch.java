@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.FutureTask;
+import java.util.function.Consumer;
 
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.ResourceUtils;
@@ -854,6 +855,19 @@ public class VoiceOverTranslationPatch {
         } catch (Exception ex) {
             logError(() -> "showHttpErrorDialog failure", ex);
         }
+    }
+
+    public static void fetchOpenRouterModelCost(String model, Consumer<Float> onResult) {
+        TranscriptTranslator.fetchOpenRouterModelCost(model, onResult);
+    }
+
+    public static String formatOpenRouterCostPerHour(float cost) {
+        String perHour = "/" + str("morphe_vot_cost_hour_abbrev");
+        if (cost == 0) return str("morphe_vot_cost_free");
+        if (cost < 0.001f) return "< $0.001" + perHour;
+        if (cost < 0.01f) return String.format(Locale.US, "~$%.3f", cost) + perHour;
+        if (cost < 0.10f) return String.format(Locale.US, "~$%.2f", cost) + perHour;
+        return String.format(Locale.US, "~$%.1f", cost) + perHour;
     }
 
     static void logError(Logger.LogMessage message, @Nullable Exception ex) {
