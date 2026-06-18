@@ -25,8 +25,11 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -102,6 +105,8 @@ final class TranscriptTranslator {
     // text. Null while no translation is running.
     @Nullable
     private static volatile List<TranscriptSegment> liveOriginals;
+
+    private static final Map<String, Float> openRouterModelCosts = Collections.synchronizedMap(new HashMap<>());
 
     // Cutting the in-flight streaming request on every seek means rapid scrubbing shreds batch
     // after batch with nothing completing. The cut is debounced: it only fires once the play head
@@ -846,37 +851,52 @@ final class TranscriptTranslator {
 
     static void fetchOpenRouterModelCost(@Nullable String model, Consumer<Float> onResult) {
         if (model == null || model.isEmpty()) {
-            new Handler(Looper.getMainLooper()).post(() -> onResult.accept(null));
+            Utils.runOnMainThread(() -> onResult.accept(null));
             return;
         }
-        new Thread(() -> {
+        Float modelCostPerHundredHours = openRouterModelCosts.get(model);
+        if (modelCostPerHundredHours != null) {
+            Utils.runOnMainThread(() -> onResult.accept(modelCostPerHundredHours));
+            return;
+        }
+
+        Utils.runOnBackgroundThread(() -> {
             try {
                 HttpURLConnection conn = (HttpURLConnection) new URL(OPENROUTER_MODELS_URL).openConnection();
                 conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
                 conn.setReadTimeout(READ_TIMEOUT_MS);
                 conn.setRequestProperty("Accept-Encoding", "identity");
-                if (conn.getResponseCode() != 200) {
-                    new Handler(Looper.getMainLooper()).post(() -> onResult.accept(null));
+                final int responseCode = conn.getResponseCode();
+                if (responseCode != 200) {
+                    VoiceOverTranslationPatch.logError(() -> "Could not fetch OpenRouter costs: "
+                            + responseCode, null);
+                    Utils.runOnMainThread(() -> onResult.accept(null));
                     return;
                 }
+
                 JSONArray data = new JSONObject(Requester.parseString(conn)).getJSONArray("data");
-                for (int i = 0; i < data.length(); i++) {
+                for (int i = 0, length = data.length(); i < length; i++) {
                     JSONObject entry = data.getJSONObject(i);
                     if (!model.equals(entry.optString("id"))) continue;
                     JSONObject pricing = entry.optJSONObject("pricing");
-                    if (pricing == null) break;
-                    float promptPrice = (float) pricing.optDouble("prompt", 0);
-                    float completionPrice = (float) pricing.optDouble("completion", 0);
+                    if (pricing == null) {
+                        VoiceOverTranslationPatch.logError(() -> "Could not fetch OpenRouter pricing: "
+                                + data, null);
+                        break;
+                    }
+                    final float promptPrice = (float) pricing.optDouble("prompt", 0);
+                    final float completionPrice = (float) pricing.optDouble("completion", 0);
                     // ~12 batches/hr (4 captions/min × 60 min / 20 captions per batch).
                     // Per batch: ~435 prompt tokens (system message + captions) + ~375 completion tokens.
-                    float hourlyCost = 12 * (435 * promptPrice + 375 * completionPrice);
-                    new Handler(Looper.getMainLooper()).post(() -> onResult.accept(hourlyCost));
+                    final float hundredHourCost = 100 * 12 * (435 * promptPrice + 375 * completionPrice);
+                    openRouterModelCosts.put(model, hundredHourCost);
+                    Utils.runOnMainThread(() -> onResult.accept(hundredHourCost));
                     return;
                 }
-            } catch (Exception e) {
-                Logger.printDebug(() -> "OpenRouter model cost fetch failed: " + e.getMessage());
+            } catch (Exception ex) {
+                VoiceOverTranslationPatch.logError(() -> "OpenRouter model cost fetch failed", ex);
             }
-            new Handler(Looper.getMainLooper()).post(() -> onResult.accept(null));
-        }).start();
+            Utils.runOnMainThread(() -> onResult.accept(null));
+        });
     }
 }

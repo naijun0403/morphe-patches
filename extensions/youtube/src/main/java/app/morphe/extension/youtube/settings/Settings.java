@@ -524,16 +524,16 @@ public class Settings extends SharedYouTubeSettings {
 
     // VoiceOverTranslation
     public static final BooleanSetting VOT_ENABLED = new BooleanSetting("morphe_vot_enabled", FALSE, true);
-    public static final BooleanSetting VOT_WAIT_FOR_TTS = new BooleanSetting("morphe_vot_wait_for_tts", TRUE, parent(VOT_ENABLED));
     public static final BooleanSetting VOT_SESSION_ENABLED = new BooleanSetting("morphe_vot_session_enabled", TRUE);
+    public static final BooleanSetting VOT_WAIT_FOR_TTS = new BooleanSetting("morphe_vot_wait_for_tts", TRUE, parent(VOT_ENABLED));
+    public static final StringSetting VOT_CAPTION_LANGUAGE = new StringSetting("morphe_vot_caption_language", "app", parent(VOT_ENABLED));
+    public static final StringSetting VOT_TTS_VOICE_TYPE = new StringSetting("morphe_vot_tts_voice_type", "auto", parent(VOT_ENABLED));
     public static final IntegerSetting VOT_ORIGINAL_AUDIO_VOLUME = new IntegerSetting("morphe_vot_original_audio_volume", 100, parent(VOT_ENABLED));
     public static final IntegerSetting VOT_MAX_SPEECH_RATE = new IntegerSetting("morphe_vot_max_speech_rate", 18, parent(VOT_ENABLED));
     public static final StringSetting VOT_TRANSLATION_SERVICE = new StringSetting("morphe_vot_translation_service", "google", parent(VOT_ENABLED));
-    public static final StringSetting VOT_MYMEMORY_EMAIL = new StringSetting("morphe_vot_mymemory_email", "", new MyMemoryServiceAvailability());
     public static final StringSetting VOT_OPENROUTER_API_KEY = new StringSetting("morphe_vot_openrouter_api_key", "", new OpenRouterServiceAvailability());
     public static final StringSetting VOT_OPENROUTER_MODEL = new StringSetting("morphe_vot_openrouter_model", "mistralai/mistral-nemo", new OpenRouterServiceAvailability());
-    public static final StringSetting VOT_CAPTION_LANGUAGE = new StringSetting("morphe_vot_caption_language", "app", parent(VOT_ENABLED));
-    public static final StringSetting VOT_TTS_VOICE_TYPE = new StringSetting("morphe_vot_tts_voice_type", "auto", parent(VOT_ENABLED));
+    public static final StringSetting VOT_MYMEMORY_EMAIL = new StringSetting("morphe_vot_mymemory_email", "", new MyMemoryServiceAvailability());
     public static final BooleanSetting VOT_USE_NATIVE_TTS = new BooleanSetting("morphe_vot_use_native_tts", FALSE, parent(VOT_ENABLED));
     public static final BooleanSetting VOT_SHOW_HTTP_ERROR_DIALOG = new BooleanSetting("morphe_vot_show_http_error_dialog", TRUE);
 

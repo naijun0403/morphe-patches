@@ -46,7 +46,10 @@ public class VoiceOverTranslationModelPreference extends CustomDialogListPrefere
 
     private static final String CUSTOM_SENTINEL = "custom";
 
+    public static final String OPEN_ROUTER_MODEL_NAME_FREE = "openrouter/free";
+
     private static final List<String> PRESET_IDS = List.of(
+            OPEN_ROUTER_MODEL_NAME_FREE,
             "mistralai/mistral-nemo",
             "deepseek/deepseek-v4-flash",
             "google/gemma-4-26b-a4b-it"
@@ -56,18 +59,22 @@ public class VoiceOverTranslationModelPreference extends CustomDialogListPrefere
 
     public VoiceOverTranslationModelPreference(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         super(context, attrs, defStyleAttr, defStyleRes);
+        updateEntries();
     }
 
     public VoiceOverTranslationModelPreference(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
+        updateEntries();
     }
 
     public VoiceOverTranslationModelPreference(Context context, AttributeSet attrs) {
         super(context, attrs);
+        updateEntries();
     }
 
     public VoiceOverTranslationModelPreference(Context context) {
         super(context);
+        updateEntries();
     }
 
     private static boolean isPreset(String modelId) {
@@ -79,6 +86,7 @@ public class VoiceOverTranslationModelPreference extends CustomDialogListPrefere
 
     private void updateEntries() {
         setEntries(new CharSequence[]{
+                str("morphe_vot_openrouter_model_free"),
                 str("morphe_vot_openrouter_model_mistral_nemo"),
                 str("morphe_vot_openrouter_model_deepseek_flash_v4"),
                 str("morphe_vot_openrouter_model_gemma4_26b_a4b"),
@@ -90,22 +98,17 @@ public class VoiceOverTranslationModelPreference extends CustomDialogListPrefere
     }
 
     @Override
-    public void setSummary(CharSequence summary) {
-        // Suppress auto-summary set by the preference fragment.
-    }
-
-    @Override
     protected void showDialog(@Nullable Bundle state) {
         updateEntries();
 
         Context context = getContext();
         String currentModel = Settings.VOT_OPENROUTER_MODEL.get();
-        boolean isCustom = !isPreset(currentModel);
+        final boolean isCustom = !isPreset(currentModel);
 
         final int fg = Utils.getAppForegroundColor();
         final int secondaryFg = Color.argb(153, Color.red(fg), Color.green(fg), Color.blue(fg));
         final int checkmarkRes = Utils.appIsUsingBoldIcons() ? DRAWABLE_CHECKMARK_BOLD : DRAWABLE_CHECKMARK;
-        final LayoutInflater inflater = LayoutInflater.from(context);
+        LayoutInflater inflater = LayoutInflater.from(context);
 
         LinearLayout contentLayout = new LinearLayout(context);
         contentLayout.setOrientation(LinearLayout.VERTICAL);
@@ -119,14 +122,14 @@ public class VoiceOverTranslationModelPreference extends CustomDialogListPrefere
 
         CharSequence[] entries = getEntries();
         CharSequence[] entryValues = getEntryValues();
-        final String[] currentSelection = {isCustom ? CUSTOM_SENTINEL : currentModel};
-        final List<Runnable> selectionUpdaters = new ArrayList<>();
-        final Runnable refreshChecks = () -> { for (Runnable u : selectionUpdaters) u.run(); };
+        String[] currentSelection = {isCustom ? CUSTOM_SENTINEL : currentModel};
+        List<Runnable> selectionUpdaters = new ArrayList<>();
+        Runnable refreshChecks = () -> { for (Runnable u : selectionUpdaters) u.run(); };
 
-        final TextView[] customCostView = {null};
+        TextView[] customCostView = {null};
 
         for (int i = 0; i < entries.length; i++) {
-            final String value = entryValues[i].toString();
+            String value = entryValues[i].toString();
             final boolean isPresetEntry = !value.equals(CUSTOM_SENTINEL);
 
             View row = inflater.inflate(LAYOUT_MORPHE_CUSTOM_LIST_ITEM_CHECKED, listLayout, false);
@@ -136,11 +139,11 @@ public class VoiceOverTranslationModelPreference extends CustomDialogListPrefere
             check.setColorFilter(fg);
             View checkPlaceholder = row.findViewById(ID_MORPHE_CHECK_ICON_PLACEHOLDER);
 
-            boolean initialSelected = value.equals(currentSelection[0]);
+            final boolean initialSelected = value.equals(currentSelection[0]);
             check.setVisibility(initialSelected ? View.VISIBLE : View.GONE);
             checkPlaceholder.setVisibility(initialSelected ? View.GONE : View.VISIBLE);
             selectionUpdaters.add(() -> {
-                boolean selected = value.equals(currentSelection[0]);
+                final boolean selected = value.equals(currentSelection[0]);
                 check.setVisibility(selected ? View.VISIBLE : View.GONE);
                 checkPlaceholder.setVisibility(selected ? View.GONE : View.VISIBLE);
             });
@@ -156,7 +159,7 @@ public class VoiceOverTranslationModelPreference extends CustomDialogListPrefere
             itemText.setLayoutParams(new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
             LinearLayout rowLayout = (LinearLayout) row;
-            int idx = rowLayout.indexOfChild(itemText);
+            final int idx = rowLayout.indexOfChild(itemText);
             rowLayout.removeView(itemText);
             textContainer.addView(itemText);
 
@@ -167,8 +170,10 @@ public class VoiceOverTranslationModelPreference extends CustomDialogListPrefere
             rowLayout.addView(textContainer, idx);
 
             if (isPresetEntry) {
-                VoiceOverTranslationPatch.fetchOpenRouterModelCost(value,
-                        cost -> costView.setText(cost != null ? VoiceOverTranslationPatch.formatOpenRouterCostPerHour(cost) : ""));
+                VoiceOverTranslationPatch.fetchOpenRouterModelCost(value, cost ->
+                        costView.setText(cost != null
+                                ? VoiceOverTranslationPatch.formatOpenRouterCostPerHundredHours(cost)
+                                : ""));
             } else {
                 customCostView[0] = costView;
             }
@@ -195,7 +200,7 @@ public class VoiceOverTranslationModelPreference extends CustomDialogListPrefere
         // with debounce (see syncListSelection below).
         if (isCustom && !currentModel.isEmpty()) {
             VoiceOverTranslationPatch.fetchOpenRouterModelCost(currentModel,
-                    cost -> customCostView[0].setText(cost != null ? VoiceOverTranslationPatch.formatOpenRouterCostPerHour(cost) : ""));
+                    cost -> customCostView[0].setText(cost != null ? VoiceOverTranslationPatch.formatOpenRouterCostPerHundredHours(cost) : ""));
         }
 
         //noinspection ExtractMethodRecommender
@@ -210,8 +215,10 @@ public class VoiceOverTranslationModelPreference extends CustomDialogListPrefere
             if (!isPreset(typedValue) && !typedValue.isEmpty()) {
                 customCostView[0].setText("");
                 pendingCostFetch[0] = () -> VoiceOverTranslationPatch.fetchOpenRouterModelCost(
-                        typedValue, cost -> customCostView[0].setText(
-                                cost != null ? VoiceOverTranslationPatch.formatOpenRouterCostPerHour(cost) : ""));
+                        typedValue, cost -> customCostView[0].setText(cost != null
+                                ? VoiceOverTranslationPatch.formatOpenRouterCostPerHundredHours(cost)
+                                : "")
+                );
                 costHandler.postDelayed(pendingCostFetch[0], 800);
             } else {
                 customCostView[0].setText("");

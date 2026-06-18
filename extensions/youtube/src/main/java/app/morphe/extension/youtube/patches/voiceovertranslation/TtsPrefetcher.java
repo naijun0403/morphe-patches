@@ -76,11 +76,13 @@ final class TtsPrefetcher {
                 latch = loadingLatch;
             }
             if (latch != null) {
+                final long start = System.currentTimeMillis();
                 Logger.printDebug(() -> "Waiting for TTS prefetch");
                 final boolean awaitResult = latch.await(maxWaitTimeMilliseconds, TimeUnit.MILLISECONDS);
                 Logger.printDebug(() -> (awaitResult
                         ? "TTS prefetch completed: "
-                        : "TTS prefetch latch timed out: ") + videoId);
+                        : "TTS prefetch latch timed out: ") + videoId + " waitTime: "
+                        + (System.currentTimeMillis() - start) + "ms");
             }
         } catch (InterruptedException e) {
             throw new RuntimeException(e);

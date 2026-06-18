@@ -355,23 +355,26 @@ Tap here to open mymemory.translated.net"</string>
     <string name="morphe_vot_mymemory_email_title">MyMemory email</string>
     <string name="morphe_vot_mymemory_email_summary">Optional. Enter your MyMemory email address to increase the daily limit from 5,000 to 50,000 characters. Leave empty to use the anonymous limit</string>
     <string name="morphe_vot_service_openrouter" translatable="false">OpenRouter</string>
-    <string name="morphe_vot_paid_suffix">paid</string>
-    <string name="morphe_vot_openrouter_info_summary">"Paid AI translation via OpenRouter. Top up once and get thousands of translations. Mistral Nemo is the cheapest option; Gemma 4 26B A4B offers the highest quality.
+    <string name="morphe_vot_service_openrouter_free">OpenRouter (free)</string>
+    <!-- "OpenRouter" must not be translated -->
+    <string name="morphe_vot_service_openrouter_paid">OpenRouter (paid)</string>
+    <string name="morphe_vot_openrouter_info_summary">"Paid AI translation via OpenRouter. Top up once and get thousands of translations. Mistral Nemo is the cheapest option, Gemma 4 offers the highest quality. Free model is a randomly selected free tier model and may be slow or rate limited
 
 Tap here to open openrouter.ai"</string>
     <string name="morphe_vot_openrouter_api_key_title">OpenRouter API key</string>
     <string name="morphe_vot_openrouter_api_key_summary">Required. Enter your OpenRouter API key. Get one at openrouter.ai/settings/keys</string>
-    <string name="morphe_vot_openrouter_model_title">Model</string>
+    <string name="morphe_vot_openrouter_model_title">OpenRouter Model</string>
+    <string name="morphe_vot_openrouter_model_free">Random free model</string>
     <string name="morphe_vot_openrouter_model_mistral_nemo" translatable="false">Mistral Nemo</string>
-    <string name="morphe_vot_openrouter_model_gemma4_26b_a4b" translatable="false">Gemma 4 26B A4B</string>
+    <string name="morphe_vot_openrouter_model_gemma4_26b_a4b" translatable="false">Gemma 4</string>
     <string name="morphe_vot_openrouter_model_deepseek_flash_v4" translatable="false">DeepSeek V4 Flash</string>
     <string name="morphe_vot_openrouter_model_custom">Custom</string>
-    <string name="morphe_vot_openrouter_model_hint" translatable="false">e.g. mistralai/mistral-nemo</string>
+    <string name="morphe_vot_openrouter_model_hint" translatable="false">e.g. qwen/qwen3.5-flash-02-23</string>
     <string name="morphe_vot_openrouter_not_configured_title">OpenRouter not configured</string>
     <string name="morphe_vot_openrouter_not_configured_message">Enter your OpenRouter API key in settings before selecting this provider</string>
     <string name="morphe_vot_cost_free">Free</string>
-    <!-- Hour abbreviation appended after a slash to form e.g. "~$0.003/hr" -->
-    <string name="morphe_vot_cost_hour_abbrev">hr</string>
+    <!-- %s is dollar cost, e.g. $0.10 per 100 hours -->
+    <string name="morphe_vot_cost_per_hour">%s per 100 hours</string>
     <string name="morphe_vot_tts_voice_type">Voice</string>
     <string name="morphe_vot_tts_system">System</string>
     <string name="morphe_vot_voice_gender_male_multilingual">Multilingual male</string>

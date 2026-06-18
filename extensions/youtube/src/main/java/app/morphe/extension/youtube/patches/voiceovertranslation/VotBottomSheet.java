@@ -18,6 +18,7 @@ import static app.morphe.extension.youtube.patches.voiceovertranslation.Transcri
 import static app.morphe.extension.youtube.patches.voiceovertranslation.TranscriptTranslator.TRANSLATION_SERVICE_MY_MEMORY;
 import static app.morphe.extension.youtube.patches.voiceovertranslation.TranscriptTranslator.TRANSLATION_SERVICE_OPENROUTER;
 import static app.morphe.extension.youtube.patches.voiceovertranslation.VoiceOverTranslationPatch.TTS_ENGINE_SYSTEM;
+import static app.morphe.extension.youtube.settings.preference.VoiceOverTranslationModelPreference.OPEN_ROUTER_MODEL_NAME_FREE;
 import static app.morphe.extension.youtube.videoplayer.LegacyPlayerControlButton.fadeInDuration;
 import static app.morphe.extension.youtube.videoplayer.LegacyPlayerControlButton.getDialogBackgroundColor;
 
@@ -204,7 +205,9 @@ public final class VotBottomSheet {
         String[] entries = {
                 str("morphe_vot_service_google"),
                 str("morphe_vot_service_mymemory"),
-                str("morphe_vot_service_openrouter") + " (" + str("morphe_vot_paid_suffix") + ")"
+                str(Settings.VOT_OPENROUTER_MODEL.get().equals(OPEN_ROUTER_MODEL_NAME_FREE)
+                        ? "morphe_vot_service_openrouter_free"
+                        : "morphe_vot_service_openrouter_paid")
         };
         String[] values = { TRANSLATION_SERVICE_GOOGLE, TRANSLATION_SERVICE_MY_MEMORY, TRANSLATION_SERVICE_OPENROUTER };
 
@@ -265,7 +268,9 @@ public final class VotBottomSheet {
                 rowLayout.addView(textContainer, idx);
 
                 TranscriptTranslator.fetchOpenRouterModelCost(Settings.VOT_OPENROUTER_MODEL.get(),
-                        cost -> costView.setText(cost != null ? VoiceOverTranslationPatch.formatOpenRouterCostPerHour(cost) : ""));
+                        cost -> costView.setText(cost != null
+                                ? VoiceOverTranslationPatch.formatOpenRouterCostPerHundredHours(cost)
+                                : ""));
             }
 
             row.setOnClickListener(v -> {
@@ -273,7 +278,8 @@ public final class VotBottomSheet {
                     CustomDialog.create(context,
                             str("morphe_vot_openrouter_not_configured_title"),
                             str("morphe_vot_openrouter_not_configured_message"),
-                            null, null, () -> {}, null, null, null, false)
+                            null, null, () -> {}, null,
+                                    null, null, false)
                             .first.show();
                     return;
                 }
