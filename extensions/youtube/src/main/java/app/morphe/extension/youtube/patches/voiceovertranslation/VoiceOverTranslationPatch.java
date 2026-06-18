@@ -281,6 +281,14 @@ public class VoiceOverTranslationPatch {
                         Logger.printDebug(() -> "Waiting for translation at segment: " + segIdx);
                         break;
                     }
+                    // isAwaitingTranslationAt returns false once a batch is marked done, even if
+                    // translation failed and the segment kept its source-language text. Check lang
+                    // so a permanently untranslated segment is never spoken.
+                    if (!TranscriptFetcher.isSameSpokenLanguage(resolveTargetLang(), seg.lang())) {
+                        final int segIdx = i;
+                        Logger.printDebug(() -> "Skipping untranslated segment: " + segIdx);
+                        break;
+                    }
                     if (!ttsEngine.isSpeaking() || wasExplicitSeek) {
                         lastSpokenIndex = i;
                         speak(seg, i);

@@ -261,7 +261,7 @@ final class TranscriptTranslator {
 
                 translatingBatchIndex = index;
                 final List<String> translated = translateBatchSafe(videoId, batch, targetLang,
-                        streamCallback(onUpdate, mainHandler, working, batch, finalOffset));
+                        streamCallback(onUpdate, mainHandler, working, batch, finalOffset, targetLang));
                 translatingBatchIndex = -1;
 
                 // A seek cut this request short - drop the partial result and re-pick against the
@@ -274,7 +274,7 @@ final class TranscriptTranslator {
                 }
                 if (abortTranslation) break;
 
-                applyBatch(working, batch, finalOffset, translated);
+                applyBatch(working, batch, finalOffset, translated, targetLang);
 
                 // Re-queue segments the model failed to translate as a new undone batch so they
                 // are retried instead of permanently staying in the original language.
@@ -426,7 +426,7 @@ final class TranscriptTranslator {
      * A {@code null} translation (failed batch) leaves the original text in place.
      */
     private static void applyBatch(List<TranscriptSegment> target, List<TranscriptSegment> batch,
-                                   int offset, @Nullable List<String> translated) {
+                                   int offset, @Nullable List<String> translated, String lang) {
         if (translated == null) return;
         final int limit = Math.min(batch.size(), translated.size());
         if (translated.size() != batch.size()) {
@@ -437,7 +437,7 @@ final class TranscriptTranslator {
         for (int j = 0; j < limit; j++) {
             TranscriptSegment orig = batch.get(j);
             target.set(offset + j,
-                    new TranscriptSegment(orig.startMs(), orig.endMs(), translated.get(j)));
+                    new TranscriptSegment(orig.startMs(), orig.endMs(), translated.get(j), lang));
         }
     }
 
@@ -447,11 +447,12 @@ final class TranscriptTranslator {
             Handler mainHandler,
             List<TranscriptSegment> working,
             List<TranscriptSegment> batch,
-            int offset) {
+            int offset,
+            String lang) {
         if (onUpdate == null) return null;
         return partial -> {
             List<TranscriptSegment> snap = new ArrayList<>(working);
-            applyBatch(snap, batch, offset, partial);
+            applyBatch(snap, batch, offset, partial, lang);
             mainHandler.post(() -> onUpdate.accept(snap));
         };
     }

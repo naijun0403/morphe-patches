@@ -59,6 +59,7 @@ final class TranscriptFetcher {
         return segments;
     }
 
+    //noinspection BooleanMethodIsAlwaysInverted
     public static boolean isSameSpokenLanguage(String target, String source) {
         if (target == null || source == null) return false;
         if (target.equalsIgnoreCase(source)) return true; // Direct match (handles pt-BR == pt-BR)
@@ -87,9 +88,10 @@ final class TranscriptFetcher {
                 if (poToken != null) baseUrl += "&pot=" + poToken;
 
                 String json = fetchUrl(baseUrl);
-                List<TranscriptSegment> segments = parseJson3(json);
+                String detectedLang = extractLangFromUrl(captionUrl).split("-")[0];
+                List<TranscriptSegment> segments = parseJson3(json, detectedLang);
                 if (!segments.isEmpty()) {
-                    lastSourceLang = extractLangFromUrl(captionUrl).split("-")[0];
+                    lastSourceLang = detectedLang;
                     return segments;
                 }
             } catch (Exception ex) {
@@ -193,7 +195,7 @@ final class TranscriptFetcher {
                         + "&lang=" + srcLang + "&kind=asr&fmt=json3";
                 String json = fetchUrl(urlStr);
                 if (!json.isEmpty()) {
-                    List<TranscriptSegment> segments = parseJson3(json);
+                    List<TranscriptSegment> segments = parseJson3(json, "en");
                     if (!segments.isEmpty()) {
                         lastSourceLang = "en";
                         return segments;
@@ -235,7 +237,7 @@ final class TranscriptFetcher {
     // Tighter length cap so unpunctuated chunks stay short and re-sync with the video often.
     private static final int MAX_UNPUNCTUATED_CHARS = 200;
 
-    private static List<TranscriptSegment> parseJson3(String json) throws Exception {
+    private static List<TranscriptSegment> parseJson3(String json, String sourceLang) throws Exception {
         List<TranscriptSegment> lines = new ArrayList<>();
         JSONObject root = new JSONObject(json);
         JSONArray events = root.optJSONArray("events");
@@ -264,7 +266,7 @@ final class TranscriptFetcher {
             if (textStr.startsWith("[") && textStr.endsWith("]")) continue;
             if (!textStr.isEmpty()) {
                 lines.add(new TranscriptSegment(startMs,
-                        startMs + Math.max(durationMs, 500), textStr));
+                        startMs + Math.max(durationMs, 500), textStr, sourceLang));
             }
         }
 
@@ -277,11 +279,11 @@ final class TranscriptFetcher {
             TranscriptSegment next = lines.get(i + 1);
 
             if (cur.endMs() > next.startMs()) {
-                lines.set(i, new TranscriptSegment(cur.startMs(), next.startMs(), cur.text()));
+                lines.set(i, new TranscriptSegment(cur.startMs(), next.startMs(), cur.text(), cur.lang()));
             } else if (next.startMs() - cur.endMs() <= CLOSE_GAP_THRESHOLD_MS) {
                 final long mid = (cur.endMs() + next.startMs()) / 2;
-                lines.set(i, new TranscriptSegment(cur.startMs(), mid, cur.text()));
-                lines.set(i + 1, new TranscriptSegment(mid, next.endMs(), next.text()));
+                lines.set(i, new TranscriptSegment(cur.startMs(), mid, cur.text(), cur.lang()));
+                lines.set(i + 1, new TranscriptSegment(mid, next.endMs(), next.text(), next.lang()));
             }
         }
 
@@ -300,11 +302,13 @@ final class TranscriptFetcher {
         StringBuilder text = new StringBuilder();
         long startMs = 0;
         long endMs;
+        String sentenceLang = "";
 
         for (int i = 0, size = lines.size(); i < size; i++) {
             TranscriptSegment line = lines.get(i);
             if (text.length() == 0) {
                 startMs = line.startMs();
+                sentenceLang = line.lang();
             } else {
                 text.append(' ');
             }
@@ -329,7 +333,7 @@ final class TranscriptFetcher {
             }
 
             if (flush) {
-                sentences.add(new TranscriptSegment(startMs, endMs, text.toString()));
+                sentences.add(new TranscriptSegment(startMs, endMs, text.toString(), sentenceLang));
                 text.setLength(0);
             }
         }

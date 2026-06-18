@@ -9,7 +9,7 @@ package app.morphe.extension.youtube.patches.voiceovertranslation;
 
 import androidx.annotation.NonNull;
 
-record TranscriptSegment(long startMs, long endMs, String text) {
+record TranscriptSegment(long startMs, long endMs, String text, String lang) {
     @NonNull
     @Override
     public String toString() {
@@ -17,6 +17,7 @@ record TranscriptSegment(long startMs, long endMs, String text) {
                 "startMs=" + startMs +
                 ", endMs=" + endMs +
                 ", text='" + text + '\'' +
+                ", lang='" + lang + '\'' +
                 '}';
     }
 }
