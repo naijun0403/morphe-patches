@@ -121,18 +121,6 @@ public final class VotBottomSheet {
         content.addView(makeLanguageRow(context, str("morphe_vot_caption_language_title"), fg,
                 langEntries, langValues, mainRef));
         content.addView(translationRow);
-        if (TRANSLATION_SERVICE_OPENROUTER.equals(Settings.VOT_TRANSLATION_SERVICE.get())) {
-            TextView costView = new TextView(context);
-            costView.setTextSize(12);
-            costView.setTextColor(secondaryColor(fg));
-            LinearLayout.LayoutParams costLp = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            costLp.setMargins(0, 0, 0, Dim.dp4);
-            costView.setLayoutParams(costLp);
-            content.addView(costView);
-            TranscriptTranslator.fetchOpenRouterModelCost(Settings.VOT_OPENROUTER_MODEL.get(),
-                    cost -> costView.setText(cost != null ? formatOpenRouterCostPerHour(cost) : ""));
-        }
         content.addView(engineRow);
         content.addView(makeDivider(context, fg));
         content.addView(makeSliderRow(context,
@@ -223,38 +211,82 @@ public final class VotBottomSheet {
         SheetBottomDialog.DraggableLinearLayout pickerRoot =
                 SheetBottomDialog.createMainLayout(context, getDialogBackgroundColor());
         pickerRoot.setPadding(Dim.dp16, 0, Dim.dp16, Dim.dp16);
-        pickerRoot.addView(makeTitle(context, str("morphe_vot_translation_service_title"),
-                Utils.getAppForegroundColor()));
+        final int fg = Utils.getAppForegroundColor();
+        pickerRoot.addView(makeTitle(context, str("morphe_vot_translation_service_title"), fg));
 
-        ListView listView = new ListView(context);
-        listView.setDivider(null);
-        CustomDialogListPreference.ListPreferenceArrayAdapter adapter =
-                new CustomDialogListPreference.ListPreferenceArrayAdapter(
-                        context, LAYOUT_MORPHE_CUSTOM_LIST_ITEM_CHECKED, entries, values,
-                        Settings.VOT_TRANSLATION_SERVICE.get());
-        listView.setAdapter(adapter);
+        LayoutInflater inflater = LayoutInflater.from(context);
+        int checkmarkRes = Utils.appIsUsingBoldIcons() ? DRAWABLE_CHECKMARK_BOLD : DRAWABLE_CHECKMARK;
+        String selectedService = Settings.VOT_TRANSLATION_SERVICE.get();
 
         SheetBottomDialog.SlideDialog pickerDialog =
                 SheetBottomDialog.createSlideDialog(context, pickerRoot, fadeInDuration);
 
-        listView.setOnItemClickListener((parent, view, position, id) -> {
-            String selected = values[position];
-            if (selected.equals(TRANSLATION_SERVICE_OPENROUTER)
-                    && Settings.VOT_OPENROUTER_API_KEY.get().trim().isEmpty()) {
-                CustomDialog.create(context,
-                        str("morphe_vot_openrouter_not_configured_title"),
-                        str("morphe_vot_openrouter_not_configured_message"),
-                        null, null, () -> {}, null, null, null, false)
-                        .first.show();
-                return;
-            }
-            Settings.VOT_TRANSLATION_SERVICE.save(selected);
-            VoiceOverTranslationPatch.reloadTranscript();
-            VotBottomSheet.show(context);
-            pickerDialog.dismiss();
-        });
+        LinearLayout listLayout = new LinearLayout(context);
+        listLayout.setOrientation(LinearLayout.VERTICAL);
 
-        pickerRoot.addView(listView);
+        for (int i = 0; i < entries.length; i++) {
+            final String value = values[i];
+            final boolean isOpenRouter = TRANSLATION_SERVICE_OPENROUTER.equals(value);
+
+            View row = inflater.inflate(LAYOUT_MORPHE_CUSTOM_LIST_ITEM_CHECKED, listLayout, false);
+
+            ImageView check = row.findViewById(ID_MORPHE_CHECK_ICON);
+            check.setImageResource(checkmarkRes);
+            check.setColorFilter(fg);
+            boolean isSelected = value.equals(selectedService);
+            check.setVisibility(isSelected ? View.VISIBLE : View.GONE);
+            row.findViewById(ID_MORPHE_CHECK_ICON_PLACEHOLDER)
+                    .setVisibility(isSelected ? View.GONE : View.VISIBLE);
+
+            TextView itemText = row.findViewById(ID_MORPHE_ITEM_TEXT);
+            itemText.setText(entries[i]);
+            itemText.setTextColor(fg);
+
+            if (isOpenRouter) {
+                LinearLayout.LayoutParams existingLp = (LinearLayout.LayoutParams) itemText.getLayoutParams();
+
+                LinearLayout textContainer = new LinearLayout(context);
+                textContainer.setOrientation(LinearLayout.VERTICAL);
+                textContainer.setLayoutParams(existingLp);
+
+                itemText.setLayoutParams(new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+                LinearLayout rowLayout = (LinearLayout) row;
+                int idx = rowLayout.indexOfChild(itemText);
+                rowLayout.removeView(itemText);
+                textContainer.addView(itemText);
+
+                TextView costView = new TextView(context);
+                costView.setTextColor(secondaryColor(fg));
+                costView.setTextSize(12);
+                textContainer.addView(costView);
+
+                rowLayout.addView(textContainer, idx);
+
+                TranscriptTranslator.fetchOpenRouterModelCost(Settings.VOT_OPENROUTER_MODEL.get(),
+                        cost -> costView.setText(cost != null ? formatOpenRouterCostPerHour(cost) : ""));
+            }
+
+            row.setOnClickListener(v -> {
+                if (isOpenRouter && Settings.VOT_OPENROUTER_API_KEY.get().trim().isEmpty()) {
+                    CustomDialog.create(context,
+                            str("morphe_vot_openrouter_not_configured_title"),
+                            str("morphe_vot_openrouter_not_configured_message"),
+                            null, null, () -> {}, null, null, null, false)
+                            .first.show();
+                    return;
+                }
+                Settings.VOT_TRANSLATION_SERVICE.save(value);
+                VoiceOverTranslationPatch.reloadTranscript();
+                VotBottomSheet.show(context);
+                pickerDialog.dismiss();
+            });
+
+            listLayout.addView(row);
+        }
+
+        pickerRoot.addView(listLayout);
         mainDialog.dismiss();
         pickerDialog.setOnCancelListener(d -> VotBottomSheet.show(context));
         pickerDialog.show();
