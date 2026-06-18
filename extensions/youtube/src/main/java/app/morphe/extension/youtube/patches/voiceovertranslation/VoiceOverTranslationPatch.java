@@ -97,7 +97,7 @@ public class VoiceOverTranslationPatch {
     private static final long TEST_PREFETCH_WAIT = 500;
 
     private static float lastSpeechRate = MIN_SPEECH_RATE;
-    private static long lastVideoTimeMs;
+    static volatile long lastVideoTimeMs;
     // Estimated video timestamp when the currently-playing TTS audio finishes.
     // Duck is held until this time so TTS that extends into the gap before the
     // next segment does not prematurely restore the original audio volume.
@@ -221,10 +221,13 @@ public class VoiceOverTranslationPatch {
 
         TtsPrefetcher.updateTime(timeMs);
 
+        final long prevVideoTimeMs = lastVideoTimeMs;
+        lastVideoTimeMs = timeMs;
+
         if (segments.isEmpty()) return;
 
-        if (lastVideoTimeMs > 0) {
-            final long timeSinceLastUpdate = Math.abs(timeMs - lastVideoTimeMs);
+        if (prevVideoTimeMs > 0) {
+            final long timeSinceLastUpdate = Math.abs(timeMs - prevVideoTimeMs);
             if (timeSinceLastUpdate > SEEK_JUMP_THRESHOLD_MS) {
                 // Large jump outside current segment area - stop everything.
                 // Small jumps within the same segment are handled by speak()'s startTime logic.
@@ -234,7 +237,6 @@ public class VoiceOverTranslationPatch {
                 lastSpokenIndex = -1;
             }
         }
-        lastVideoTimeMs = timeMs;
 
         final long effectiveTimeMs = timeMs + TTS_LOOKAHEAD_MS;
         for (int i = 0, size = segments.size(); i < size; i++) {

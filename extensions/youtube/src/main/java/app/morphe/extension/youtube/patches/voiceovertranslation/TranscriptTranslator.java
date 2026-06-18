@@ -122,6 +122,23 @@ final class TranscriptTranslator {
 
         final Handler mainHandler = new Handler(Looper.getMainLooper());
 
+        // Translate the batch at the current video position first so TTS gets translated text
+        // without waiting for all preceding batches. Critical when starting mid-video or seeking.
+        final long currentTimeMs = VoiceOverTranslationPatch.lastVideoTimeMs;
+        final int priorityBatchIndex = currentTimeMs > 0 ? findBatchAtTime(batches, currentTimeMs) : 0;
+
+        if (priorityBatchIndex > 0) {
+            final List<TranscriptSegment> priorityBatch = batches.get(priorityBatchIndex);
+            final int priorityOffset = offsets[priorityBatchIndex];
+            applyBatch(working, priorityBatch, priorityOffset,
+                    translateBatchSafe(videoId, priorityBatch, targetLang,
+                            streamCallback(onUpdate, mainHandler, working, priorityBatch, priorityOffset)));
+            if (onUpdate != null && !isOpenRouter) {
+                List<TranscriptSegment> snap = new ArrayList<>(working);
+                mainHandler.post(() -> onUpdate.accept(snap));
+            }
+        }
+
         final List<TranscriptSegment> batch0 = batches.get(0);
         applyBatch(working, batch0, 0, translateBatchSafe(videoId, batch0, targetLang,
                 streamCallback(onUpdate, mainHandler, working, batch0, 0)));
@@ -141,6 +158,7 @@ final class TranscriptTranslator {
 
         for (int batchIndex = 1; batchIndex < batchesSize; batchIndex++) {
             if (abortTranslation) break;
+            if (batchIndex == priorityBatchIndex) continue;
             List<TranscriptSegment> batchN = batches.get(batchIndex);
             final int batchOffset = offsets[batchIndex];
             List<String> translated = translateBatchSafe(videoId, batchN, targetLang,
@@ -236,6 +254,16 @@ final class TranscriptTranslator {
             }
             return null;
         }
+    }
+
+    private static int findBatchAtTime(List<List<TranscriptSegment>> batches, long timeMs) {
+        for (int i = 0; i < batches.size(); i++) {
+            List<TranscriptSegment> batch = batches.get(i);
+            if (batch.get(batch.size() - 1).endMs() > timeMs) {
+                return i;
+            }
+        }
+        return batches.size() - 1;
     }
 
     private static List<List<TranscriptSegment>> splitByCharBudget(
@@ -395,7 +423,7 @@ final class TranscriptTranslator {
 
         final String model = Settings.VOT_OPENROUTER_MODEL.get();
         final long start = System.currentTimeMillis();
-        Logger.printDebug(() -> "OpenRouter translation starting: " + targetLang + " model: " + model);
+        Logger.printDebug(() -> "OpenRouter translation starting: " + videoId + " lang: " + targetLang + " model: " + model);
 
         String apiKey = Settings.VOT_OPENROUTER_API_KEY.get().trim();
         if (apiKey.isEmpty()) throw new Exception("OpenRouter API key is not set");
