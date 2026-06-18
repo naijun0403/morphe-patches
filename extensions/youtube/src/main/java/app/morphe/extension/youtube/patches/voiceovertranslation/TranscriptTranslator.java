@@ -627,7 +627,7 @@ final class TranscriptTranslator {
         JSONObject systemMessage = new JSONObject()
                 .put("role", "system")
                 .put("content", "Translate each numbered line to " + targetLangName + " (" + targetLang + "). "
-                        + "Reply \"N: translation\". One line per number. Do not merge or skip.");
+                        + "Reply \"N: translation\" where N is the input number. One line per number. Do not merge or skip.");
         JSONObject userMessage = new JSONObject()
                 .put("role", "user")
                 .put("content", joined.toString());
