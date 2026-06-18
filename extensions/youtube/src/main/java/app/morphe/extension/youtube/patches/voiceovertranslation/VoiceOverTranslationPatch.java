@@ -322,6 +322,9 @@ public class VoiceOverTranslationPatch {
         stopTts();
         segments = new ArrayList<>();
         lastSpokenIndex = -1;
+        // Without this, in-flight onUpdate callbacks for the old language would restore
+        // stale segments after we cleared them.
+        TranscriptTranslator.requestAbort();
         if (!isLoading) {
             loadTranscript(currentVideoId);
         }
@@ -343,6 +346,7 @@ public class VoiceOverTranslationPatch {
         Utils.verifyOnMainThread();
         if (isLoading) return;
         isLoading = true;
+        final String loadLang = resolveTargetLang();
 
         Utils.runOnBackgroundThread(() -> {
             try {
@@ -353,7 +357,7 @@ public class VoiceOverTranslationPatch {
                         videoId,
                         updated -> {
                             Utils.verifyOnMainThread();
-                            if (videoId.equals(currentVideoId)) {
+                            if (videoId.equals(currentVideoId) && loadLang.equals(resolveTargetLang())) {
                                 // If the segment we last started speaking had its text replaced
                                 // by a freshly-arrived translation, stop and let videoTimeChanged
                                 // re-speak it with the translated text on the next tick.
@@ -374,7 +378,7 @@ public class VoiceOverTranslationPatch {
                         });
 
                 Utils.runOnMainThread(() -> {
-                    if (videoId.equals(currentVideoId)) {
+                    if (videoId.equals(currentVideoId) && loadLang.equals(resolveTargetLang())) {
                         // With sequential batch execution, cancelCheck.get() ensures every
                         // onUpdate fires before translate() returns, so segments is already
                         // fully translated by the time we arrive here. Only fall back to the
@@ -391,10 +395,9 @@ public class VoiceOverTranslationPatch {
             } finally {
                 Utils.runOnMainThread(() -> {
                     isLoading = false;
-                    // The video may have changed while this fetch was in flight - the isLoading
-                    // gate blocked that load, so restart it for the current video.
-                    if (!currentVideoId.isEmpty() && !currentVideoId.equals(videoId)
-                            && Settings.VOT_ENABLED.get()) {
+                    // Restart if the video or language changed while this fetch was in flight.
+                    if (!currentVideoId.isEmpty() && Settings.VOT_ENABLED.get()
+                            && (!currentVideoId.equals(videoId) || !loadLang.equals(resolveTargetLang()))) {
                         loadTranscript(currentVideoId);
                     }
                 });
