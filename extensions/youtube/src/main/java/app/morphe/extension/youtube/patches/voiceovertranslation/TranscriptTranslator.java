@@ -275,8 +275,24 @@ final class TranscriptTranslator {
                 if (abortTranslation) break;
 
                 applyBatch(working, batch, finalOffset, translated);
+
+                // Re-queue segments the model failed to translate as a new undone batch so they
+                // are retried instead of permanently staying in the original language.
+                if (translated != null && translated.size() < batch.size()) {
+                    List<TranscriptSegment> tail = new ArrayList<>(batch.subList(translated.size(), batch.size()));
+                    batches.add(index + 1, tail);
+                    batchDone.add(index + 1, false);
+                }
+
                 batchDone.set(index, true);
                 completed++;
+
+                // liveBatches must be visible to isAwaitingTranslationAt() before liveBatchDone is
+                // updated on the main thread. If a tail was re-queued above, the new batch must
+                // already be in liveBatches when the main thread sees the original batch marked done,
+                // so tail segments stay blocked (index >= done.length → awaiting) rather than spoken
+                // in the original language.
+                liveBatches = new ArrayList<>(batches);
 
                 // liveBatchDone must become visible on the main thread only after segments is
                 // updated; otherwise videoTimeChanged() can see done=true while segments still
@@ -809,14 +825,18 @@ final class TranscriptTranslator {
         }
 
         final int matchedFirst = matched[0];
+        Logger.printDebug(() -> "OpenRouter translation complete: " + targetLang
+                + " fetchTime: " + (System.currentTimeMillis() - start) + "ms");
+
         if (matchedFirst != segmentSize) {
             Logger.printDebug(() -> "OpenRouter line mismatch - expected: " + segmentSize
                     + ", got: " + matchedFirst + "; last: " + (segmentSize - matchedFirst)
-                    + " segment(s) keep original text");
+                    + " segment(s) queued for retry");
+            if (matchedFirst > 0) {
+                // Return only the translated portion; the caller re-queues the tail for retry.
+                return new ArrayList<>(result.subList(0, matchedFirst));
+            }
         }
-
-        Logger.printDebug(() -> "OpenRouter translation complete: " + targetLang
-                + " fetchTime: " + (System.currentTimeMillis() - start) + "ms");
         return result;
     }
 
