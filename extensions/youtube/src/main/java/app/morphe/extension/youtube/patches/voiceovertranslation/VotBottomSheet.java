@@ -280,9 +280,10 @@ public final class VotBottomSheet {
         Collections.sort(nativeVoices);
         Collections.sort(multilingualVoices);
 
+        String voiceId = Settings.VOT_TTS_VOICE_TYPE.get();
         String selectedValue = Settings.VOT_USE_NATIVE_TTS.get()
                 ? TTS_ENGINE_SYSTEM
-                : Settings.VOT_TTS_VOICE_TYPE.get();
+                : VoiceCatalog.resolve(lang, voiceId);
 
         final int fg = Utils.getAppForegroundColor();
 
