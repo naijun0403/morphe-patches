@@ -187,7 +187,7 @@ public final class VotBottomSheet {
 
         if (Settings.VOT_USE_NATIVE_TTS.get() || (voice == null && VoiceCatalog.resolve(lang, null) == null)) {
             valueView.setText(str("morphe_vot_tts_system"));
-        } else if (voice != null && (voice.id.startsWith(lang) || voice.isMultilingual)) {
+        } else if (voice != null && (voice.languageTag.equalsIgnoreCase(VoiceCatalog.getIso639(lang)) || voice.isMultilingual)) {
             valueView.setText(voice.dialogDisplayName);
         } else {
             String defaultVoiceId = VoiceCatalog.resolve(lang, null);
