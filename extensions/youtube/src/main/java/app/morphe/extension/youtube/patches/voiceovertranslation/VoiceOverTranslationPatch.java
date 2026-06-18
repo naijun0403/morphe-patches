@@ -96,6 +96,11 @@ public class VoiceOverTranslationPatch {
 
     private static float lastSpeechRate = MIN_SPEECH_RATE;
     static volatile long lastVideoTimeMs;
+    // Tracks the latest known position even when paused, unlike lastVideoTimeMs which only
+    // updates during PLAYING. Used by translate() to pick the right initial batch when a video
+    // starts mid-position (PAUSED setVideoTime calls arrive before newVideoLoaded and before
+    // lastVideoTimeMs is ever set for the new video).
+    static volatile long videoPositionHint;
     // Estimated video timestamp when the currently-playing TTS audio finishes.
     // Duck is held until this time so TTS that extends into the gap before the
     // next segment does not prematurely restore the original audio volume.
@@ -214,6 +219,9 @@ public class VoiceOverTranslationPatch {
             return;
         }
         VideoState state = VideoState.getCurrent();
+        // Capture position before the PAUSED early return so translate() can pick the right
+        // initial batch even when the first setVideoTime ticks arrive before play begins.
+        videoPositionHint = timeMs;
         // Video state can be null until the overlay is activated the first time.
         if (state != null && state != VideoState.PLAYING) {
             Logger.printDebug(() -> "Ignoring TTS for video state: " + state);

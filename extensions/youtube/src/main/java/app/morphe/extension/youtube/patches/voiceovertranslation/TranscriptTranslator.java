@@ -226,7 +226,7 @@ final class TranscriptTranslator {
                 if (abortTranslation) break;
                 reprioritize = false;
 
-                final long timeMs = VoiceOverTranslationPatch.lastVideoTimeMs;
+                final long timeMs = VoiceOverTranslationPatch.videoPositionHint;
                 final int index = pickNextBatch(batches, batchDone, timeMs);
                 if (index < 0) break;
 
