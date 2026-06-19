@@ -51,7 +51,7 @@ final class TranscriptFetcher {
 
         if (!segments.isEmpty()) {
             String targetLangCode = VoiceOverTranslationPatch.resolveTargetLang();
-            if (!isSameSpokenLanguage(targetLangCode, lastSourceLang)) {
+            if (isSpokenLanguageDifferent(targetLangCode, lastSourceLang)) {
                 segments = TranscriptTranslator.translate(videoId, segments, targetLangCode, onUpdate, cancelled);
             }
         }
@@ -59,16 +59,15 @@ final class TranscriptFetcher {
         return segments;
     }
 
-    //noinspection BooleanMethodIsAlwaysInverted
-    public static boolean isSameSpokenLanguage(String target, String source) {
-        if (target == null || source == null) return false;
-        if (target.equalsIgnoreCase(source)) return true; // Direct match (handles pt-BR == pt-BR)
+    public static boolean isSpokenLanguageDifferent(String target, String source) {
+        if (target == null || source == null) return true;
+        if (target.equalsIgnoreCase(source)) return false; // Direct match (handles pt-BR == pt-BR)
 
         // If Portuguese but didn't match directly above, the regions are different (e.g., pt-BR != pt-PT)
-        if (target.startsWith("pt-")) return false;
+        if (target.startsWith("pt-")) return true;
 
         // For everything else, strip the region and compare base languages (e.g., en-US == en-GB)
-        return VoiceCatalog.getIso639(target).equalsIgnoreCase(VoiceCatalog.getIso639(source));
+        return !VoiceCatalog.getIso639(target).equalsIgnoreCase(VoiceCatalog.getIso639(source));
     }
 
     private static List<TranscriptSegment> fetchEnglishSegments(String videoId) {

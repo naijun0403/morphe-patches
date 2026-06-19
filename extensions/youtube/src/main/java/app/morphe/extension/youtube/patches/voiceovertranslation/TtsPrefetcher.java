@@ -269,7 +269,7 @@ final class TtsPrefetcher {
                 }
                 // A failed translation batch leaves segments in the source language; skip them
                 // so we don't cache source-language TTS while the user expects the target language.
-                if (!TranscriptFetcher.isSameSpokenLanguage(lang, seg.lang())) continue;
+                if (TranscriptFetcher.isSpokenLanguageDifferent(lang, seg.lang())) continue;
                 if (TtsCache.notCached(videoId, i, voice, lang, seg.text())) {
                     return new NextFetch(i, i - firstFutureIndex, seg);
                 }
@@ -279,7 +279,7 @@ final class TtsPrefetcher {
         // Priority 2: Past segments (for loops/seeks), closest to playhead first.
         for (int i = firstFutureIndex - 1; i >= 0; i--) {
             TranscriptSegment seg = segments.get(i);
-            if (!TranscriptFetcher.isSameSpokenLanguage(lang, seg.lang())) continue;
+            if (TranscriptFetcher.isSpokenLanguageDifferent(lang, seg.lang())) continue;
             if (TtsCache.notCached(videoId, i, voice, lang, seg.text())) {
                 return new NextFetch(i, firstFutureIndex - i, seg);
             }

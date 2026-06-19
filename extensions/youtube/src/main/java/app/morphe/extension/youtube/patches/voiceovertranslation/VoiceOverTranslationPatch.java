@@ -282,7 +282,7 @@ public class VoiceOverTranslationPatch {
                     // isAwaitingTranslationAt returns false once a batch is marked done, even if
                     // translation failed and the segment kept its source-language text. Check lang
                     // so a permanently untranslated segment is never spoken.
-                    if (!TranscriptFetcher.isSameSpokenLanguage(resolveTargetLang(), seg.lang())) {
+                    if (TranscriptFetcher.isSpokenLanguageDifferent(resolveTargetLang(), seg.lang())) {
                         final int segIdx = i;
                         Logger.printDebug(() -> "Skipping untranslated segment: " + segIdx);
                         break;
