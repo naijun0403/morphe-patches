@@ -46,10 +46,7 @@ public class VoiceOverTranslationModelPreference extends CustomDialogListPrefere
 
     private static final String CUSTOM_SENTINEL = "custom";
 
-    public static final String OPEN_ROUTER_MODEL_NAME_FREE = "openrouter/free";
-
     private static final List<String> PRESET_IDS = List.of(
-            OPEN_ROUTER_MODEL_NAME_FREE,
             "mistralai/mistral-nemo",
             "deepseek/deepseek-v4-flash",
             "google/gemma-4-26b-a4b-it"
@@ -86,7 +83,6 @@ public class VoiceOverTranslationModelPreference extends CustomDialogListPrefere
 
     private void updateEntries() {
         setEntries(new CharSequence[]{
-                str("morphe_vot_openrouter_model_free"),
                 str("morphe_vot_openrouter_model_mistral_nemo"),
                 str("morphe_vot_openrouter_model_deepseek_flash_v4"),
                 str("morphe_vot_openrouter_model_gemma4_26b_a4b"),

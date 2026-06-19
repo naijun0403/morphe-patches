@@ -355,16 +355,12 @@ Tap here to open mymemory.translated.net"</string>
     <string name="morphe_vot_mymemory_email_title">MyMemory email</string>
     <string name="morphe_vot_mymemory_email_summary">Optional. Enter your MyMemory email address to increase the daily limit from 5,000 to 50,000 characters. Leave empty to use the anonymous limit</string>
     <string name="morphe_vot_service_openrouter" translatable="false">OpenRouter</string>
-    <string name="morphe_vot_service_openrouter_free">OpenRouter (free)</string>
-    <!-- "OpenRouter" must not be translated -->
-    <string name="morphe_vot_service_openrouter_paid">OpenRouter (paid)</string>
-    <string name="morphe_vot_openrouter_info_summary">"Paid AI translation via OpenRouter. Top up once and get thousands of translations. Mistral Nemo is the cheapest option, Gemma 4 offers the highest quality. Free model is a randomly selected free tier model and may be slow or rate limited
+    <string name="morphe_vot_openrouter_info_summary">"Paid AI translation via OpenRouter. Top up once and get thousands of translations. Mistral Nemo is the cheapest option, Gemma 4 offers the highest quality
 
-Tap here to open openrouter.ai"</string>
+Tap here to open OpenRouter.ai"</string>
     <string name="morphe_vot_openrouter_api_key_title">OpenRouter API key</string>
-    <string name="morphe_vot_openrouter_api_key_summary">Required. Enter your OpenRouter API key. Get one at openrouter.ai/settings/keys</string>
+    <string name="morphe_vot_openrouter_api_key_summary">Your OpenRouter API key. Create a key at OpenRouter.ai > Workspace > API Keys</string>
     <string name="morphe_vot_openrouter_model_title">OpenRouter Model</string>
-    <string name="morphe_vot_openrouter_model_free">Random free model</string>
     <string name="morphe_vot_openrouter_model_mistral_nemo" translatable="false">Mistral Nemo</string>
     <string name="morphe_vot_openrouter_model_gemma4_26b_a4b" translatable="false">Gemma 4</string>
     <string name="morphe_vot_openrouter_model_deepseek_flash_v4" translatable="false">DeepSeek V4 Flash</string>
