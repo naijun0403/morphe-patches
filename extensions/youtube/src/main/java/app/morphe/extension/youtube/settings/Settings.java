@@ -14,15 +14,15 @@ import static app.morphe.extension.youtube.patches.ChangeStartPagePatch.StartPag
 import static app.morphe.extension.youtube.patches.ExitFullscreenPatch.FullscreenMode;
 import static app.morphe.extension.youtube.patches.MiniplayerPatch.MiniplayerAnyModernAvailability;
 import static app.morphe.extension.youtube.patches.MiniplayerPatch.MiniplayerHideOverlayButtonsAvailability;
-import static app.morphe.extension.youtube.patches.MiniplayerPatch.MiniplayerOverlayOpacityAvailability;
 import static app.morphe.extension.youtube.patches.MiniplayerPatch.MiniplayerHorizontalDragAvailability;
+import static app.morphe.extension.youtube.patches.MiniplayerPatch.MiniplayerOverlayOpacityAvailability;
 import static app.morphe.extension.youtube.patches.MiniplayerPatch.MiniplayerType;
 import static app.morphe.extension.youtube.patches.OpenShortsInRegularPlayerPatch.ShortsPlayerType;
 import static app.morphe.extension.youtube.patches.components.PlayerFlyoutMenuComponentsFilter.HideAudioFlyoutMenuAvailability;
 import static app.morphe.extension.youtube.patches.spoof.SpoofVideoStreamsPatch.SpoofClientAv1Availability;
+import static app.morphe.extension.youtube.patches.theme.ThemePatch.SplashScreenAnimationStyle;
 import static app.morphe.extension.youtube.patches.voiceovertranslation.VoiceOverTranslationPatch.MyMemoryServiceAvailability;
 import static app.morphe.extension.youtube.patches.voiceovertranslation.VoiceOverTranslationPatch.OpenRouterServiceAvailability;
-import static app.morphe.extension.youtube.patches.theme.ThemePatch.SplashScreenAnimationStyle;
 import static app.morphe.extension.youtube.sponsorblock.SegmentPlaybackController.SponsorBlockDuration;
 import static app.morphe.extension.youtube.sponsorblock.objects.CategoryBehaviour.IGNORE;
 import static app.morphe.extension.youtube.sponsorblock.objects.CategoryBehaviour.MANUAL_SKIP;
@@ -53,6 +53,7 @@ import app.morphe.extension.youtube.patches.ChangeFormFactorPatch.TabletLayoutIn
 import app.morphe.extension.youtube.patches.LegacyPlayerControlsPatch.RestoreOldPlayerButtonsAvailability;
 import app.morphe.extension.youtube.patches.VersionCheckPatch;
 import app.morphe.extension.youtube.patches.components.LayoutComponentsFilter;
+import app.morphe.extension.youtube.patches.voiceovertranslation.VoiceOverTranslationPatch;
 import app.morphe.extension.youtube.sponsorblock.SponsorBlockSettings;
 import app.morphe.extension.youtube.swipecontrols.SwipeControlsConfigurationProvider.SwipeOverlayStyle;
 
@@ -536,6 +537,7 @@ public class Settings extends SharedYouTubeSettings {
     public static final StringSetting VOT_MYMEMORY_EMAIL = new StringSetting("morphe_vot_mymemory_email", "", new MyMemoryServiceAvailability());
     public static final BooleanSetting VOT_USE_NATIVE_TTS = new BooleanSetting("morphe_vot_use_native_tts", FALSE, parent(VOT_ENABLED));
     public static final BooleanSetting VOT_SHOW_HTTP_ERROR_DIALOG = new BooleanSetting("morphe_vot_show_http_error_dialog", TRUE);
+    public static final BooleanSetting VOT_HIDE_EXPORT_WARNING = new BooleanSetting("morphe_vot_hide_export_warning", FALSE, false, false);
 
     // ReturnYoutubeDislike
     public static final BooleanSetting RYD_ENABLED = new BooleanSetting("morphe_ryd_enabled", TRUE);
@@ -651,6 +653,7 @@ public class Settings extends SharedYouTubeSettings {
         }
 
         Setting.addImportExportCallback(SponsorBlockSettings.SB_IMPORT_EXPORT_CALLBACK);
+        Setting.addImportExportCallback(VoiceOverTranslationPatch.VOT_IMPORT_EXPORT_CALLBACK);
     }
 
     // Register SeekBar UI configs so the single shared SeekBarPreference class knows the

@@ -355,7 +355,7 @@ Tap here to open MyMemory.translated.net"</string>
     <string name="morphe_vot_mymemory_email_title">MyMemory email</string>
     <string name="morphe_vot_mymemory_email_summary">Optional. Enter your MyMemory email address to increase the daily limit from 5,000 to 50,000 characters. Leave empty to use the anonymous limit</string>
     <string name="morphe_vot_service_openrouter" translatable="false">OpenRouter</string>
-    <string name="morphe_vot_openrouter_info_summary">"Paid AI translation via OpenRouter. Top up once and get thousands of translations. Mistral Nemo is the cheapest option, Gemma 4 offers the highest quality
+    <string name="morphe_vot_openrouter_info_summary">"Paid AI translation via OpenRouter. Top up once and get thousands of translations. Mistral Nemo is the cheapest option, Gemma 4 offers the highest quality.
 
 Tap here to open OpenRouter.ai"</string>
     <string name="morphe_vot_openrouter_api_key_title">OpenRouter API key</string>
@@ -383,7 +383,13 @@ Tap here to open OpenRouter.ai"</string>
 
 To continue using translations, switch to a different provider in settings or use a VPN"</string>
     <string name="morphe_vot_do_not_show_again">Do not show again</string>
-    
+    <string name="morphe_vot_export_api_key_warning">"Your settings contain an OpenRouter API key.
+
+Your API key should never be shared. Anyone with access to it can use your OpenRouter credits"</string>
+    <string name="morphe_vot_openrouter_credits_title">OpenRouter credit limit reached</string>
+    <string name="morphe_vot_openrouter_credits_message">Your OpenRouter credit limit has been reached. Top up your balance or increase your key spending limit at OpenRouter.ai</string>
+    <string name="morphe_vot_openrouter_open_website">Open OpenRouter.ai</string>
+    <string name="morphe_vot_openrouter_error">OpenRouter translation failed (HTTP %s)</string>
 
     <!-- interaction.loop.loopVideoPatch -->
     <string name="morphe_loop_video_title">Enable loop video</string>

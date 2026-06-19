@@ -15,6 +15,8 @@ import static app.morphe.extension.youtube.patches.voiceovertranslation.Transcri
 import android.app.Activity;
 import android.app.Dialog;
 import android.content.Context;
+import android.content.Intent;
+import android.net.Uri;
 import android.media.AudioAttributes;
 import android.media.AudioFocusRequest;
 import android.media.AudioManager;
@@ -51,6 +53,36 @@ import app.morphe.extension.youtube.shared.VideoState;
  */
 @SuppressWarnings({"unused", "deprecation", "RedundantSuppression"})
 public class VoiceOverTranslationPatch {
+
+    public static final Setting.ImportExportCallback VOT_IMPORT_EXPORT_CALLBACK = new Setting.ImportExportCallback() {
+        @Override
+        public void settingsImported(@Nullable Activity context) {}
+
+        @Override
+        public void settingsExported(@Nullable Activity context) {
+            showExportWarningIfNeeded(context);
+        }
+    };
+
+    private static void showExportWarningIfNeeded(@Nullable Activity activity) {
+        Utils.verifyOnMainThread();
+        if (activity == null) return;
+        if (Settings.VOT_OPENROUTER_API_KEY.get().trim().isEmpty()) return;
+        if (Settings.VOT_HIDE_EXPORT_WARNING.get()) return;
+        Pair<Dialog, LinearLayout> dialogPair = CustomDialog.create(
+                activity,
+                null,
+                str("morphe_vot_export_api_key_warning"),
+                null,
+                null,
+                () -> {},
+                null,
+                str("morphe_vot_do_not_show_again"),
+                () -> Settings.VOT_HIDE_EXPORT_WARNING.save(true),
+                true
+        );
+        Utils.showDialog(activity, dialogPair.first, false, null);
+    }
 
     public static class MyMemoryServiceAvailability implements Setting.Availability {
         @Override
@@ -840,6 +872,49 @@ public class VoiceOverTranslationPatch {
             if (activity == null || activity.isFinishing() || activity.isDestroyed()) return;
             showHttpErrorDialog(activity, statusCode);
         });
+    }
+
+    static void notifyOpenRouterError(int httpCode, String errorBody) {
+        if (httpErrorDialogShownThisVideo) return;
+        httpErrorDialogShownThisVideo = true;
+        if (TranscriptTranslator.isOpenRouterCreditsError(httpCode, errorBody)) {
+            Utils.runOnMainThread(() -> {
+                Activity activity = Utils.getActivity();
+                if (activity == null || activity.isFinishing() || activity.isDestroyed()) return;
+                showOpenRouterCreditsDialog(activity);
+            });
+        } else {
+            Utils.showToastLong(str("morphe_vot_openrouter_error", httpCode));
+        }
+    }
+
+    private static void showOpenRouterCreditsDialog(Activity activity) {
+        Utils.verifyOnMainThread();
+        try {
+            Pair<Dialog, LinearLayout> pair = CustomDialog.create(
+                    activity,
+                    str("morphe_vot_openrouter_credits_title"),
+                    str("morphe_vot_openrouter_credits_message"),
+                    null,
+                    null,
+                    () -> {},
+                    null,
+                    str("morphe_vot_openrouter_open_website"),
+                    () -> {
+                        try {
+                            activity.startActivity(
+                                    new Intent(Intent.ACTION_VIEW, Uri.parse("https://openrouter.ai/credits"))
+                                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                        } catch (Exception ex) {
+                            logError(() -> "Failed to open openrouter.ai", ex);
+                        }
+                    },
+                    true
+            );
+            pair.first.show();
+        } catch (Exception ex) {
+            logError(() -> "showOpenRouterCreditsDialog failure", ex);
+        }
     }
 
     private static void showHttpErrorDialog(Activity activity, int statusCode) {

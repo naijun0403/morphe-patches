@@ -478,7 +478,7 @@ final class TranscriptTranslator {
             // FileNotFoundException from getInputStream() is Android's HttpURLConnection reporting
             // a 4xx/5xx error when getResponseCode() incorrectly returned 200 in streaming mode.
             if (ex instanceof FileNotFoundException
-                    || (msg != null && (msg.contains("429") || msg.contains("401") || msg.contains("403")))) {
+                    || (msg != null && (msg.contains("402") || msg.contains("429") || msg.contains("401") || msg.contains("403")))) {
                 abortTranslation = true;
             }
             if (reportNextTranslationError) {
@@ -696,6 +696,40 @@ final class TranscriptTranslator {
         return result;
     }
 
+    private static String readErrorBody(HttpURLConnection conn) {
+        try (java.io.InputStream es = conn.getErrorStream()) {
+            if (es == null) return "";
+            StringBuilder sb = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(es, StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) sb.append(line);
+            }
+            return sb.toString();
+        } catch (Exception ignored) {
+            return "";
+        }
+    }
+
+    /**
+     * Extracts the inner {@code error.code} from an OpenRouter JSON error body.
+     * Returns -1 when the body is missing or unparseable.
+     */
+    private static int parseOpenRouterErrorCode(String body) {
+        try {
+            return new JSONObject(body).getJSONObject("error").getInt("code");
+        } catch (Exception ignored) {
+            return -1;
+        }
+    }
+
+    static boolean isOpenRouterCreditsError(int httpCode, String body) {
+        final int innerCode = parseOpenRouterErrorCode(body);
+        if (innerCode == 402 || httpCode == 402) return true;
+        // OpenRouter returns 403 for both moderation blocks and spending limits;
+        // distinguish by checking the message text.
+        return body.contains("credit") || body.contains("limit exceeded");
+    }
+
     private static List<String> translateBatchOpenRouter(
             String videoId,
             List<TranscriptSegment> segments, String targetLang,
@@ -764,9 +798,11 @@ final class TranscriptTranslator {
         try {
             final int code = conn.getResponseCode();
             if (code != 200) {
-                VoiceOverTranslationPatch.notifyHttpError(code);
+                String errorBody = readErrorBody(conn);
+                reportNextTranslationError = false; // notifyOpenRouterError shows a specific message
+                VoiceOverTranslationPatch.notifyOpenRouterError(code, errorBody);
                 throw new Exception("OpenRouter HTTP status: " + code + " language: " + targetLang
-                        + " response: " + Requester.parseString(conn));
+                        + " response: " + errorBody);
             }
 
             // SSE: each "data: {...}" event carries a content delta; rawOutput mirrors it for
