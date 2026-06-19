@@ -878,9 +878,9 @@ public class VoiceOverTranslationPatch {
         } else {
             String format;
             if (cost < 0.01f) {
-                format = "~$%.3f";
+                format = "$%.3f";
             } else {
-                format = "~$%.2f";
+                format = "$%.2f";
             }
             costString = String.format(Locale.US, format, cost);
         }

@@ -886,9 +886,11 @@ final class TranscriptTranslator {
                     }
                     final float promptPrice = (float) pricing.optDouble("prompt", 0);
                     final float completionPrice = (float) pricing.optDouble("completion", 0);
+                    final float estimateScaleFactor = 1.3f; // Error on a higher cost estimate.
                     // ~12 batches/hr (4 captions/min × 60 min / 20 captions per batch).
                     // Per batch: ~435 prompt tokens (system message + captions) + ~375 completion tokens.
-                    final float hundredHourCost = 100 * 12 * (435 * promptPrice + 375 * completionPrice);
+                    final float hundredHourCost = estimateScaleFactor * 100 * 12
+                            * (435 * promptPrice + 375 * completionPrice);
                     openRouterModelCosts.put(model, hundredHourCost);
                     Utils.runOnMainThread(() -> onResult.accept(hundredHourCost));
                     return;
