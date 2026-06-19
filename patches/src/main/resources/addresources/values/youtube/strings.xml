@@ -351,7 +351,7 @@ Verify the package name is correct and the app is installed"</string>
     <string name="morphe_vot_service_mymemory" translatable="false">MyMemory</string>
     <string name="morphe_vot_mymemory_info_summary">"Free translation API, no API key required. Up to 5,000 characters per day on the free tier, or up to 50,000 characters per day with an email address.
 
-Tap here to open mymemory.translated.net"</string>
+Tap here to open MyMemory.translated.net"</string>
     <string name="morphe_vot_mymemory_email_title">MyMemory email</string>
     <string name="morphe_vot_mymemory_email_summary">Optional. Enter your MyMemory email address to increase the daily limit from 5,000 to 50,000 characters. Leave empty to use the anonymous limit</string>
     <string name="morphe_vot_service_openrouter" translatable="false">OpenRouter</string>
@@ -886,8 +886,10 @@ Settings → Playback (or Autoplay) → Autoplay next video"</string>
     <string name="morphe_ryd_estimated_like_summary">Shows an estimated like count on videos where the creator has disabled likes</string>
     <string name="morphe_ryd_toast_on_connection_error_title">Show connection error alerts</string>
     <string name="morphe_ryd_toast_on_connection_error_summary">Shows a notification when the Return YouTube Dislike server is unavailable</string>
-    <string name="morphe_ryd_attribution_title" translatable="false">ReturnYouTubeDislike.com</string>
-    <string name="morphe_ryd_attribution_summary">Data is provided by the Return YouTube Dislike API. Tap here to learn more</string>
+    <string name="morphe_ryd_attribution_title" translatable="false">ReturnYouTubeDislike</string>
+    <string name="morphe_ryd_attribution_summary">"Data is provided by the Return YouTube Dislike API.
+
+Tap here to open ReturnYouTubeDislike.com"</string>
     <!-- Statistic strings are shown in the settings only when Morphe debug mode is enabled. Typical users will never see these. -->
     <string name="morphe_ryd_statistics_category_title">Return YouTube Dislike API statistics of this device</string>
     <string name="morphe_ryd_statistics_getFetchCallResponseTimeAverage_title">API response time, average</string>
@@ -1132,8 +1134,10 @@ If you\'re not submitting a highlight, tap Cancel and mark the second location"<
     <string name="morphe_sb_color_opacity_label">Opacity:</string>
     <string name="morphe_sb_color_dot_label">Color:</string>
     <string name="morphe_sb_about_title">About</string>
-    <string name="morphe_sb_about_api_title" translatable="false">sponsor.ajay.app</string>
-    <string name="morphe_sb_about_api_summary">Data is provided by the SponsorBlock API. Tap here to learn more and see downloads for other platforms</string>
+    <string name="morphe_sb_about_api_title" translatable="false">SponsorBlock</string>
+    <string name="morphe_sb_about_api_summary">"Data is provided by the SponsorBlock API.
+
+Tap here to open Sponsor.ajay.app and see downloads for other platforms"</string>
     <!-- layout.formfactor.changeFormFactorPatch -->
     <string name="morphe_change_form_factor_title">Device layout</string>
     <string name="morphe_change_form_factor_entry_1">Default</string>
@@ -1304,7 +1308,7 @@ Limitation: Using the back button on the toolbar may not work"</string>
 
 If enabled, video URLs will be sent to the API server and no other data is sent. If a video does not have DeArrow thumbnails, then the original or still captures are shown
 
-Tap here to learn more about DeArrow"</string>
+Tap here to open DeArrow.ajay.app"</string>
     <string name="morphe_alt_thumbnail_dearrow_connection_toast_title">Show connection error alerts</string>
     <string name="morphe_alt_thumbnail_dearrow_connection_toast_summary">Shows a notification when the DeArrow server is unavailable</string>
     <string name="morphe_alt_thumbnail_dearrow_api_url_title">DeArrow API endpoint</string>
