@@ -393,6 +393,7 @@ public class VoiceOverTranslationPatch {
         if (isLoading) return;
         isLoading = true;
         final String loadLang = resolveTargetLang();
+        final String loadService = Settings.VOT_TRANSLATION_SERVICE.get();
 
         Utils.runOnBackgroundThread(() -> {
             try {
@@ -441,9 +442,11 @@ public class VoiceOverTranslationPatch {
             } finally {
                 Utils.runOnMainThread(() -> {
                     isLoading = false;
-                    // Restart if the video or language changed while this fetch was in flight.
+                    // Restart if the video, language, or translation provider changed while this fetch was in flight.
                     if (!currentVideoId.isEmpty() && Settings.VOT_ENABLED.get()
-                            && (!currentVideoId.equals(videoId) || !loadLang.equals(resolveTargetLang()))) {
+                            && (!currentVideoId.equals(videoId)
+                            || !loadLang.equals(resolveTargetLang())
+                            || !loadService.equals(Settings.VOT_TRANSLATION_SERVICE.get()))) {
                         loadTranscript(currentVideoId);
                     }
                 });
