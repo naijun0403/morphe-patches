@@ -340,8 +340,6 @@ Verify the package name is correct and the app is installed"</string>
     <string name="morphe_vot_screen_title">Voice over translation</string>
     <string name="morphe_vot_screen_summary">Read video captions aloud using on-device text-to-speech, synchronized with playback</string>
     <string name="morphe_vot_enabled_title">Voice over translation</string>
-    <string name="morphe_vot_wait_for_tts_title">Wait for TTS before starting video</string>
-    <string name="morphe_vot_wait_for_tts_dialog">When enabled, video playback is held for up to 10 seconds until the first TTS audio segment has been prefetched. This ensures the voice-over starts in sync with the video, but may slightly delay playback on slow connections</string>
     <string name="morphe_vot_caption_language_title">Language</string>
     <string name="morphe_vot_translation_service_title">Translation provider</string>
     <string name="morphe_vot_original_audio_volume_title">Voice volume</string>
@@ -356,7 +354,7 @@ Tap here to open MyMemory.translated.net"</string>
     <string name="morphe_vot_mymemory_email_title">MyMemory email</string>
     <string name="morphe_vot_mymemory_email_summary">Optional. Enter your MyMemory email address to increase the daily limit from 5,000 to 50,000 characters. Leave empty to use the anonymous limit</string>
     <string name="morphe_vot_service_openrouter" translatable="false">OpenRouter</string>
-    <string name="morphe_vot_openrouter_info_summary">"Paid AI translation via OpenRouter. Top up once and get thousands of translations. Mistral Nemo is the cheapest option, Gemma 4 offers the highest quality.
+    <string name="morphe_vot_openrouter_info_summary">"Paid AI translation via OpenRouter. Top up once and translate thousands of videos. Mistral Nemo is the cheapest option, Gemma 4 offers the highest quality.
 
 Tap here to open OpenRouter.ai"</string>
     <string name="morphe_vot_openrouter_api_key_title">OpenRouter API key</string>

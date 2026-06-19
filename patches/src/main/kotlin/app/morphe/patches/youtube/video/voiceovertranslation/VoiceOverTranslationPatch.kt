@@ -26,8 +26,7 @@ import app.morphe.patches.youtube.misc.settings.PreferenceScreen
 import app.morphe.patches.youtube.shared.Constants.COMPATIBILITY_YOUTUBE
 import app.morphe.patches.youtube.video.information.videoInformationPatch
 import app.morphe.patches.youtube.video.information.videoTimeHook
-import app.morphe.patches.youtube.video.playerresponse.Hook
-import app.morphe.patches.youtube.video.playerresponse.addPlayerResponseMethodHook
+import app.morphe.patches.youtube.video.videoid.hookVideoId
 import app.morphe.util.ResourceGroup
 import app.morphe.util.copyResources
 
@@ -77,7 +76,6 @@ val voiceOverTranslationPatch = bytecodePatch(
                 sorting = PreferenceScreenPreference.Sorting.UNSORTED,
                 preferences = setOf(
                     SwitchPreference("morphe_vot_enabled"),
-                    SwitchPreference("morphe_vot_wait_for_tts"),
                     ListPreference("morphe_vot_caption_language"),
                     NonInteractivePreference("morphe_vot_max_speech_rate",
                         tag = "app.morphe.extension.shared.settings.preference.SeekBarPreference",
@@ -96,17 +94,12 @@ val voiceOverTranslationPatch = bytecodePatch(
                         tag = "app.morphe.extension.youtube.settings.preference.VoiceOverTranslationMyMemoryInfoPreference",
                         selectable = true),
                     TextPreference("morphe_vot_mymemory_email")
-
                 )
             )
         )
 
+        hookVideoId("$EXTENSION_CLASS->newVideoLoaded(Ljava/lang/String;)V")
         videoTimeHook(EXTENSION_CLASS, "videoTimeChanged")
-        addPlayerResponseMethodHook(
-            Hook.ProtoBufferParameterBeforeVideoId(
-                "$EXTENSION_CLASS->preloadTranslations(Ljava/lang/String;Ljava/lang/String;Z)Ljava/lang/String;",
-            )
-        )
 
         addPlayerBottomButton(EXTENSION_BUTTON)
         initializeLegacyBottomControl(EXTENSION_BUTTON)
