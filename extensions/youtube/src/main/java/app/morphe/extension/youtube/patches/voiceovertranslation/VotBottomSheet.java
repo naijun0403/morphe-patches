@@ -161,7 +161,7 @@ public final class VotBottomSheet {
         row.addView(labelView);
 
         TextView valueView = new TextView(context);
-        valueView.setTextColor(secondaryColor(fg));
+        valueView.setTextColor(fg);
         valueView.setTextSize(14);
         valueView.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
@@ -501,7 +501,7 @@ public final class VotBottomSheet {
 
         TextView valueView = new TextView(context);
         valueView.setText(getLangDisplayName(Settings.VOT_CAPTION_LANGUAGE.get(), langEntries, langValues));
-        valueView.setTextColor(secondaryColor(fgColor));
+        valueView.setTextColor(fgColor);
         valueView.setTextSize(14);
         valueView.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
