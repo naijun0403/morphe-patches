@@ -196,7 +196,9 @@ public class VoiceOverTranslationModelPreference extends CustomDialogListPrefere
         // with debounce (see syncListSelection below).
         if (isCustom && !currentModel.isEmpty()) {
             VoiceOverTranslationPatch.fetchOpenRouterModelCost(currentModel,
-                    cost -> customCostView[0].setText(cost != null ? VoiceOverTranslationPatch.formatOpenRouterCostPerHundredHours(cost) : ""));
+                    cost -> customCostView[0].setText(cost != null
+                            ? VoiceOverTranslationPatch.formatOpenRouterCostPerHundredHours(cost)
+                            : ""));
         }
 
         //noinspection ExtractMethodRecommender

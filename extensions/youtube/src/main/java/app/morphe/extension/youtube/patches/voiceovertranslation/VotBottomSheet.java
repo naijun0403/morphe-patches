@@ -264,7 +264,7 @@ public final class VotBottomSheet {
 
                 rowLayout.addView(textContainer, idx);
 
-                TranscriptTranslator.fetchOpenRouterModelCost(Settings.VOT_OPENROUTER_MODEL.get(),
+                VoiceOverTranslationPatch.fetchOpenRouterModelCost(Settings.VOT_OPENROUTER_MODEL.get(),
                         cost -> costView.setText(cost != null
                                 ? VoiceOverTranslationPatch.formatOpenRouterCostPerHundredHours(cost)
                                 : ""));
