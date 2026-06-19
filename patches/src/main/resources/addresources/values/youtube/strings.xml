@@ -343,7 +343,7 @@ Verify the package name is correct and the app is installed"</string>
     <string name="morphe_vot_wait_for_tts_title">Wait for TTS before starting video</string>
     <string name="morphe_vot_wait_for_tts_dialog">When enabled, video playback is held for up to 10 seconds until the first TTS audio segment has been prefetched. This ensures the voice-over starts in sync with the video, but may slightly delay playback on slow connections</string>
     <string name="morphe_vot_caption_language_title">Language</string>
-    <string name="morphe_vot_translation_service_title">Provider</string>
+    <string name="morphe_vot_translation_service_title">Translation provider</string>
     <string name="morphe_vot_original_audio_volume_title">Voice volume</string>
     <string name="morphe_vot_original_audio_volume_summary">Adjust the dubbed voice volume relative to the original audio (0 is silent, 100 is full volume)</string>
     <string name="morphe_vot_max_speech_rate_title">Max speech rate</string>
@@ -382,7 +382,7 @@ Tap here to open OpenRouter.ai"</string>
     <string name="morphe_vot_http_error_title">Translation unavailable</string>
     <string name="morphe_vot_http_error_message">"The translation service returned HTTP error %s. Your IP address has likely been rate-limited for up to 24 hours.
 
-To continue using translations, switch to a different provider in settings or use a VPN"</string>
+To continue using translations, switch to a different translation provider in settings or use a VPN"</string>
     <string name="morphe_vot_do_not_show_again">Do not show again</string>
     <string name="morphe_vot_export_api_key_warning">"Your settings contain an OpenRouter API key.
 
