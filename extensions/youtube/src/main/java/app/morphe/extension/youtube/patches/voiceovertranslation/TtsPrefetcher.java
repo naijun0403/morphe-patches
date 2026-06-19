@@ -127,6 +127,14 @@ final class TtsPrefetcher {
         }
     }
 
+    static void triggerRescan() {
+        synchronized (lock) {
+            if (running) {
+                lock.notifyAll();
+            }
+        }
+    }
+
     @GuardedBy("lock")
     private static void startBackgroundThread() {
         running = true;
@@ -295,7 +303,9 @@ final class TtsPrefetcher {
             final byte[] data = engine.prefetch(seg.text(), voice, lang);
             if (data.length > 0) {
                 TtsCache.put(videoId, index, voice, lang, seg.text(), data);
-                TtsCache.putDuration(videoId, index, voice, lang, seg.text(), TtsEngine.mp3DurationMs(data.length));
+                final long durationMs = TtsEngine.mp3DurationMs(data.length);
+                seg.setDurationMs(durationMs);
+                engine.adjustPlaybackTimes(currentSegments, index, videoId, voice, lang);
                 final int textSubstringLength = 30;
                 Logger.printDebug(() -> "prefetched TTS: " + videoId
                         + " segment: " + index + "/" + totalSegments + " fetchTime: "

@@ -113,7 +113,6 @@ public class VoiceOverTranslationPatch {
 
     // Rough estimate of natural speech duration (~15 chars per second) used to
     // decide how much the TTS rate must be raised to fit the segment time slot.
-    private static final long ESTIMATED_MS_PER_CHAR = 65;
     private static final float MIN_SPEECH_RATE = 1.0f;
     // Max rate increase between consecutive utterances. One delayed segment then
     // raises the pace gradually over a few sentences instead of jumping straight
@@ -279,7 +278,7 @@ public class VoiceOverTranslationPatch {
         final long effectiveTimeMs = timeMs + TTS_LOOKAHEAD_MS;
         for (int i = 0, size = segments.size(); i < size; i++) {
             TranscriptSegment seg = segments.get(i);
-            if (effectiveTimeMs >= seg.startMs() && timeMs < seg.endMs()) {
+            if (effectiveTimeMs >= seg.playbackStartMs() && timeMs < seg.playbackEndMs()) {
                 if (i != lastSpokenIndex) {
                     if (TranscriptTranslator.isAwaitingTranslationAt(i, seg.startMs(), seg.text())) {
                         final int segIdx = i;
@@ -335,6 +334,16 @@ public class VoiceOverTranslationPatch {
     public static void interruptSpeech() {
         Utils.verifyOnMainThread();
         stopTts();
+    }
+
+    public static void resetPlaybackState() {
+        Utils.verifyOnMainThread();
+        for (TranscriptSegment seg : segments) {
+            seg.setPlaybackStartMs(seg.startMs());
+            seg.setPlaybackEndMs(seg.endMs());
+            seg.setDurationMs(-1);
+        }
+        TtsPrefetcher.triggerRescan();
     }
 
     public static void reloadTranscript() {
@@ -509,9 +518,9 @@ public class VoiceOverTranslationPatch {
         String voice = resolveVoice(lang);
         if (voice == null) return;
 
-        final long speakFromMs = Math.max(lastVideoTimeMs, seg.startMs());
+        final long speakFromMs = Math.max(lastVideoTimeMs, seg.playbackStartMs());
 
-        final long availableMs = seg.endMs() - speakFromMs;
+        final long availableMs = seg.playbackEndMs() - speakFromMs;
 
         // Exact if cached, otherwise estimated from char count.
         final long speechDurationMs = getSpeechDurationMs(seg, index, voice, lang);
@@ -519,7 +528,7 @@ public class VoiceOverTranslationPatch {
         // Calculate if we should seek into the audio (e.g. after a short seek within segment).
         long startTimeMs = 0;
         if (wasExplicitSeek) {
-            final long timeIntoSegment = lastVideoTimeMs - seg.startMs();
+            final long timeIntoSegment = lastVideoTimeMs - seg.playbackStartMs();
             if (timeIntoSegment > SEEK_INTO_THRESHOLD_MS) {
                 // Approximate audio position. Ideally we'd use the speech rate, but since rate is
                 // baked into SSML for Edge, we assume normal speed. The TTS clip is usually shorter
@@ -578,8 +587,12 @@ public class VoiceOverTranslationPatch {
     }
 
     private static long getSpeechDurationMs(TranscriptSegment seg, int index, String voice, String lang) {
-        final long cachedDuration = TtsCache.getDuration(currentVideoId, index, voice, lang, seg.text());
-        return cachedDuration > 0 ? cachedDuration : (long) seg.text().length() * ESTIMATED_MS_PER_CHAR;
+        long duration = seg.durationMs();
+        if (duration <= 0) {
+            duration = TtsCache.getDuration(currentVideoId, index, voice, lang, seg.text());
+            if (duration > 0) seg.setDurationMs(duration);
+        }
+        return duration > 0 ? duration : (long) seg.text().length() * TtsEngine.ESTIMATED_MS_PER_CHAR;
     }
 
     /**
@@ -587,7 +600,7 @@ public class VoiceOverTranslationPatch {
      * {@link #calculateSpeechRate(long, long)}. Used when exact duration is not yet known.
      */
     private static float calculateSpeechRate(String text, long availableMs) {
-        return calculateSpeechRate((long) text.length() * ESTIMATED_MS_PER_CHAR, availableMs);
+        return calculateSpeechRate((long) text.length() * TtsEngine.ESTIMATED_MS_PER_CHAR, availableMs);
     }
 
     /**
@@ -617,7 +630,7 @@ public class VoiceOverTranslationPatch {
         boolean insideSameSegment = false;
         if (lastSpokenIndex >= 0 && lastSpokenIndex < segments.size()) {
             TranscriptSegment seg = segments.get(lastSpokenIndex);
-            if (lastVideoTimeMs >= seg.startMs() && lastVideoTimeMs < seg.endMs()) {
+            if (lastVideoTimeMs >= seg.playbackStartMs() && lastVideoTimeMs < seg.playbackEndMs()) {
                 insideSameSegment = true;
             }
         }

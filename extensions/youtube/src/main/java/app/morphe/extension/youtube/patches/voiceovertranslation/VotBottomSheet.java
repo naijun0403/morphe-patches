@@ -433,6 +433,7 @@ public final class VotBottomSheet {
                 Settings.VOT_USE_NATIVE_TTS.save(false);
                 Settings.VOT_TTS_VOICE_TYPE.save(value);
             }
+            VoiceOverTranslationPatch.resetPlaybackState();
             VoiceOverTranslationPatch.interruptSpeech();
             VotBottomSheet.show(context);
             pickerDialog.dismiss();

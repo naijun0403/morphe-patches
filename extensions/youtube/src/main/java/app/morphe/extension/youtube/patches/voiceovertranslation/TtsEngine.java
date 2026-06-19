@@ -26,6 +26,7 @@ import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 import java.util.TimeZone;
 import java.util.UUID;
@@ -67,6 +68,10 @@ final class TtsEngine {
     // Close the persistent socket if it has been idle longer than this to avoid
     // "Connection reset" when the server drops an idle WebSocket connection.
     private static final long SOCKET_MAX_IDLE_MS = 20_000;
+
+    public static final long ESTIMATED_MS_PER_CHAR = 65;
+    // TODO: Allow changing this with a setting of low/medium/high?
+    public static final long PLAYBACK_ADJUST_LIMIT_MS = 2000;
 
     // All fields below (except synthesisLock related) must be accessed ONLY on the main thread.
     private boolean stopped;
@@ -252,6 +257,104 @@ final class TtsEngine {
                 VoiceOverTranslationPatch.logError(() -> "MediaPlayer release failed", ex);
             }
             currentPlayer = null;
+        }
+    }
+
+    /**
+     * Adjusts playback times for a contiguous block of segments to fit the actual spoken audio.
+     */
+    public void adjustPlaybackTimes(List<TranscriptSegment> segments, int index,
+                                    String videoId, String voice, String lang) {
+        if (index < 0 || index >= segments.size()) return;
+
+        // Find contiguous block
+        int startIdx = index;
+        while (startIdx > 0 && segments.get(startIdx).startMs() == segments.get(startIdx - 1).endMs()) {
+            startIdx--;
+        }
+        int endIdx = index;
+        while (endIdx < segments.size() - 1 && segments.get(endIdx).endMs() == segments.get(endIdx + 1).startMs()) {
+            endIdx++;
+        }
+
+        // Calculate total spoken duration
+        long totalSpokenMs = 0;
+        final long originalDurationMs = segments.get(endIdx).endMs() - segments.get(startIdx).startMs();
+
+        for (int i = startIdx; i <= endIdx; i++) {
+            TranscriptSegment s = segments.get(i);
+            long duration = s.durationMs();
+            if (duration <= 0) {
+                duration = TtsCache.getDuration(videoId, i, voice, lang, s.text());
+                if (duration > 0) s.setDurationMs(duration);
+            }
+            if (duration <= 0) {
+                duration = s.text().length() * ESTIMATED_MS_PER_CHAR;
+            }
+            totalSpokenMs += duration;
+        }
+
+        // Calculate limits
+        final long originalStart = segments.get(startIdx).startMs();
+        final long originalEnd = segments.get(endIdx).endMs();
+
+        final long gapStart = (startIdx > 0) ? segments.get(startIdx - 1).endMs() : 0;
+        final long gapEnd = (endIdx < segments.size() - 1) ? segments.get(endIdx + 1).startMs() : Long.MAX_VALUE;
+
+        // Available expansion at start is half the gap to the previous non-contiguous segment
+        final long maxExpandStart = Math.min(PLAYBACK_ADJUST_LIMIT_MS, (originalStart - gapStart) / 2);
+        // Available expansion at end is half the gap to the next non-contiguous segment
+        final long maxExpandEnd = Math.min(PLAYBACK_ADJUST_LIMIT_MS, (gapEnd - originalEnd) / 2);
+
+        long limitStart = originalStart - maxExpandStart;
+        long limitEnd = originalEnd + maxExpandEnd;
+
+        // Expand block if needed
+        long newStart = originalStart;
+        long newEnd = originalEnd;
+
+        if (totalSpokenMs > originalDurationMs) {
+            long needed = totalSpokenMs - originalDurationMs;
+
+            // Prefer end expansion
+            final long expandEnd = Math.min(needed, limitEnd - originalEnd);
+            newEnd += expandEnd;
+            needed -= expandEnd;
+
+            if (needed > 0) {
+                final long expandStart = Math.min(needed, originalStart - limitStart);
+                newStart -= expandStart;
+            }
+        }
+
+        // Redistribute internal boundaries
+        long currentPos = newStart;
+        final long totalWindow = newEnd - newStart;
+
+        for (int i = startIdx; i <= endIdx; i++) {
+            TranscriptSegment s = segments.get(i);
+            long spoken = s.durationMs();
+            if (spoken <= 0) {
+                spoken = TtsCache.getDuration(videoId, i, voice, lang, s.text());
+                if (spoken > 0) s.setDurationMs(spoken);
+            }
+            if (spoken <= 0) spoken = s.text().length() * ESTIMATED_MS_PER_CHAR;
+
+            s.setPlaybackStartMs(currentPos);
+            final long segmentWindow;
+            if (i == endIdx) {
+                segmentWindow = newEnd - currentPos;
+            } else {
+                final long idealEnd = currentPos + (long) (totalWindow * (spoken / (double) totalSpokenMs));
+                // Clamp every boundary to respect the drift limit
+                long clampedEnd = Math.max(s.endMs() - PLAYBACK_ADJUST_LIMIT_MS,
+                        Math.min(s.endMs() + PLAYBACK_ADJUST_LIMIT_MS, idealEnd));
+                // Ensure monotonicity
+                clampedEnd = Math.max(currentPos, Math.min(newEnd, clampedEnd));
+                segmentWindow = clampedEnd - currentPos;
+            }
+            currentPos += segmentWindow;
+            s.setPlaybackEndMs(currentPos);
         }
     }
 

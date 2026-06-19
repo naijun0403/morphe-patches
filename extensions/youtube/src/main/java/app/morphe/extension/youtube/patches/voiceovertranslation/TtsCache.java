@@ -26,8 +26,6 @@ final class TtsCache {
 
     private static final Map<String, byte[]> cache = Collections.synchronizedMap(
             Utils.createSizeRestrictedMap(1000));
-    private static final Map<String, Long> durations = Collections.synchronizedMap(
-            Utils.createSizeRestrictedMap(1000));
 
     private static final String TEST_SAMPLES_DIR = "vot_voice_samples";
 
@@ -46,15 +44,10 @@ final class TtsCache {
         cache.put(key(videoId, segmentIndex, voice, lang, text), data);
     }
 
-    static void putDuration(String videoId, int segmentIndex, String voice, String lang, String text, long durationMs) {
-        if (TTS_ENGINE_SYSTEM.equals(voice)) return;
-        durations.put(key(videoId, segmentIndex, voice, lang, text), durationMs);
-    }
-
     static long getDuration(String videoId, int segmentIndex, String voice, String lang, String text) {
         if (TTS_ENGINE_SYSTEM.equals(voice)) return -1;
-        Long d = durations.get(key(videoId, segmentIndex, voice, lang, text));
-        return d != null ? d : -1;
+        byte[] data = cache.get(key(videoId, segmentIndex, voice, lang, text));
+        return data != null ? TtsEngine.mp3DurationMs(data.length) : -1;
     }
 
     static byte[] getTestSampleFromDisk(String voiceId, String lang) {
