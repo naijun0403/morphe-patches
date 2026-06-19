@@ -32,7 +32,7 @@ import app.morphe.extension.youtube.settings.Settings;
 final class TtsPrefetcher {
 
     // Adaptive delay tiers based on segment distance (time) from play head.
-    private static final int DISTANCE_IMMEDIATE_MS = 15_000;
+    private static final int DISTANCE_IMMEDIATE_MS = 30_000;
     private static final int DISTANCE_NEAR_MS      = 60_000;
 
     // Minimum distance of the nearest segment to the current time to skip prefetch waiting.
@@ -40,7 +40,7 @@ final class TtsPrefetcher {
 
     private static final int DELAY_IMMEDIATE_MS  = 200;
     private static final int DELAY_NEAR_MS       = 1_000;
-    private static final int DELAY_BACKGROUND_MS = 3_000;
+    private static final int DELAY_BACKGROUND_MS = 4_000;
     private static final int DELAY_IDLE_MS       = 60_000;
 
     // Backoff constants for handling server-side rate limits/errors.

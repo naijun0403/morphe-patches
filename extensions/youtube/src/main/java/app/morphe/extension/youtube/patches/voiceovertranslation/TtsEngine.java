@@ -71,7 +71,7 @@ final class TtsEngine {
 
     public static final long ESTIMATED_MS_PER_CHAR = 65;
     // TODO: Allow changing this with a setting of low/medium/high?
-    public static final long PLAYBACK_ADJUST_LIMIT_MS = 2000;
+    public final long PLAYBACK_ADJUST_LIMIT_MS = 2500;
 
     // All fields below (except synthesisLock related) must be accessed ONLY on the main thread.
     private boolean stopped;
