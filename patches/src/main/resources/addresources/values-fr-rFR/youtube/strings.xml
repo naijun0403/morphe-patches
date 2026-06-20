@@ -244,12 +244,12 @@ Les mots-clés peuvent être n’importe quel texte affiché dans les titres des
 
 Les mots contenant des lettres majuscules au milieu doivent correspondre exactement (ex. : iPhone, TikTok, LeBlanc)"</string>
   <string name="morphe_hide_keyword_content_about_title">À propos du filtrage par mot-clé</string>
-  <string name="morphe_hide_keyword_content_about_summary">"Accueil / Abonnements / Recherche / Commentaires sont filtrés pour masquer le contenu correspondant aux expressions par mots-clés
+  <string name="morphe_hide_keyword_content_about_summary">"Accueil / Abonnements / Recherche / Les commentaires sont filtrés pour masquer le contenu correspondant à des expressions-clés
 
 Limitations :
-• Les Shorts ne peuvent pas être masqués par nom de chaîne
-• Certains composants de l'interface peuvent ne pas être masqués
-• La recherche d'un mot-clé peut n'afficher aucun résultat"</string>
+• Les Shorts ne peuvent pas être masqués par le nom de la chaîne
+• Certains composants de l’interface peuvent ne pas être masqués
+• La recherche d’un mot-clé peut n'afficher aucun résultat"</string>
   <string name="morphe_hide_keyword_content_about_whole_words_title">Correspondance aux mots entiers</string>
   <!-- Translations must use a localized example. For languages that do not use spaces between words (Chinese, Japanese, etc.) the English AI example should be used since no localized examples exist. Or if using machine translations, or if nobody wants to think of a localized example, then the English 'ai' example should be left as-is. -->
   <string name="morphe_hide_keyword_content_about_whole_words_summary">Mettre un mot-clé ou une expression entre guillemets permet d’éviter les correspondances partielles avec le titre des vidéos et le nom des chaîne&lt;br&gt;&lt;br&gt;Par exemple,&lt;br&gt;&lt;b&gt;\"ia\"&lt;/b&gt; masquera la vidéo : &lt;b&gt;Comment fonctionnent les IA ?&lt;/b&gt;&lt;br&gt;mais ne masquera pas : &lt;b&gt;Quelles études pour devenir commercial ?&lt;/b&gt;</string>
@@ -742,8 +742,11 @@ Paramètres → Lecture (ou Lecture automatique) → Lecture automatique de la v
   <string name="morphe_disable_fullscreen_pulled_up_gesture_title">Désactiver le geste de balayage vers le haut en mode portrait</string>
   <string name="morphe_disable_fullscreen_sliding_down_gesture_title">Désactiver le geste de balayage vers le bas en mode portrait</string>
   <string name="morphe_disable_fullscreen_dragged_down_gesture_title">Désactiver le geste de balayage vers le bas en mode paysage</string>
-  <!-- layout.player.fullscreen.openVideosFullscreen -->
-  <string name="morphe_open_videos_fullscreen_portrait_title">Ouvrir les vidéos en plein écran portrait</string>
+  <!-- layout.player.fullscreen.openVideosFullscreenPatch -->
+  <string name="morphe_open_videos_fullscreen_title">Ouvrir les vidéos en mode plein écran</string>
+  <string name="morphe_open_videos_fullscreen_entry_1">Désactivé</string>
+  <string name="morphe_open_videos_fullscreen_entry_2">Portrait</string>
+  <string name="morphe_open_videos_fullscreen_entry_3">Paysage</string>
   <!-- layout.player.overlay.customPlayerOverlayOpacityPatch -->
   <string name="morphe_player_overlay_opacity_title">Opacité de l\'overlay du lecteur</string>
   <string name="morphe_player_overlay_opacity_summary">Ajuster le niveau de transparence (0 est transparent, 100 est opaque)</string>
