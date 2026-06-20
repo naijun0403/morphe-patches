@@ -160,8 +160,8 @@ public class VoiceOverTranslationPatch {
         }
     };
     private static AudioFocusRequest focusRequest;
-    private static boolean isDucking;
-    private static boolean duckDesired;
+    private static volatile boolean isDucking;
+    private static volatile boolean duckDesired;
 
     private static TextToSpeech tts;
     private static boolean ttsReady;

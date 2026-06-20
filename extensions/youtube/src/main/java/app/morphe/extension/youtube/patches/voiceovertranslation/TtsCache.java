@@ -4,6 +4,7 @@ import static app.morphe.extension.youtube.patches.voiceovertranslation.VoiceOve
 
 import android.content.Context;
 
+import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -56,8 +57,7 @@ final class TtsCache {
             if (!file.exists()) return null;
             try (FileInputStream fis = new FileInputStream(file)) {
                 byte[] data = new byte[(int) file.length()];
-                //noinspection ResultOfMethodCallIgnored
-                fis.read(data);
+                new DataInputStream(fis).readFully(data);
                 return data;
             }
         } catch (Exception ex) {

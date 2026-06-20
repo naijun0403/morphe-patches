@@ -441,18 +441,21 @@ final class TtsEngine {
                 + "&Sec-MS-GEC-Version=" + SEC_MS_GEC_VERSION;
 
         SSLSocket socket = (SSLSocket) SSLSocketFactory.getDefault().createSocket();
-        socket.connect(new InetSocketAddress(WS_HOST, WS_PORT), CONNECT_TIMEOUT_MS);
-        socket.setSoTimeout(READ_TIMEOUT_MS);
-        socket.startHandshake();
-
-        InputStream in = socket.getInputStream();
-        sendHttpUpgrade(socket, path);
-        readHttpUpgrade(in);
-
-        persistentSocket = socket;
-        persistentOut    = socket.getOutputStream();
-        persistentIn     = in;
-        configSent       = false;
+        try {
+            socket.connect(new InetSocketAddress(WS_HOST, WS_PORT), CONNECT_TIMEOUT_MS);
+            socket.setSoTimeout(READ_TIMEOUT_MS);
+            socket.startHandshake();
+            InputStream in = socket.getInputStream();
+            sendHttpUpgrade(socket, path);
+            readHttpUpgrade(in);
+            persistentSocket = socket;
+            persistentOut    = socket.getOutputStream();
+            persistentIn     = in;
+            configSent       = false;
+        } catch (Exception e) {
+            try { socket.close(); } catch (IOException ignored) {}
+            throw e;
+        }
     }
 
     /**
@@ -652,7 +655,8 @@ final class TtsEngine {
 
         // Block background thread until playback finishes or is cancelled.
         // If play() was cancelled before reaching runOnMainThread above, latch will already be 0.
-        final boolean awaitSuccessful = latch.await(60, TimeUnit.SECONDS);
+        final long timeoutMs = mp3DurationMs(mp3.length) + 10_000;
+        final boolean awaitSuccessful = latch.await(timeoutMs, TimeUnit.MILLISECONDS);
         if (!awaitSuccessful) {
             VoiceOverTranslationPatch.logError(() -> "Waited for latch but was not successful", null);
         }
