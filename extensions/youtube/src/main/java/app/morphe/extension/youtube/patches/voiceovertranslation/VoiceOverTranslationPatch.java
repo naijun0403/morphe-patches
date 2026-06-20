@@ -443,59 +443,57 @@ public class VoiceOverTranslationPatch {
         if (tts != null) return;
         Logger.printDebug(() -> "ensureTts creating tts");
 
-        tts = new TextToSpeech(Utils.getContext(), status -> {
-            Utils.runOnMainThreadNowOrLater(() -> {
-                if (status != TextToSpeech.SUCCESS) {
-                    Logger.printDebug(() -> "TTS initialization failed: " + status);
-                    return;
+        tts = new TextToSpeech(Utils.getContext(), status -> Utils.runOnMainThreadNowOrLater(() -> {
+            if (status != TextToSpeech.SUCCESS) {
+                Logger.printDebug(() -> "TTS initialization failed: " + status);
+                return;
+            }
+            updateTtsLanguage();
+
+            // USAGE_ASSISTANCE_NAVIGATION_GUIDANCE plays TTS on a dedicated audio usage
+            // so its volume is controlled independently of YouTube's media stream.
+            tts.setAudioAttributes(new AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build());
+
+            tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                @Override
+                public void onStart(String utteranceId) {
                 }
-                updateTtsLanguage();
 
-                // USAGE_ASSISTANCE_NAVIGATION_GUIDANCE plays TTS on a dedicated audio usage
-                // so its volume is controlled independently of YouTube's media stream.
-                tts.setAudioAttributes(new AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .build());
-
-                tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
-                    @Override
-                    public void onStart(String utteranceId) {
-                    }
-
-                    @Override
-                    public void onDone(String utteranceId) {
-                        Utils.runOnMainThreadNowOrLater(() -> {
-                            try {
-                                if (utteranceId == null) return;
-                                if (utteranceId.startsWith(VOT_TEST_ID_PREFIX)) {
-                                    String suffix = utteranceId.substring(VOT_TEST_ID_PREFIX.length());
-                                    String[] parts = suffix.split("_");
-                                    final long tId = Long.parseLong(parts[0]);
-                                    final long pId = Long.parseLong(parts[1]);
-                                    ttsEngine.clearBusy(pId);
-                                    if (tId == currentTestId) isTestSpeaking = false;
-                                } else if (utteranceId.startsWith(VOT_ID_PREFIX)) {
-                                    long id = Long.parseLong(utteranceId.substring(VOT_ID_PREFIX.length()));
-                                    if (id == ttsEngine.getPlaybackId()) {
-                                        ttsEngine.clearBusy(id);
-                                    }
+                @Override
+                public void onDone(String utteranceId) {
+                    Utils.runOnMainThreadNowOrLater(() -> {
+                        try {
+                            if (utteranceId == null) return;
+                            if (utteranceId.startsWith(VOT_TEST_ID_PREFIX)) {
+                                String suffix = utteranceId.substring(VOT_TEST_ID_PREFIX.length());
+                                String[] parts = suffix.split("_");
+                                final long tId = Long.parseLong(parts[0]);
+                                final long pId = Long.parseLong(parts[1]);
+                                ttsEngine.clearBusy(pId);
+                                if (tId == currentTestId) isTestSpeaking = false;
+                            } else if (utteranceId.startsWith(VOT_ID_PREFIX)) {
+                                long id = Long.parseLong(utteranceId.substring(VOT_ID_PREFIX.length()));
+                                if (id == ttsEngine.getPlaybackId()) {
+                                    ttsEngine.clearBusy(id);
                                 }
-                            } catch (Exception ex) {
-                                logError(() -> "Utterance listener onDone failure", ex);
                             }
-                        });
-                    }
+                        } catch (Exception ex) {
+                            logError(() -> "Utterance listener onDone failure", ex);
+                        }
+                    });
+                }
 
-                    @Override
-                    public void onError(String utteranceId) {
-                        onDone(utteranceId);
-                    }
-                });
-
-                ttsReady = true;
+                @Override
+                public void onError(String utteranceId) {
+                    onDone(utteranceId);
+                }
             });
-        });
+
+            ttsReady = true;
+        }));
     }
 
     private static void updateTtsLanguage() {

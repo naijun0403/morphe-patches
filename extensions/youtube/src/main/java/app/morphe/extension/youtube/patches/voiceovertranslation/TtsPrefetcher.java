@@ -13,7 +13,6 @@ import androidx.annotation.Nullable;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.Utils;
@@ -68,26 +67,6 @@ final class TtsPrefetcher {
     private static final TtsEngine engine = TtsEngine.INSTANCE;
 
     private record NextFetch(int index, int distance, TranscriptSegment seg) {}
-
-    public static void blockUntilFirstSegmentLoads(String videoId, long maxWaitTimeMilliseconds) {
-        try {
-            CountDownLatch latch;
-            synchronized (lock) {
-                latch = loadingLatch;
-            }
-            if (latch != null) {
-                final long start = System.currentTimeMillis();
-                Logger.printDebug(() -> "Waiting for TTS prefetch");
-                final boolean awaitResult = latch.await(maxWaitTimeMilliseconds, TimeUnit.MILLISECONDS);
-                Logger.printDebug(() -> (awaitResult
-                        ? "TTS prefetch completed: "
-                        : "TTS prefetch latch timed out: ") + videoId + " waitTime: "
-                        + (System.currentTimeMillis() - start) + "ms");
-            }
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
-    }
 
     static void updateVideo(String videoId, List<TranscriptSegment> segments) {
         synchronized (lock) {
