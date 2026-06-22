@@ -288,6 +288,7 @@ final class TtsEngine {
      * Adjusts playback times for a contiguous block of segments to fit the actual spoken audio.
      */
     public void adjustPlaybackTimes(List<TranscriptSegment> segments, int index,
+                                    int currentlyPlayingIndex,
                                     String videoId, String voice, String lang) {
         if (index < 0 || index >= segments.size()) return;
 
@@ -299,6 +300,12 @@ final class TtsEngine {
         int endIdx = index;
         while (endIdx < segments.size() - 1 && segments.get(endIdx).endMs() == segments.get(endIdx + 1).startMs()) {
             endIdx++;
+        }
+
+        // Skip while a segment in this block is mid-playback; shifting its boundaries
+        // out from under the player can desync audio or end it early.
+        if (currentlyPlayingIndex >= startIdx && currentlyPlayingIndex <= endIdx) {
+            return;
         }
 
         // Calculate total spoken duration

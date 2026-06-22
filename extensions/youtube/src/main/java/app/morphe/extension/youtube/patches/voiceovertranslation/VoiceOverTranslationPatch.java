@@ -140,7 +140,13 @@ public class VoiceOverTranslationPatch {
     private static long ttsEndVideoTimeMs;
 
     private static List<TranscriptSegment> segments = new ArrayList<>();
-    private static int lastSpokenIndex = -1;
+    // Volatile so background threads can snapshot the active
+    // segment without taking a lock. Writes still happen only on the main thread.
+    private static volatile int lastSpokenIndex = -1;
+
+    static int getLastSpokenIndex() {
+        return lastSpokenIndex;
+    }
     private static String currentVideoId = "";
     private static boolean isLoading;
     private static boolean sessionEnabled = Settings.VOT_SESSION_ENABLED.get();

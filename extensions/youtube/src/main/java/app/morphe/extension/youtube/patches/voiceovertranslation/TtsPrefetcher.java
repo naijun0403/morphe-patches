@@ -284,7 +284,9 @@ final class TtsPrefetcher {
                 TtsCache.put(videoId, index, voice, lang, seg.text(), data);
                 final long durationMs = TtsEngine.mp3DurationMs(data.length);
                 seg.setDurationMs(durationMs);
-                engine.adjustPlaybackTimes(currentSegments, index, videoId, voice, lang);
+                engine.adjustPlaybackTimes(currentSegments, index,
+                        VoiceOverTranslationPatch.getLastSpokenIndex(),
+                        videoId, voice, lang);
                 final int textSubstringLength = 30;
                 Logger.printDebug(() -> "prefetched TTS: " + videoId
                         + " segment: " + index + "/" + totalSegments + " fetchTime: "
