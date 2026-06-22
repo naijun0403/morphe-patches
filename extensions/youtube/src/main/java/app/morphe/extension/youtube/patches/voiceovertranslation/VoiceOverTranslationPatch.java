@@ -155,8 +155,7 @@ public class VoiceOverTranslationPatch {
                 || focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT
                 || focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK) {
             Logger.printDebug(() -> "Ducking focus lost: " + focusChange);
-            isDucking = false;
-            updateDucking();
+            abandonDuck();
         }
     };
     private static AudioFocusRequest focusRequest;
@@ -796,7 +795,7 @@ public class VoiceOverTranslationPatch {
                         .setOnAudioFocusChangeListener(focusChangeListener)
                         .build();
             }
-            int result = getAudioManager().requestAudioFocus(focusRequest);
+            final int result = getAudioManager().requestAudioFocus(focusRequest);
             isDucking = result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
             if (!isDucking) {
                 logError(() -> "Failed to request audio focus: " + result, null);
@@ -829,19 +828,6 @@ public class VoiceOverTranslationPatch {
                 ? Locale.getDefault().toLanguageTag()
                 : Settings.VOT_CAPTION_LANGUAGE.get();
     }
-
-    /**
-     * @return ISO 639 language code (pt, en, es, etc).
-     */
-    static String resolveTargetLangIso639() {
-        String lang = resolveTargetLang();
-        final int index = lang.indexOf('-');
-        if (index > 0) {
-            lang = lang.substring(0, index);
-        }
-        return lang;
-    }
-
 
     /**
      * @param lang ISO 639 (pt) or BCP 47 (pt-BR).

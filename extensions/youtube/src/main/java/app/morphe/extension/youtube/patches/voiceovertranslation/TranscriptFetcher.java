@@ -151,7 +151,7 @@ final class TranscriptFetcher {
         final int tracksIdx = json.indexOf("\"captionTracks\":[");
         if (tracksIdx < 0) return null;
 
-        String targetLang = VoiceOverTranslationPatch.resolveTargetLangIso639();
+        String targetLang = VoiceCatalog.getIso639(VoiceOverTranslationPatch.resolveTargetLang());
         String firstUrl = null;
         String firstNonGemini = null;
         String targetLangUrl = null;
@@ -280,7 +280,7 @@ final class TranscriptFetcher {
 
             if (!textStr.isEmpty()) {
                 lines.add(new TranscriptSegment(startMs,
-                        startMs + Math.max(durationMs, 500), textStr, sourceLang));
+                        startMs + durationMs, textStr, sourceLang));
             }
         }
 
