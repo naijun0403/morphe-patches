@@ -191,12 +191,14 @@ public class VoiceOverTranslationPatch {
         });
 
         VideoState.getOnChange().addObserver(state -> {
-            if (state == VideoState.PAUSED || state == VideoState.ENDED) {
+            if (state == VideoState.PAUSED) {
                 Logger.printDebug(() -> "Stopping TTS for video state: " + state);
                 stopTts();
-                if (state == VideoState.ENDED) {
-                    TtsPrefetcher.clear();
-                }
+            } else if (state == VideoState.ENDED) {
+                Logger.printDebug(() -> "Stopping TTS prefetch and abandoning ducking: " + state);
+                // Do not stop TTS to allow any currently playing TTS to finish.
+                abandonDuck();
+                TtsPrefetcher.clear();
             }
             return kotlin.Unit.INSTANCE;
         });
