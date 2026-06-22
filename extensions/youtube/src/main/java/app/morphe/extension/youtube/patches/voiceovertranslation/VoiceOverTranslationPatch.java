@@ -106,7 +106,6 @@ public class VoiceOverTranslationPatch {
     }
 
     private static final long SEEK_JUMP_THRESHOLD_MS = 2_900;
-    private static final long TTS_LOOKAHEAD_MS = 980;
 
     // Minimum time into a segment to justify seeking within the audio instead of
     // playing from the start. Prevents tiny pops on small adjustments.
@@ -140,8 +139,8 @@ public class VoiceOverTranslationPatch {
     private static long ttsEndVideoTimeMs;
 
     private static List<TranscriptSegment> segments = new ArrayList<>();
-    // Volatile so background threads can snapshot the active
-    // segment without taking a lock. Writes still happen only on the main thread.
+    // Volatile so background threads can read the active segment without
+    // taking a lock. Writes still happen only on the main thread.
     private static volatile int lastSpokenIndex = -1;
 
     static int getLastSpokenIndex() {
@@ -271,7 +270,11 @@ public class VoiceOverTranslationPatch {
 
         if (prevVideoTimeMs > 0) {
             final long timeSinceLastUpdate = Math.abs(timeMs - prevVideoTimeMs);
-            if (timeSinceLastUpdate > SEEK_JUMP_THRESHOLD_MS) {
+            // Scale by playback speed so at high speeds a normal tick (which spans a
+            // larger in-video gap) isn't mistaken for a user seek.
+            final long jumpThreshold = (long) (SEEK_JUMP_THRESHOLD_MS
+                    * Math.max(1.0f, VideoInformation.getPlaybackSpeed()));
+            if (timeSinceLastUpdate > jumpThreshold) {
                 // Small jumps within the same segment are handled by speak()'s startTime logic.
                 Logger.printDebug(() -> "videoTimeChanged jump detected: " + timeSinceLastUpdate + "ms");
                 wasExplicitSeek = true;
@@ -283,10 +286,9 @@ public class VoiceOverTranslationPatch {
             }
         }
 
-        final long effectiveTimeMs = timeMs; // + TTS_LOOKAHEAD_MS;
         for (int i = 0, size = segments.size(); i < size; i++) {
             TranscriptSegment seg = segments.get(i);
-            if (effectiveTimeMs >= seg.playbackStartMs() && timeMs < seg.playbackEndMs()) {
+            if (timeMs >= seg.playbackStartMs() && timeMs < seg.playbackEndMs()) {
                 if (i != lastSpokenIndex) {
                     if (TranscriptTranslator.isAwaitingTranslationAt(i, seg.startMs(), seg.text())) {
                         final int segIdx = i;
