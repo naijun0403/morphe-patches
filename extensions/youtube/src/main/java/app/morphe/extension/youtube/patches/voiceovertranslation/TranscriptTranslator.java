@@ -897,6 +897,11 @@ public final class TranscriptTranslator {
             return;
         }
 
+        if (!Utils.isNetworkConnected()) {
+            Logger.printDebug(() -> "Cannot fetch OpenRouter costs as network is not connected");
+            return;
+        }
+
         Utils.runOnBackgroundThread(() -> {
             try {
                 synchronized (openRouterModelCosts) {
@@ -916,18 +921,17 @@ public final class TranscriptTranslator {
 
                                 final double promptPrice = pricing.optDouble("prompt", 0);
                                 final double completionPrice = pricing.optDouble("completion", 0);
-                                final double estimateScaleFactor = 1.2; // Error on a higher cost estimate.
                                 // ~12 batches/hr (4 captions/min × 60 min / 20 captions per batch).
                                 // Per batch: ~435 prompt tokens (system message + captions) + ~375 completion tokens.
-                                final float hundredHourCost = (float) (estimateScaleFactor * 100 * 12
+                                final float hundredHourCost = (float) (100 * 12
                                         * (435 * promptPrice + 375 * completionPrice));
                                 openRouterModelCosts.put(id, hundredHourCost);
                             }
-                            openRouterCostsFetched = true;
                         } else {
                             VoiceOverTranslationPatch.logError(() -> "Could not fetch OpenRouter costs: "
                                     + responseCode, null);
                         }
+                        openRouterCostsFetched = true; // Consider fetched if fetch failed.
                     }
                 }
             } catch (Exception ex) {
