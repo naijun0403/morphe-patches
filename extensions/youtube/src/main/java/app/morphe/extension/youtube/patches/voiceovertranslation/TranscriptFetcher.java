@@ -337,7 +337,7 @@ final class TranscriptFetcher {
                 if (punctuated) {
                     flush = endsSentence(text)
                             || text.length() >= MAX_SENTENCE_CHARS
-                            || gap > MAX_SENTENCE_GAP_MS;
+                            || (gap > MAX_SENTENCE_GAP_MS && text.length() > 80);
                 } else {
                     flush = gap > UNPUNCTUATED_GAP_MS
                             || (gap > UNPUNCTUATED_SOFT_GAP_MS
@@ -351,7 +351,23 @@ final class TranscriptFetcher {
             }
 
             if (flush) {
-                sentences.add(new TranscriptSegment(startMs, endMs, text.toString(), sentenceLang));
+                String fullText = text.toString();
+                if (i < size - 1) {
+                    int lastEnd = findLastSentenceEnd(fullText);
+                    if (lastEnd != -1 && lastEnd < fullText.length() - 1) {
+                        String head = fullText.substring(0, lastEnd + 1).trim();
+                        String tail = fullText.substring(lastEnd + 1).trim();
+
+                        long splitMs = startMs + (long) ((endMs - startMs) * ((double) head.length() / fullText.length()));
+                        sentences.add(new TranscriptSegment(startMs, splitMs, head, sentenceLang));
+
+                        text.setLength(0);
+                        text.append(tail);
+                        startMs = splitMs;
+                        continue;
+                    }
+                }
+                sentences.add(new TranscriptSegment(startMs, endMs, fullText, sentenceLang));
                 text.setLength(0);
             }
         }
@@ -391,7 +407,35 @@ final class TranscriptFetcher {
     private static boolean endsSentence(CharSequence text) {
         if (text.length() == 0) return false;
         final char c = text.charAt(text.length() - 1);
-        return c == '.' || c == '!' || c == '?' || c == '…';
+        if (c != '.' && c != '!' && c != '?' && c != '…') return false;
+
+        // Check for common abbreviations that end with a period but don't end a sentence.
+        if (c == '.') {
+            final String s = text.toString();
+            if (s.endsWith("Mr.") || s.endsWith("Ms.") || s.endsWith("Dr.") || s.endsWith("St.")
+                    || s.endsWith("Inc.") || s.endsWith("Ltd.") || s.endsWith("Jr.")
+                    || s.endsWith("Sr.") || s.endsWith("vs.")) {
+                return false;
+            }
+            // Heuristic for initials: "A.", "B.", etc.
+            if (s.length() >= 3 && s.charAt(s.length() - 2) == ' '
+                    && Character.isUpperCase(s.charAt(s.length() - 3))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static int findLastSentenceEnd(String text) {
+        for (int i = text.length() - 1; i >= 0; i--) {
+            char c = text.charAt(i);
+            if (c == '.' || c == '!' || c == '?' || c == '…') {
+                if (endsSentence(text.substring(0, i + 1))) {
+                    return i;
+                }
+            }
+        }
+        return -1;
     }
 
     private static String fetchUrl(String urlStr) throws Exception {
