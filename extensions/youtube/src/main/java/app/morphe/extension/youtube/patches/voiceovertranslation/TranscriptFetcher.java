@@ -227,7 +227,7 @@ final class TranscriptFetcher {
     // A silence gap longer than this between lines starts a new utterance even mid-sentence.
     private static final long MAX_SENTENCE_GAP_MS = 1_500;
     // Small gaps between segments are closed when they are below this threshold.
-    private static final long CLOSE_GAP_THRESHOLD_MS = 2_000;
+    private static final long CLOSE_GAP_THRESHOLD_MS = 2_500;
     // Minimum duration for a merged segment to avoid being skipped by the playback polling.
     private static final long MIN_SEGMENT_DURATION_MS = 2_000;
 
@@ -266,6 +266,7 @@ final class TranscriptFetcher {
                 text.append(segs.getJSONObject(j).optString("utf8", ""));
             }
 
+            //noinspection ExtractMethodRecommender
             String textStr = text.toString()
                     .replace('\n', ' ')
                     .replace(">>", "")
@@ -292,10 +293,12 @@ final class TranscriptFetcher {
             TranscriptSegment cur = lines.get(i);
             TranscriptSegment next = lines.get(i + 1);
 
-            if (cur.endMs() > next.startMs()) {
-                lines.set(i, new TranscriptSegment(cur.startMs(), next.startMs(), cur.text(), cur.lang()));
-            } else if (next.startMs() - cur.endMs() <= CLOSE_GAP_THRESHOLD_MS) {
-                final long mid = (cur.endMs() + next.startMs()) / 2;
+            final long curEndMs = cur.endMs();
+            final long nextStartMs = next.startMs();
+            if (curEndMs > nextStartMs) {
+                lines.set(i, new TranscriptSegment(cur.startMs(), nextStartMs, cur.text(), cur.lang()));
+            } else if (nextStartMs - curEndMs <= CLOSE_GAP_THRESHOLD_MS) {
+                final long mid = (curEndMs + nextStartMs) / 2;
                 lines.set(i, new TranscriptSegment(cur.startMs(), mid, cur.text(), cur.lang()));
                 lines.set(i + 1, new TranscriptSegment(mid, next.endMs(), next.text(), next.lang()));
             }
@@ -353,12 +356,14 @@ final class TranscriptFetcher {
             if (flush) {
                 String fullText = text.toString();
                 if (i < size - 1) {
-                    int lastEnd = findLastSentenceEnd(fullText);
-                    if (lastEnd != -1 && lastEnd < fullText.length() - 1) {
+                    final int lastEnd = findLastSentenceEnd(fullText);
+                    final int fullTextLength = fullText.length();
+                    if (lastEnd != -1 && lastEnd < fullTextLength - 1) {
                         String head = fullText.substring(0, lastEnd + 1).trim();
                         String tail = fullText.substring(lastEnd + 1).trim();
 
-                        long splitMs = startMs + (long) ((endMs - startMs) * ((double) head.length() / fullText.length()));
+                        final long splitMs = startMs + (long) ((endMs - startMs)
+                                * ((double) head.length() / fullTextLength));
                         sentences.add(new TranscriptSegment(startMs, splitMs, head, sentenceLang));
 
                         text.setLength(0);
@@ -418,8 +423,9 @@ final class TranscriptFetcher {
                 return false;
             }
             // Heuristic for initials: "A.", "B.", etc.
-            if (s.length() >= 3 && s.charAt(s.length() - 2) == ' '
-                    && Character.isUpperCase(s.charAt(s.length() - 3))) {
+            final int sLength = s.length();
+            if (sLength >= 3 && s.charAt(sLength - 2) == ' '
+                    && Character.isUpperCase(s.charAt(sLength - 3))) {
                 return false;
             }
         }

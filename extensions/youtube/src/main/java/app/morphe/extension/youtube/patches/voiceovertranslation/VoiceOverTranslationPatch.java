@@ -106,7 +106,6 @@ public class VoiceOverTranslationPatch {
     }
 
     private static final long SEEK_JUMP_THRESHOLD_MS = 2_900;
-    private static final long TTS_LOOKAHEAD_MS = 980;
 
     // Minimum time into a segment to justify seeking within the audio instead of
     // playing from the start. Prevents tiny pops on small adjustments.
@@ -277,10 +276,9 @@ public class VoiceOverTranslationPatch {
             }
         }
 
-        final long effectiveTimeMs = timeMs; // + TTS_LOOKAHEAD_MS;
         for (int i = 0, size = segments.size(); i < size; i++) {
             TranscriptSegment seg = segments.get(i);
-            if (effectiveTimeMs >= seg.playbackStartMs() && timeMs < seg.playbackEndMs()) {
+            if (timeMs >= seg.playbackStartMs() && timeMs < seg.playbackEndMs()) {
                 if (i != lastSpokenIndex) {
                     if (TranscriptTranslator.isAwaitingTranslationAt(i, seg.startMs(), seg.text())) {
                         final int segIdx = i;
