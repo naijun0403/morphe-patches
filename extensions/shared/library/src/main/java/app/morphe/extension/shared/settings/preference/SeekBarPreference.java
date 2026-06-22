@@ -40,17 +40,23 @@ public class SeekBarPreference extends Preference {
     public record SeekBarConfig(IntegerSetting setting, int min, int max, int step,
                                 String unit, int divisor,
                                 @Nullable String minLabelKey,
-                                @Nullable String maxLabelKey) {
+                                @Nullable String maxLabelKey,
+                                @Nullable String[] valueLabelKeys) {
         public SeekBarConfig(IntegerSetting setting, int min, int max, int step, String unit, int divisor) {
-            this(setting, min, max, step, unit, divisor, null, null);
+            this(setting, min, max, step, unit, divisor, null, null, null);
         }
         public SeekBarConfig(IntegerSetting setting, int min, int max, int step, String unit) {
-            this(setting, min, max, step, unit, 1, null, null);
+            this(setting, min, max, step, unit, 1, null, null, null);
         }
         /** Slider with text labels at the ends instead of numeric min/max. */
         public SeekBarConfig(IntegerSetting setting, int min, int max, int step,
                              String unit, String minLabelKey, String maxLabelKey) {
-            this(setting, min, max, step, unit, 1, minLabelKey, maxLabelKey);
+            this(setting, min, max, step, unit, 1, minLabelKey, maxLabelKey, null);
+        }
+        /** Slider that snaps to a fixed set of positions, each with its own label. */
+        public SeekBarConfig(IntegerSetting setting, int min, int max, int step,
+                             String minLabelKey, String maxLabelKey, String[] valueLabelKeys) {
+            this(setting, min, max, step, "", 1, minLabelKey, maxLabelKey, valueLabelKeys);
         }
     }
 
@@ -58,6 +64,12 @@ public class SeekBarPreference extends Preference {
 
     public static void register(SeekBarConfig config) {
         REGISTRY.put(config.setting.key, config);
+    }
+
+    /** Returns the config registered for the given setting, or {@code null} if none. */
+    @Nullable
+    public static SeekBarConfig configFor(IntegerSetting setting) {
+        return REGISTRY.get(setting.key);
     }
 
     public SeekBarPreference(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
@@ -198,7 +210,17 @@ public class SeekBarPreference extends Preference {
     }
 
     private static void updateLabel(TextView label, int value, SeekBarConfig config) {
-        label.setText(formatValue(value, config));
+        label.setText(formatLabel(value, config));
+    }
+
+    public static String formatLabel(int value, SeekBarConfig config) {
+        if (config.valueLabelKeys != null) {
+            int progress = valueToProgress(config, value);
+            if (progress >= 0 && progress < config.valueLabelKeys.length) {
+                return StringRef.str(config.valueLabelKeys[progress]);
+            }
+        }
+        return formatValue(value, config);
     }
 
     private static String formatValue(int value, SeekBarConfig config) {
@@ -208,11 +230,11 @@ public class SeekBarPreference extends Preference {
         return String.format(Locale.ROOT, "%.1f%s", (float) value / config.divisor, config.unit);
     }
 
-    private static int valueToProgress(SeekBarConfig config, int value) {
+    public static int valueToProgress(SeekBarConfig config, int value) {
         return (Math.max(config.min, Math.min(config.max, value)) - config.min) / config.step;
     }
 
-    private static int progressToValue(SeekBarConfig config, int progress) {
+    public static int progressToValue(SeekBarConfig config, int progress) {
         return config.min + progress * config.step;
     }
 }
