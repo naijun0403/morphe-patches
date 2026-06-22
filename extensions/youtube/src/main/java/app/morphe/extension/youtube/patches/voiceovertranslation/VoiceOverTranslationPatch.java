@@ -294,9 +294,16 @@ public class VoiceOverTranslationPatch {
             }
         }
 
+        // Amount of time to look ahead for the next segment to schedule it.
+        final long lookaheadMs = 900;
+        // Small delay added to scheduled segments to ensure the video time has definitely
+        // reached the segment start time before the check runs.
+        final long schedulingDelayMs = 10;
+
         for (int i = 0, size = segments.size(); i < size; i++) {
             TranscriptSegment seg = segments.get(i);
-            if (timeMs >= seg.playbackStartMs() && timeMs < seg.playbackEndMs()) {
+            final long segPlaybackStartMs = seg.playbackStartMs();
+            if (timeMs >= segPlaybackStartMs && timeMs < seg.playbackEndMs()) {
                 if (i != lastSpokenIndex) {
                     if (TranscriptTranslator.isAwaitingTranslationAt(i, seg.startMs(), seg.text())) {
                         final int segIdx = i;
@@ -318,6 +325,15 @@ public class VoiceOverTranslationPatch {
                         speak(seg, i);
                     }
                 }
+                break;
+            } else if (i > lastSpokenIndex && segPlaybackStartMs > timeMs
+                    && segPlaybackStartMs <= timeMs + lookaheadMs) {
+                // Next segment starts between now and the next update to this method.
+                // Schedule a call to recheck TTS playback when the segment will start.
+                final float speed = Math.max(0.1f, VideoInformation.getPlaybackSpeed());
+                final long delayMs = (long) ((segPlaybackStartMs - timeMs + schedulingDelayMs) / speed);
+                Logger.printDebug(() -> "Scheduling next segment check in " + delayMs + "ms");
+                Utils.runOnMainThreadDelayed(() -> videoTimeChanged(VideoInformation.getVideoTime()), delayMs);
                 break;
             }
         }
