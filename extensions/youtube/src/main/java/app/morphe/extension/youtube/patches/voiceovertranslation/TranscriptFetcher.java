@@ -227,6 +227,8 @@ final class TranscriptFetcher {
     private static final long MAX_SENTENCE_GAP_MS = 1_500;
     // Small gaps between segments are closed when they are below this threshold.
     private static final long CLOSE_GAP_THRESHOLD_MS = 2_000;
+    // Minimum duration for a merged segment to avoid being skipped by the playback polling.
+    private static final long MIN_SEGMENT_DURATION_MS = 2_000;
 
     // Heuristics for old ASR tracks that have no punctuation at all.
     // A pause this long is treated as a sentence boundary on its own.
@@ -328,6 +330,10 @@ final class TranscriptFetcher {
                             || (gap > UNPUNCTUATED_SOFT_GAP_MS
                             && startsWithUpperCase(lines.get(i + 1).text()))
                             || text.length() >= MAX_UNPUNCTUATED_CHARS;
+                }
+
+                if (flush && endMs - startMs < MIN_SEGMENT_DURATION_MS && gap <= 0) {
+                    flush = false;
                 }
             }
 
