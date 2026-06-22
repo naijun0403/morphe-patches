@@ -253,6 +253,32 @@ final class TtsEngine {
         });
     }
 
+    /**
+     * Pauses the active MediaPlayer without releasing it so playback can resume from the
+     * same MP3 position. Audio focus and engine state are intentionally left untouched
+     * so resume() avoids the audio-ducking ramp delay that would clip the first frames.
+     */
+    void pause() {
+        Utils.verifyOnMainThread();
+        if (currentPlayer == null) return;
+        try {
+            currentPlayer.pause();
+        } catch (Exception ex) {
+            VoiceOverTranslationPatch.logError(() -> "MediaPlayer pause failed", ex);
+        }
+    }
+
+    /** Resumes a previously paused MediaPlayer. No-op if there is no active player. */
+    void resume() {
+        Utils.verifyOnMainThread();
+        if (currentPlayer == null) return;
+        try {
+            currentPlayer.start();
+        } catch (Exception ex) {
+            VoiceOverTranslationPatch.logError(() -> "MediaPlayer resume failed", ex);
+        }
+    }
+
     /** Stops any in-progress synthesis or playback immediately. */
     void stop() {
         Utils.verifyOnMainThread();

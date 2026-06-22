@@ -122,7 +122,6 @@ public class VoiceOverTranslationPatch {
     private static final int TEST_SEGMENT_INDEX = -1;
     private static final long TEST_PREFETCH_WAIT = 500;
 
-    private static float lastSpeechRate = MIN_SPEECH_RATE;
     static volatile long lastVideoTimeMs;
     // Tracks the latest known position even when paused, unlike lastVideoTimeMs which only
     // updates during PLAYING. Used by translate() to pick the right initial batch when a video
@@ -193,8 +192,18 @@ public class VoiceOverTranslationPatch {
 
         VideoState.getOnChange().addObserver(state -> {
             if (state == VideoState.PAUSED) {
-                Logger.printDebug(() -> "Stopping TTS for video state: " + state);
-                stopTts();
+                // System TTS has no pause API, so fall back to stop+restart for it.
+                // Edge TTS pauses in place to avoid restarting the segment and re-arming
+                // audio focus (which would clip the first frames after resume).
+                if (tts != null && tts.isSpeaking()) {
+                    Logger.printDebug(() -> "Stopping system TTS for video state: " + state);
+                    stopTts();
+                } else {
+                    Logger.printDebug(() -> "Pausing Edge TTS for video state: " + state);
+                    ttsEngine.pause();
+                }
+            } else if (state == VideoState.PLAYING) {
+                ttsEngine.resume();
             } else if (state == VideoState.ENDED) {
                 Logger.printDebug(() -> "Stopping TTS prefetch and abandoning ducking: " + state);
                 // Do not stop TTS to allow any currently playing TTS to finish.
@@ -759,7 +768,7 @@ public class VoiceOverTranslationPatch {
         if (tts != null) tts.stop();
         // Speech was interrupted (new video, seek, pause) - no backlog left to catch
         // up on, so the next utterance starts from normal speed again.
-        lastSpeechRate = MIN_SPEECH_RATE;
+        float lastSpeechRate = MIN_SPEECH_RATE;
         lastSpokenIndex = -1;
         ttsEndVideoTimeMs = 0;
         abandonDuck();
