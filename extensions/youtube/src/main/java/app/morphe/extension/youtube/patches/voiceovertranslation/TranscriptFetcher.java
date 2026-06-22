@@ -262,9 +262,18 @@ final class TranscriptFetcher {
                 text.append(segs.getJSONObject(j).optString("utf8", ""));
             }
 
-            String textStr = text.toString().replace('\n', ' ').trim();
-            // Drop sound effect markers such as [Applause] or [Music] - they should not be spoken.
-            if (textStr.startsWith("[") && textStr.endsWith("]")) continue;
+            String textStr = text.toString()
+                    .replace('\n', ' ')
+                    .replace(">>", "")
+                    .replace("♪", "")
+                    .replace("♫", "")
+                    .trim();
+
+            // Drop sound effect markers such as [Applause] or (music) - they should not be spoken.
+            textStr = textStr.replaceAll("\\[[^\\]]*]", "");
+            textStr = textStr.replaceAll("\\([^)]*\\)", "");
+            textStr = textStr.trim();
+
             if (!textStr.isEmpty()) {
                 lines.add(new TranscriptSegment(startMs,
                         startMs + Math.max(durationMs, 500), textStr, sourceLang));
