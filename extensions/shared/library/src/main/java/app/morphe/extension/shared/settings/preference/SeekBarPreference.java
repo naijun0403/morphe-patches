@@ -38,25 +38,18 @@ import app.morphe.extension.shared.ui.Dim;
 public class SeekBarPreference extends Preference {
 
     public record SeekBarConfig(IntegerSetting setting, int min, int max, int step,
-                                String unit, int divisor,
+                                String unit,
                                 @Nullable String minLabelKey,
                                 @Nullable String maxLabelKey,
                                 @Nullable String[] valueLabelKeys) {
-        public SeekBarConfig(IntegerSetting setting, int min, int max, int step, String unit, int divisor) {
-            this(setting, min, max, step, unit, divisor, null, null, null);
-        }
+        /** Plain slider showing the numeric value with the given unit suffix. */
         public SeekBarConfig(IntegerSetting setting, int min, int max, int step, String unit) {
-            this(setting, min, max, step, unit, 1, null, null, null);
-        }
-        /** Slider with text labels at the ends instead of numeric min/max. */
-        public SeekBarConfig(IntegerSetting setting, int min, int max, int step,
-                             String unit, String minLabelKey, String maxLabelKey) {
-            this(setting, min, max, step, unit, 1, minLabelKey, maxLabelKey, null);
+            this(setting, min, max, step, unit, null, null, null);
         }
         /** Slider that snaps to a fixed set of positions, each with its own label. */
         public SeekBarConfig(IntegerSetting setting, int min, int max, int step,
                              String minLabelKey, String maxLabelKey, String[] valueLabelKeys) {
-            this(setting, min, max, step, "", 1, minLabelKey, maxLabelKey, valueLabelKeys);
+            this(setting, min, max, step, "", minLabelKey, maxLabelKey, valueLabelKeys);
         }
     }
 
@@ -224,10 +217,7 @@ public class SeekBarPreference extends Preference {
     }
 
     private static String formatValue(int value, SeekBarConfig config) {
-        if (config.divisor == 1) {
-            return String.format(Locale.ROOT, "%d%s", value, config.unit);
-        }
-        return String.format(Locale.ROOT, "%.1f%s", (float) value / config.divisor, config.unit);
+        return String.format(Locale.ROOT, "%d%s", value, config.unit);
     }
 
     public static int valueToProgress(SeekBarConfig config, int value) {
