@@ -448,7 +448,7 @@ final class TtsEngine {
                     // Ensure we have a valid connection.
                     ensureConnected();
 
-                    boolean needsConfig = !configSent;
+                    final boolean needsConfig = !configSent;
                     if (needsConfig) configSent = true;
 
                     // speech.config only needs to be sent once per connection.
@@ -485,12 +485,12 @@ final class TtsEngine {
 
     private String buildSsml(String text, String voice, String lang, float rate) {
         String inner = escapeXml(text);
-        int ratePercent = Math.round((rate - 1.0f) * 100);
+        final int ratePercent = Math.round((rate - 1.0f) * 100);
         if (ratePercent != 0) {
             inner = "<prosody rate='" + (ratePercent > 0 ? "+" : "") + ratePercent + "%'>"
                     + inner + "</prosody>";
         }
-        final String speakLang = lang != null && !lang.isEmpty() ? lang : localePart(voice);
+        String speakLang = lang != null && !lang.isEmpty() ? lang : localePart(voice);
         return "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis'"
                 + " xml:lang='" + speakLang + "'>"
                 + "<voice name='" + voice + "'>" + inner + "</voice></speak>";
@@ -573,7 +573,7 @@ final class TtsEngine {
     }
 
     private void readHttpUpgrade(InputStream in) throws IOException {
-        StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder(1024);
         for (int b; (b = in.read()) != -1; ) {
             sb.append((char) b);
             if (sb.length() >= 4 && "\r\n\r\n".contentEquals(sb.subSequence(sb.length() - 4, sb.length()))) {
@@ -691,8 +691,8 @@ final class TtsEngine {
                     @Override
                     public int readAt(long position, byte[] buffer, int offset, int size) {
                         if (position >= mp3.length) return -1;
-                        int pos   = (int) position;
-                        int count = Math.min(size, mp3.length - pos);
+                        final int pos   = (int) position;
+                        final int count = Math.min(size, mp3.length - pos);
                         System.arraycopy(mp3, pos, buffer, offset, count);
                         return count;
                     }
@@ -770,8 +770,8 @@ final class TtsEngine {
         // 5 minutes expressed in 100-nanosecond ticks.
         final long FIVE_MIN_TICKS     = 3_000_000_000L;
 
-        long ticks   = System.currentTimeMillis() * 10_000L + EPOCH_OFFSET_TICKS;
-        long rounded = ticks - (ticks % FIVE_MIN_TICKS);
+        final long ticks   = System.currentTimeMillis() * 10_000L + EPOCH_OFFSET_TICKS;
+        final long rounded = ticks - (ticks % FIVE_MIN_TICKS);
 
         String input = (rounded + TOKEN).toUpperCase(Locale.US);
         MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
@@ -784,7 +784,7 @@ final class TtsEngine {
 
     /** Extract locale portion from a voice name, e.g. "uk-UA-OstapNeural" → "uk-UA". */
     private static String localePart(String voice) {
-        int third = voice.indexOf('-', voice.indexOf('-') + 1);
+        final int third = voice.indexOf('-', voice.indexOf('-') + 1);
         return third > 0 ? voice.substring(0, third) : "en-US";
     }
 

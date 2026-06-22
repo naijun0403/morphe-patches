@@ -139,7 +139,7 @@ public final class TranscriptTranslator {
     private static void applySeekCut() {
         HttpURLConnection conn = activeConnection;
         if (conn == null) return;
-        final List<List<TranscriptSegment>> batches = liveBatches;
+        List<List<TranscriptSegment>> batches = liveBatches;
         final boolean[] done = liveBatchDone;
         if (batches == null || done == null) return;
         final int target = findBatchAtTime(batches, pendingSeekTimeMs);
@@ -156,12 +156,12 @@ public final class TranscriptTranslator {
      *         kept the original text still unblocks playback); no translation is running.
      */
     static boolean isAwaitingTranslationAt(int segmentIndex, long segmentStartMs, String currentText) {
-        final List<TranscriptSegment> originals = liveOriginals;
+        List<TranscriptSegment> originals = liveOriginals;
         if (originals == null) return false;
         if (segmentIndex < 0 || segmentIndex >= originals.size()) return false;
         // Text already differs from the original - translated by a completed batch or a streamed line.
         if (!currentText.equals(originals.get(segmentIndex).text())) return false;
-        final List<List<TranscriptSegment>> batches = liveBatches;
+        List<List<TranscriptSegment>> batches = liveBatches;
         final boolean[] done = liveBatchDone;
         if (batches == null || done == null) return true;
         final int index = findBatchAtTime(batches, segmentStartMs);
@@ -214,8 +214,8 @@ public final class TranscriptTranslator {
 
         // Growable so a dynamic split inserts an extra slot. Drives both dispatch order and
         // seek handling.
-        final List<Boolean> batchDone = new ArrayList<>(batches.size());
-        for (int i = 0; i < batches.size(); i++) batchDone.add(false);
+        List<Boolean> batchDone = new ArrayList<>(batches.size());
+        for (int i = 0, batchesSize = batches.size(); i < batchesSize; i++) batchDone.add(false);
 
         final int batchDelay = isMyMemory ? MYMEMORY_INTER_BATCH_DELAY_MS
                 : isOpenRouter ? OPENROUTER_INTER_BATCH_DELAY_MS
@@ -260,14 +260,13 @@ public final class TranscriptTranslator {
                 List<TranscriptSegment> batch = batches.get(index);
                 int offset = 0;
                 for (int b = 0; b < index; b++) offset += batches.get(b).size();
-                final int finalOffset = offset;
 
                 // Republish so consumers see the updated batch layout (a split changes indices).
                 liveBatches = new ArrayList<>(batches);
 
                 translatingBatchIndex = index;
                 final List<String> translated = translateBatchSafe(videoId, batch, targetLang,
-                        streamCallback(onUpdate, mainHandler, working, batch, finalOffset, targetLang));
+                        streamCallback(onUpdate, mainHandler, working, batch, offset, targetLang));
                 translatingBatchIndex = -1;
 
                 // A seek cut this request short - drop the partial result and re-pick against the
@@ -280,7 +279,7 @@ public final class TranscriptTranslator {
                 }
                 if (abortTranslation) break;
 
-                applyBatch(working, batch, finalOffset, translated, targetLang);
+                applyBatch(working, batch, offset, translated, targetLang);
 
                 // Re-queue segments the model failed to translate as a new undone batch so they
                 // are retried instead of permanently staying in the original language.
@@ -353,8 +352,9 @@ public final class TranscriptTranslator {
     }
 
     private static boolean[] toBoolArray(List<Boolean> source) {
-        boolean[] dst = new boolean[source.size()];
-        for (int i = 0; i < source.size(); i++) dst[i] = source.get(i);
+        final int sourceSize = source.size();
+        boolean[] dst = new boolean[sourceSize];
+        for (int i = 0; i < sourceSize; i++) dst[i] = source.get(i);
         return dst;
     }
 
@@ -367,18 +367,19 @@ public final class TranscriptTranslator {
     private static int splitBatchAtPlayhead(List<List<TranscriptSegment>> batches,
                                             List<Boolean> batchDone, int index, long timeMs) {
         if (timeMs <= 0) return index;
-        final List<TranscriptSegment> batch = batches.get(index);
-        if (batch.size() <= 1) return index;
+        List<TranscriptSegment> batch = batches.get(index);
+        final int batchSize = batch.size();
+        if (batchSize <= 1) return index;
         int splitAt = -1;
-        for (int i = 0; i < batch.size(); i++) {
+        for (int i = 0; i < batchSize; i++) {
             if (batch.get(i).endMs() > timeMs) {
                 if (i > 0) splitAt = i;
                 break;
             }
         }
         if (splitAt <= 0) return index;
-        final List<TranscriptSegment> before = new ArrayList<>(batch.subList(0, splitAt));
-        final List<TranscriptSegment> after = new ArrayList<>(batch.subList(splitAt, batch.size()));
+        List<TranscriptSegment> before = new ArrayList<>(batch.subList(0, splitAt));
+        List<TranscriptSegment> after = new ArrayList<>(batch.subList(splitAt, batchSize));
         batches.set(index, before);
         batches.add(index + 1, after);
         batchDone.add(index + 1, false);
@@ -392,18 +393,19 @@ public final class TranscriptTranslator {
      */
     private static void capFirstBatch(List<List<TranscriptSegment>> batches,
                                       List<Boolean> batchDone, int index) {
-        final List<TranscriptSegment> batch = batches.get(index);
-        if (batch.size() <= 1) return;
+        List<TranscriptSegment> batch = batches.get(index);
+        final int batchSize = batch.size();
+        if (batchSize <= 1) return;
         int chars = 0;
         int splitAt = 0;
-        for (int i = 0; i < batch.size(); i++) {
+        for (int i = 0; i < batchSize; i++) {
             chars += batch.get(i).text().length() + 1;
             splitAt = i + 1;
             if (chars >= OPENROUTER_FIRST_BATCH_CHARS) break;
         }
-        if (splitAt >= batch.size()) return; // Whole batch already within budget.
-        final List<TranscriptSegment> head = new ArrayList<>(batch.subList(0, splitAt));
-        final List<TranscriptSegment> tail = new ArrayList<>(batch.subList(splitAt, batch.size()));
+        if (splitAt >= batchSize) return; // Whole batch already within budget.
+        List<TranscriptSegment> head = new ArrayList<>(batch.subList(0, splitAt));
+        List<TranscriptSegment> tail = new ArrayList<>(batch.subList(splitAt, batchSize));
         batches.set(index, head);
         batches.add(index + 1, tail);
         batchDone.add(index + 1, false);
@@ -434,16 +436,18 @@ public final class TranscriptTranslator {
     private static void applyBatch(List<TranscriptSegment> target, List<TranscriptSegment> batch,
                                    int offset, @Nullable List<String> translated, String lang) {
         if (translated == null) return;
-        final int limit = Math.min(batch.size(), translated.size());
-        if (translated.size() != batch.size()) {
+        final int batchSize = batch.size();
+        final int translatedSize = translated.size();
+        final int limit = Math.min(batchSize, translatedSize);
+        if (translatedSize != batchSize) {
             Logger.printDebug(() -> "Line count mismatch - expected: "
-                    + batch.size() + ", got: " + translated.size() + "; last: "
-                    + (batch.size() - limit) + " segment(s) keep original text");
+                    + batchSize + ", got: " + translatedSize + "; last: "
+                    + (batchSize - limit) + " segment(s) keep original text");
         }
         for (int j = 0; j < limit; j++) {
             TranscriptSegment orig = batch.get(j);
-            target.set(offset + j,
-                    new TranscriptSegment(orig.startMs(), orig.endMs(), translated.get(j), lang));
+            target.set(offset + j, new TranscriptSegment(
+                    orig.startMs(), orig.endMs(), translated.get(j), lang));
         }
     }
 
@@ -492,13 +496,14 @@ public final class TranscriptTranslator {
     }
 
     private static int findBatchAtTime(List<List<TranscriptSegment>> batches, long timeMs) {
-        for (int i = 0; i < batches.size(); i++) {
+        final int batchesSize = batches.size();
+        for (int i = 0; i < batchesSize; i++) {
             List<TranscriptSegment> batch = batches.get(i);
             if (batch.get(batch.size() - 1).endMs() > timeMs) {
                 return i;
             }
         }
-        return batches.size() - 1;
+        return batchesSize - 1;
     }
 
     private static List<List<TranscriptSegment>> splitByCharBudget(
@@ -541,13 +546,15 @@ public final class TranscriptTranslator {
         final char sep = line.charAt(i);
         if (sep != ':' && sep != '.' && sep != ')') return false;
         try {
-            int num = Integer.parseInt(line.substring(0, i));
+            final int num = Integer.parseInt(line.substring(0, i));
             String text = line.substring(i + 1).trim();
             if (num >= 1 && num <= segmentCount && !text.isEmpty()) {
                 result.set(num - 1, text);
                 return true;
             }
-        } catch (NumberFormatException ignored) {}
+        } catch (NumberFormatException ex) {
+            Logger.printDebug(() -> "Invalid line number: " + line, ex);
+        }
         return false;
     }
 
@@ -571,8 +578,9 @@ public final class TranscriptTranslator {
      */
     private static String stripNumberPrefix(String line) {
         int i = 0;
-        while (i < line.length() && Character.isDigit(line.charAt(i))) i++;
-        if (i > 0 && i < line.length()) {
+        final int lineLength = line.length();
+        while (i < lineLength && Character.isDigit(line.charAt(i))) i++;
+        if (i > 0 && i < lineLength) {
             final char sep = line.charAt(i);
             if (sep == ':' || sep == '.' || sep == ')') {
                 return line.substring(i + 1).trim();
@@ -590,7 +598,7 @@ public final class TranscriptTranslator {
     private static List<String> positionalFallback(String raw, int segmentCount) {
         List<String> lines = new ArrayList<>(segmentCount);
         for (String line : raw.split("\n")) {
-            final String trimmed = line.trim();
+            String trimmed = line.trim();
             if (trimmed.isEmpty()) continue;
             lines.add(stripNumberPrefix(trimmed));
         }
@@ -604,7 +612,7 @@ public final class TranscriptTranslator {
         final long start = System.currentTimeMillis();
         Logger.printDebug(() -> "Google translation starting: " + videoId + " lang: " + targetLang);
 
-        StringBuilder joined = new StringBuilder();
+        StringBuilder joined = new StringBuilder(100 * segments.size());
         for (TranscriptSegment seg : segments) {
             if (joined.length() > 0) joined.append('\n');
             joined.append(seg.text());
@@ -655,7 +663,7 @@ public final class TranscriptTranslator {
         final long start = System.currentTimeMillis();
         Logger.printDebug(() -> "MyMemory translation starting: " + videoId + " lang: " + targetLang);
 
-        StringBuilder joined = new StringBuilder();
+        StringBuilder joined = new StringBuilder(100 * segments.size());
         for (TranscriptSegment seg : segments) {
             if (joined.length() > 0) joined.append('\n');
             joined.append(seg.text());
@@ -736,7 +744,7 @@ public final class TranscriptTranslator {
             @Nullable Consumer<List<String>> onLineStreamed) throws Exception {
         Utils.verifyOffMainThread();
 
-        final String model = Settings.VOT_OPENROUTER_MODEL.get();
+        String model = Settings.VOT_OPENROUTER_MODEL.get();
         final long start = System.currentTimeMillis();
         Logger.printDebug(() -> "OpenRouter translation starting: " + videoId + " lang: " + targetLang + " model: " + model);
 
@@ -750,7 +758,7 @@ public final class TranscriptTranslator {
             joined.append(i + 1).append(": ").append(segments.get(i).text());
         }
 
-        final String targetLangName = Locale.forLanguageTag(targetLang).getDisplayLanguage(Locale.ENGLISH);
+        String targetLangName = Locale.forLanguageTag(targetLang).getDisplayLanguage(Locale.ENGLISH);
         JSONObject systemMessage = new JSONObject()
                 .put("role", "system")
                 .put("content", "Translate numbered YouTube caption lines to " + targetLangName + " (" + targetLang + "). "
@@ -829,10 +837,10 @@ public final class TranscriptTranslator {
 
                     String content = delta.optString("content", "");
                     rawOutput.append(content);
-                    for (int ci = 0; ci < content.length(); ci++) {
+                    for (int ci = 0, contentLength = content.length(); ci < contentLength; ci++) {
                         final char c = content.charAt(ci);
                         if (c == '\n') {
-                            final String line = lineBuffer.toString().trim();
+                            String line = lineBuffer.toString().trim();
                             lineBuffer.setLength(0);
                             if (applyStreamedLine(line, result, segments.size(), matched)
                                     && onLineStreamed != null) {
@@ -845,7 +853,7 @@ public final class TranscriptTranslator {
                 }
                 // Flush any remaining content that arrived without a trailing newline.
                 if (lineBuffer.length() > 0) {
-                    final String line = lineBuffer.toString().trim();
+                    String line = lineBuffer.toString().trim();
                     if (applyStreamedLine(line, result, segments.size(), matched)
                             && onLineStreamed != null) {
                         onLineStreamed.accept(new ArrayList<>(result));

@@ -85,17 +85,17 @@ public final class VotBottomSheet {
 
         if (langEntries.length > 1) {
             List<Pair<String, String>> list = new ArrayList<>();
-            for (int i = 1; i < langEntries.length; i++) {
+            for (int i = 1, length = langEntries.length; i < length; i++) {
                 list.add(new Pair<>(langEntries[i], langValues[i]));
             }
             list.sort((p1, p2) -> p1.first.compareToIgnoreCase(p2.first));
-            for (int i = 1; i < langEntries.length; i++) {
+            for (int i = 1, length = langEntries.length; i < length; i++) {
                 langEntries[i] = list.get(i - 1).first;
                 langValues[i] = list.get(i - 1).second;
             }
         }
 
-        final SheetBottomDialog.SlideDialog[] mainRef = {null};
+        SheetBottomDialog.SlideDialog[] mainRef = {null};
 
         LinearLayout engineRow = makeValueRow(context, fg, str("morphe_vot_tts_voice_type"));
         Runnable refreshEngine = () -> refreshEngineRow(engineRow);
@@ -191,14 +191,18 @@ public final class VotBottomSheet {
         String voiceId = Settings.VOT_TTS_VOICE_TYPE.get();
         VoiceCatalog.Voice voice = VoiceCatalog.getVoice(voiceId);
 
-        if (Settings.VOT_USE_NATIVE_TTS.get() || (voice == null && VoiceCatalog.resolve(lang, null) == null)) {
+        if (Settings.VOT_USE_NATIVE_TTS.get() || (voice == null
+                && VoiceCatalog.resolve(lang, null) == null)) {
             valueView.setText(str("morphe_vot_tts_system"));
-        } else if (voice != null && (voice.languageTag.equalsIgnoreCase(VoiceCatalog.getIso639(lang)) || voice.isMultilingual)) {
+        } else if (voice != null && (voice.languageTag.equalsIgnoreCase(VoiceCatalog.getIso639(lang))
+                || voice.isMultilingual)) {
             valueView.setText(voice.dialogDisplayName);
         } else {
             String defaultVoiceId = VoiceCatalog.resolve(lang, null);
             VoiceCatalog.Voice defaultVoice = VoiceCatalog.getVoice(defaultVoiceId);
-            valueView.setText(defaultVoice != null ? defaultVoice.dialogDisplayName : str("morphe_vot_tts_system"));
+            valueView.setText(defaultVoice != null
+                    ? defaultVoice.dialogDisplayName
+                    : str("morphe_vot_tts_system"));
         }
 
         final boolean edgeAvailable = VoiceCatalog.resolve(lang, null) != null;
@@ -212,7 +216,11 @@ public final class VotBottomSheet {
                 str("morphe_vot_service_mymemory"),
                 str("morphe_vot_service_openrouter")
         };
-        String[] values = { TRANSLATION_SERVICE_GOOGLE, TRANSLATION_SERVICE_MY_MEMORY, TRANSLATION_SERVICE_OPENROUTER };
+        String[] values = {
+                TRANSLATION_SERVICE_GOOGLE,
+                TRANSLATION_SERVICE_MY_MEMORY,
+                TRANSLATION_SERVICE_OPENROUTER
+        };
 
         SheetBottomDialog.DraggableLinearLayout pickerRoot =
                 SheetBottomDialog.createMainLayout(context, getDialogBackgroundColor());
@@ -221,17 +229,17 @@ public final class VotBottomSheet {
         pickerRoot.addView(makeTitle(context, str("morphe_vot_translation_service_title"), fg));
 
         LayoutInflater inflater = LayoutInflater.from(context);
-        int checkmarkRes = Utils.appIsUsingBoldIcons() ? DRAWABLE_CHECKMARK_BOLD : DRAWABLE_CHECKMARK;
+        final int checkmarkRes = Utils.appIsUsingBoldIcons() ? DRAWABLE_CHECKMARK_BOLD : DRAWABLE_CHECKMARK;
         String selectedService = Settings.VOT_TRANSLATION_SERVICE.get();
 
-        SheetBottomDialog.SlideDialog pickerDialog =
-                SheetBottomDialog.createSlideDialog(context, pickerRoot, fadeInDuration);
+        SheetBottomDialog.SlideDialog pickerDialog = SheetBottomDialog
+                .createSlideDialog(context, pickerRoot, fadeInDuration);
 
         LinearLayout listLayout = new LinearLayout(context);
         listLayout.setOrientation(LinearLayout.VERTICAL);
 
-        for (int i = 0; i < entries.length; i++) {
-            final String value = values[i];
+        for (int i = 0, length = entries.length; i < length; i++) {
+            String value = values[i];
             final boolean isOpenRouter = TRANSLATION_SERVICE_OPENROUTER.equals(value);
 
             View row = inflater.inflate(LAYOUT_MORPHE_CUSTOM_LIST_ITEM_CHECKED, listLayout, false);
@@ -239,7 +247,7 @@ public final class VotBottomSheet {
             ImageView check = row.findViewById(ID_MORPHE_CHECK_ICON);
             check.setImageResource(checkmarkRes);
             check.setColorFilter(fg);
-            boolean isSelected = value.equals(selectedService);
+            final boolean isSelected = value.equals(selectedService);
             check.setVisibility(isSelected ? View.VISIBLE : View.GONE);
             row.findViewById(ID_MORPHE_CHECK_ICON_PLACEHOLDER)
                     .setVisibility(isSelected ? View.GONE : View.VISIBLE);
@@ -259,7 +267,7 @@ public final class VotBottomSheet {
                         LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
                 LinearLayout rowLayout = (LinearLayout) row;
-                int idx = rowLayout.indexOfChild(itemText);
+                final int idx = rowLayout.indexOfChild(itemText);
                 rowLayout.removeView(itemText);
                 textContainer.addView(itemText);
 
@@ -282,8 +290,8 @@ public final class VotBottomSheet {
                             str("morphe_vot_openrouter_not_configured_title"),
                             str("morphe_vot_openrouter_not_configured_message"),
                             null, null, () -> {}, null,
-                                    null, null, false)
-                            .first.show();
+                                    null, null, false
+                            ).first.show();
                     return;
                 }
                 Settings.VOT_TRANSLATION_SERVICE.save(value);
@@ -342,8 +350,8 @@ public final class VotBottomSheet {
         scroll.addView(listLayout);
 
         LayoutInflater inflater = LayoutInflater.from(context);
-        int checkmarkRes = Utils.appIsUsingBoldIcons() ? DRAWABLE_CHECKMARK_BOLD : DRAWABLE_CHECKMARK;
-        int speakerRes = Utils.appIsUsingBoldIcons() ? DRAWABLE_SPEAKER_BOLD : DRAWABLE_SPEAKER;
+        final int checkmarkRes = Utils.appIsUsingBoldIcons() ? DRAWABLE_CHECKMARK_BOLD : DRAWABLE_CHECKMARK;
+        final int speakerRes = Utils.appIsUsingBoldIcons() ? DRAWABLE_SPEAKER_BOLD : DRAWABLE_SPEAKER;
         final int rippleColor = Color.argb(60, Color.red(fg), Color.green(fg), Color.blue(fg));
 
         int maleCount = 0;
@@ -405,7 +413,7 @@ public final class VotBottomSheet {
         ImageView check = row.findViewById(ID_MORPHE_CHECK_ICON);
         check.setImageResource(checkmarkRes);
         check.setColorFilter(fg);
-        boolean isSelected = value.equals(selectedValue);
+        final boolean isSelected = value.equals(selectedValue);
         check.setVisibility(isSelected ? View.VISIBLE : View.GONE);
         row.findViewById(ID_MORPHE_CHECK_ICON_PLACEHOLDER)
                 .setVisibility(isSelected ? View.GONE : View.VISIBLE);
@@ -457,7 +465,7 @@ public final class VotBottomSheet {
         containerParams.setMargins(0, Dim.dp8, 0, 0);
         container.setLayoutParams(containerParams);
 
-        int lineColor = Color.argb(30, Color.red(fg), Color.green(fg), Color.blue(fg));
+        final int lineColor = Color.argb(30, Color.red(fg), Color.green(fg), Color.blue(fg));
 
         View lineStart = new View(context);
         lineStart.setBackgroundColor(lineColor);

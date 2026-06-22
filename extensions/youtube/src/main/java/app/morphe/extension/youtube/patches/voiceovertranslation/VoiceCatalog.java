@@ -449,7 +449,7 @@ final class VoiceCatalog {
 
     static {
         VOICES_BY_ID = new HashMap<>(2 * ALL_VOICES.length);
-        VOICES_BY_LANG = new HashMap<>();
+        VOICES_BY_LANG = new HashMap<>(100, 0.5f);
 
         List<Voice> multilingualVoices = new ArrayList<>();
 
