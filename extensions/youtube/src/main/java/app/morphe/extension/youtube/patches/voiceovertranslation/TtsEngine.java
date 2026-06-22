@@ -149,6 +149,26 @@ final class TtsEngine {
      */
     long markBusy() {
         Utils.verifyOnMainThread();
+        // Stop any prior playback before starting a new session, otherwise the
+        // old MediaPlayer keeps playing alongside the new one and leaks.
+        if (playLatch != null) {
+            playLatch.countDown();
+            playLatch = null;
+        }
+        if (currentPlayer != null) {
+            try {
+                currentPlayer.setVolume(0, 0);
+                currentPlayer.stop();
+            } catch (Exception ex) {
+                VoiceOverTranslationPatch.logError(() -> "MediaPlayer stop failed in markBusy", ex);
+            }
+            try {
+                currentPlayer.release();
+            } catch (Exception ex) {
+                VoiceOverTranslationPatch.logError(() -> "MediaPlayer release failed in markBusy", ex);
+            }
+            currentPlayer = null;
+        }
         stopped = false;
         playbackId++;
         speaking = true;
