@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.Utils;
@@ -230,6 +231,9 @@ final class TranscriptFetcher {
     // Minimum duration for a merged segment to avoid being skipped by the playback polling.
     private static final long MIN_SEGMENT_DURATION_MS = 2_000;
 
+    private static final Pattern BRACKETS_PATTERN = Pattern.compile("\\[[^\\]]*]");
+    private static final Pattern PARENTHESES_PATTERN = Pattern.compile("\\([^)]*\\)");
+
     // Heuristics for old ASR tracks that have no punctuation at all.
     // A pause this long is treated as a sentence boundary on its own.
     private static final long UNPUNCTUATED_GAP_MS = 700;
@@ -270,8 +274,8 @@ final class TranscriptFetcher {
                     .trim();
 
             // Drop sound effect markers such as [Applause] or (music) - they should not be spoken.
-            textStr = textStr.replaceAll("\\[[^\\]]*]", "");
-            textStr = textStr.replaceAll("\\([^)]*\\)", "");
+            textStr = BRACKETS_PATTERN.matcher(textStr).replaceAll("");
+            textStr = PARENTHESES_PATTERN.matcher(textStr).replaceAll("");
             textStr = textStr.trim();
 
             if (!textStr.isEmpty()) {
