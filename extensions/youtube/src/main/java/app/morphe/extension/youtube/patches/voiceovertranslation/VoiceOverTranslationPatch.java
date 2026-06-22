@@ -607,8 +607,10 @@ public class VoiceOverTranslationPatch {
             wasExplicitSeek = false;
         }
 
-        final float rate = calculateSpeechRate(speechDurationMs, availableMs);
-        ttsEndVideoTimeMs = speakFromMs + (long) (speechDurationMs / rate);
+        // Rate must be based on the audio that will actually play, not the full clip.
+        final long remainingSpeechMs = Math.max(0, speechDurationMs - startTimeMs);
+        final float rate = calculateSpeechRate(remainingSpeechMs, availableMs);
+        ttsEndVideoTimeMs = speakFromMs + (long) (remainingSpeechMs / rate);
 
         if (TTS_ENGINE_SYSTEM.equals(voice)) {
             ensureTts();
