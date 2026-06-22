@@ -44,7 +44,7 @@ import app.morphe.extension.youtube.settings.Settings;
 /**
  * Translates transcript segments via the configured translation service.
  */
-final class TranscriptTranslator {
+public final class TranscriptTranslator {
 
     private static final String TRANSLATE_URL =
             "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&dt=t&tl=";
