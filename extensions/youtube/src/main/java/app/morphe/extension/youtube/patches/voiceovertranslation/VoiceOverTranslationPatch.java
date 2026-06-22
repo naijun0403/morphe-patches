@@ -38,6 +38,7 @@ import app.morphe.extension.shared.ResourceUtils;
 import app.morphe.extension.shared.Utils;
 import app.morphe.extension.shared.settings.Setting;
 import app.morphe.extension.shared.ui.CustomDialog;
+import app.morphe.extension.youtube.patches.VideoInformation;
 import app.morphe.extension.youtube.settings.Settings;
 import app.morphe.extension.youtube.shared.PlayerType;
 import app.morphe.extension.youtube.shared.VideoState;
@@ -105,7 +106,7 @@ public class VoiceOverTranslationPatch {
     }
 
     private static final long SEEK_JUMP_THRESHOLD_MS = 2_900;
-    private static final long TTS_LOOKAHEAD_MS = 400;
+    private static final long TTS_LOOKAHEAD_MS = 980;
 
     // Minimum time into a segment to justify seeking within the audio instead of
     // playing from the start. Prevents tiny pops on small adjustments.
@@ -276,7 +277,7 @@ public class VoiceOverTranslationPatch {
             }
         }
 
-        final long effectiveTimeMs = timeMs + TTS_LOOKAHEAD_MS;
+        final long effectiveTimeMs = timeMs; // + TTS_LOOKAHEAD_MS;
         for (int i = 0, size = segments.size(); i < size; i++) {
             TranscriptSegment seg = segments.get(i);
             if (effectiveTimeMs >= seg.playbackStartMs() && timeMs < seg.playbackEndMs()) {
@@ -296,6 +297,8 @@ public class VoiceOverTranslationPatch {
                     }
                     if (!ttsEngine.isSpeaking() || wasExplicitSeek) {
                         lastSpokenIndex = i;
+                        Logger.printDebug(() -> "Found segment: " + lastSpokenIndex
+                                + " videoTime: " + timeMs);
                         speak(seg, i);
                     }
                 }
@@ -479,6 +482,7 @@ public class VoiceOverTranslationPatch {
                                 long id = Long.parseLong(utteranceId.substring(VOT_ID_PREFIX.length()));
                                 if (id == ttsEngine.getPlaybackId()) {
                                     ttsEngine.clearBusy(id);
+                                    triggerNextSegmentCheck();
                                 }
                             }
                         } catch (Exception ex) {
@@ -517,7 +521,6 @@ public class VoiceOverTranslationPatch {
         if (voice == null) return;
 
         final long speakFromMs = Math.max(lastVideoTimeMs, seg.playbackStartMs());
-
         final long availableMs = seg.playbackEndMs() - speakFromMs;
 
         // Exact if cached, otherwise estimated from char count.
@@ -540,7 +543,9 @@ public class VoiceOverTranslationPatch {
             wasExplicitSeek = false;
         }
 
-        final float rate = smoothRate(calculateSpeechRate(speechDurationMs, availableMs));
+//        final float rate = smoothRate(VideoInformation.getPlaybackSpeed() *
+//                calculateSpeechRate(speechDurationMs, availableMs));
+        final float rate = calculateSpeechRate(speechDurationMs, availableMs);
         ttsEndVideoTimeMs = speakFromMs + (long) (speechDurationMs / rate);
 
         if (TTS_ENGINE_SYSTEM.equals(voice)) {
@@ -552,7 +557,7 @@ public class VoiceOverTranslationPatch {
             updateTtsLanguage();
             requestDuck();
             updateDucking();
-            tts.setSpeechRate(rate);
+            tts.setSpeechRate(rate * VideoInformation.getPlaybackSpeed());
             Bundle params = new Bundle();
             params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume);
             final long id = ttsEngine.markBusy();
@@ -566,12 +571,22 @@ public class VoiceOverTranslationPatch {
         byte[] cached = TtsCache.get(currentVideoId, index, voice, lang, seg.text());
         if (cached != null) {
             final long playbackId = ttsEngine.markBusy();
-            ttsEngine.play(cached, volume, rate, startTimeMs, playbackId, null);
+            ttsEngine.play(cached, volume, rate, startTimeMs, playbackId,
+                    VoiceOverTranslationPatch::triggerNextSegmentCheck);
             return;
         }
 
         // Edge synthesis doesn't support seeking during synthesis; play() will seek the result.
-        ttsEngine.speak(seg.text(), voice, lang, volume, rate, startTimeMs, null);
+        ttsEngine.speak(seg.text(), voice, lang, volume, rate, startTimeMs,
+                VoiceOverTranslationPatch::triggerNextSegmentCheck);
+    }
+
+    private static void triggerNextSegmentCheck() {
+        Utils.runOnMainThreadNowOrLater(() -> {
+            if (VideoState.getCurrent() == VideoState.PLAYING) {
+                videoTimeChanged(VideoInformation.getVideoTime());
+            }
+        });
     }
 
     /**

@@ -38,6 +38,7 @@ import javax.net.ssl.SSLSocketFactory;
 
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.Utils;
+import app.morphe.extension.youtube.patches.VideoInformation;
 
 /**
  * Synthesizes speech via the Microsoft Edge TTS WebSocket API and plays the result
@@ -121,7 +122,10 @@ final class TtsEngine {
                 byte[] data = synthesize(text, voiceId, lang, rate);
                 Utils.runOnMainThread(() -> {
                     if (data.length > 0 && !stopped && id == playbackId) {
-                        play(data, volume, 1.0f, startTimeMs, id, onDone); // rate is baked into SSML
+                        // Must play based on playback rate. Underlying voice speaking rate
+                        // is baked into synthesized data.
+                        final float playbackRate = VideoInformation.getPlaybackSpeed();
+                        play(data, volume, playbackRate, startTimeMs, id, onDone);
                     } else if (id == playbackId) {
                         speaking = false;
                         if (onDone != null) onDone.run();
