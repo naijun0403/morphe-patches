@@ -366,6 +366,12 @@ public class VoiceOverTranslationPatch {
         TtsPrefetcher.triggerRescan();
     }
 
+    /** Applies the current voice volume setting to the active playback. */
+    public static void updatePlaybackVolume() {
+        Utils.verifyOnMainThread();
+        ttsEngine.setVolume(Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f);
+    }
+
     /**
      * Re-fits every contiguous block of segments using the current timing-flexibility setting.
      * Preserves cached MP3 durations so no re-synthesis is triggered.

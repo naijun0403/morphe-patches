@@ -127,7 +127,10 @@ public final class VotBottomSheet {
                 str("morphe_vot_original_audio_volume_title"),
                 Settings.VOT_ORIGINAL_AUDIO_VOLUME.get(),
                 fg,
-                Settings.VOT_ORIGINAL_AUDIO_VOLUME::save));
+                value -> {
+                    Settings.VOT_ORIGINAL_AUDIO_VOLUME.save(value);
+                    VoiceOverTranslationPatch.updatePlaybackVolume();
+                }));
         content.addView(makeRateSliderRow(context,
                 str("morphe_vot_timing_flexibility_title"),
                 Settings.VOT_TIMING_FLEXIBILITY_MS.get(),

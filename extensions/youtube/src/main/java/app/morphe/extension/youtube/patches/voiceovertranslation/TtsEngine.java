@@ -287,6 +287,17 @@ final class TtsEngine {
         }
     }
 
+    /** Updates the active playback volume. No-op if there is no active player. */
+    void setVolume(float volume) {
+        Utils.verifyOnMainThread();
+        if (currentPlayer == null) return;
+        try {
+            currentPlayer.setVolume(volume, volume);
+        } catch (Exception ex) {
+            VoiceOverTranslationPatch.logError(() -> "MediaPlayer setVolume failed", ex);
+        }
+    }
+
     /** Stops any in-progress synthesis or playback immediately. */
     void stop() {
         Utils.verifyOnMainThread();
