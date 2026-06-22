@@ -624,7 +624,6 @@ public final class VotBottomSheet {
         currentLabel.setText(SeekBarPreference.formatLabel(storedValue, config));
         currentLabel.setTextColor(fgColor);
         currentLabel.setTextSize(14);
-        currentLabel.setPadding(0, Dim.dp4, 0, 0);
 
         SeekBar seekBar = new SeekBar(context);
         seekBar.setMax((config.max() - config.min()) / config.step());
@@ -636,6 +635,8 @@ public final class VotBottomSheet {
         seekCenter.setOrientation(LinearLayout.VERTICAL);
         LinearLayout.LayoutParams currentParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        currentParams.topMargin = Dim.dp8;
+        currentParams.bottomMargin = Dim.dp8;
         seekCenter.addView(currentLabel, currentParams);
         seekCenter.addView(seekBar,
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -709,7 +710,8 @@ public final class VotBottomSheet {
         currentLabel.setTextSize(14);
         LinearLayout.LayoutParams currentParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        currentParams.topMargin = Dim.dp4;
+        currentParams.topMargin = Dim.dp8;
+        currentParams.bottomMargin = Dim.dp8;
         outer.addView(currentLabel, currentParams);
 
         SeekBar seekBar = new SeekBar(context);
