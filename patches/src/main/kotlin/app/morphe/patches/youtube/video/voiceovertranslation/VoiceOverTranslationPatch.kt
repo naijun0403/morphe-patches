@@ -77,7 +77,7 @@ val voiceOverTranslationPatch = bytecodePatch(
                 preferences = setOf(
                     SwitchPreference("morphe_vot_enabled"),
                     ListPreference("morphe_vot_caption_language"),
-                    NonInteractivePreference("morphe_vot_max_speech_rate",
+                    NonInteractivePreference("morphe_vot_timing_flexibility",
                         tag = "app.morphe.extension.shared.settings.preference.SeekBarPreference",
                         selectable = true),
                     ListPreference("morphe_vot_translation_service"),

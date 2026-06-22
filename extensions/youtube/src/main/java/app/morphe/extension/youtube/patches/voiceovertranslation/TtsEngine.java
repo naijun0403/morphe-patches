@@ -39,6 +39,7 @@ import javax.net.ssl.SSLSocketFactory;
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.Utils;
 import app.morphe.extension.youtube.patches.VideoInformation;
+import app.morphe.extension.youtube.settings.Settings;
 
 /**
  * Synthesizes speech via the Microsoft Edge TTS WebSocket API and plays the result
@@ -71,8 +72,15 @@ final class TtsEngine {
     private static final long SOCKET_MAX_IDLE_MS = 20_000;
 
     public static final long ESTIMATED_MS_PER_CHAR = 65;
-    // TODO: Allow changing this with a setting of low/medium/high?
-    public final long PLAYBACK_ADJUST_LIMIT_MS = 2500;
+
+    /**
+     * How far a segment's playback boundaries may drift from its original caption
+     * timing to make room for natural-rate speech. Read from user setting
+     * {@code VOT_TIMING_FLEXIBILITY_MS} on each call so live slider changes take effect.
+     */
+    long playbackAdjustLimitMs() {
+        return Settings.VOT_TIMING_FLEXIBILITY_MS.get();
+    }
 
     // All fields below (except synthesisLock related) must be accessed ONLY on the main thread.
     private boolean stopped;
@@ -334,7 +342,7 @@ final class TtsEngine {
             return;
         }
 
-        // Calculate total spoken duration
+        // Calculate total spoken duration.
         long totalSpokenMs = 0;
         final long originalDurationMs = segments.get(endIdx).endMs() - segments.get(startIdx).startMs();
 
@@ -351,29 +359,30 @@ final class TtsEngine {
             totalSpokenMs += duration;
         }
 
-        // Calculate limits
+        // Calculate limits.
         final long originalStart = segments.get(startIdx).startMs();
         final long originalEnd = segments.get(endIdx).endMs();
 
         final long gapStart = (startIdx > 0) ? segments.get(startIdx - 1).endMs() : 0;
         final long gapEnd = (endIdx < segments.size() - 1) ? segments.get(endIdx + 1).startMs() : Long.MAX_VALUE;
 
-        // Available expansion at start is half the gap to the previous non-contiguous segment
-        final long maxExpandStart = Math.min(PLAYBACK_ADJUST_LIMIT_MS, (originalStart - gapStart) / 2);
-        // Available expansion at end is half the gap to the next non-contiguous segment
-        final long maxExpandEnd = Math.min(PLAYBACK_ADJUST_LIMIT_MS, (gapEnd - originalEnd) / 2);
+        final long adjustLimitMs = playbackAdjustLimitMs();
+        // Available expansion at start is half the gap to the previous non-contiguous segment.
+        final long maxExpandStart = Math.min(adjustLimitMs, (originalStart - gapStart) / 2);
+        // Available expansion at end is half the gap to the next non-contiguous segment.
+        final long maxExpandEnd = Math.min(adjustLimitMs, (gapEnd - originalEnd) / 2);
 
         long limitStart = originalStart - maxExpandStart;
         long limitEnd = originalEnd + maxExpandEnd;
 
-        // Expand block if needed
+        // Expand block if needed.
         long newStart = originalStart;
         long newEnd = originalEnd;
 
         if (totalSpokenMs > originalDurationMs) {
             long needed = totalSpokenMs - originalDurationMs;
 
-            // Prefer end expansion
+            // Prefer end expansion.
             final long expandEnd = Math.min(needed, limitEnd - originalEnd);
             newEnd += expandEnd;
             needed -= expandEnd;
@@ -384,7 +393,7 @@ final class TtsEngine {
             }
         }
 
-        // Redistribute internal boundaries
+        // Redistribute internal boundaries.
         long currentPos = newStart;
         final long totalWindow = newEnd - newStart;
 
@@ -403,10 +412,10 @@ final class TtsEngine {
                 segmentWindow = newEnd - currentPos;
             } else {
                 final long idealEnd = currentPos + (long) (totalWindow * (spoken / (double) totalSpokenMs));
-                // Clamp every boundary to respect the drift limit
-                long clampedEnd = Math.max(s.endMs() - PLAYBACK_ADJUST_LIMIT_MS,
-                        Math.min(s.endMs() + PLAYBACK_ADJUST_LIMIT_MS, idealEnd));
-                // Ensure monotonicity
+                // Clamp every boundary to respect the drift limit.
+                long clampedEnd = Math.max(s.endMs() - adjustLimitMs,
+                        Math.min(s.endMs() + adjustLimitMs, idealEnd));
+                // Ensure monotonicity.
                 clampedEnd = Math.max(currentPos, Math.min(newEnd, clampedEnd));
                 segmentWindow = clampedEnd - currentPos;
             }
@@ -655,7 +664,7 @@ final class TtsEngine {
         Utils.runOnMainThread(() -> {
             if (stopped || id != playbackId) {
                 mp.release();
-                latch.countDown(); // Prevent await block
+                latch.countDown(); // Prevent await block.
                 return;
             }
             playLatch = latch;

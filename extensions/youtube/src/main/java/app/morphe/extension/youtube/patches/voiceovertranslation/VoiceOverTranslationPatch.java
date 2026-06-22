@@ -114,6 +114,9 @@ public class VoiceOverTranslationPatch {
     // Rough estimate of natural speech duration (~15 chars per second) used to
     // decide how much the TTS rate must be raised to fit the segment time slot.
     private static final float MIN_SPEECH_RATE = 1.0f;
+    // Hard cap on speed multiplier. Above this TTS becomes hard to understand,
+    // so we let segments overlap rather than push past it.
+    private static final float MAX_SPEECH_RATE_HARD_CAP = 3.0f;
 
     public static final String TTS_ENGINE_SYSTEM = "system";
     private static final String VOT_ID_PREFIX = "vot_";
@@ -363,6 +366,32 @@ public class VoiceOverTranslationPatch {
         TtsPrefetcher.triggerRescan();
     }
 
+    /**
+     * Re-fits every contiguous block of segments using the current timing-flexibility setting.
+     * Preserves cached MP3 durations so no re-synthesis is triggered.
+     */
+    public static void recalculatePlaybackTimes() {
+        Utils.verifyOnMainThread();
+        for (TranscriptSegment seg : segments) {
+            seg.setPlaybackStartMs(seg.startMs());
+            seg.setPlaybackEndMs(seg.endMs());
+        }
+        String lang = resolveTargetLang();
+        String voice = resolveVoice(lang);
+        if (voice == null) return;
+        int i = 0;
+        final int size = segments.size();
+        while (i < size) {
+            int endIdx = i;
+            while (endIdx < size - 1
+                    && segments.get(endIdx).endMs() == segments.get(endIdx + 1).startMs()) {
+                endIdx++;
+            }
+            ttsEngine.adjustPlaybackTimes(segments, i, lastSpokenIndex, currentVideoId, voice, lang);
+            i = endIdx + 1;
+        }
+    }
+
     public static void reloadTranscript() {
         Utils.verifyOnMainThread();
         if (currentVideoId.isEmpty()) return;
@@ -602,12 +631,14 @@ public class VoiceOverTranslationPatch {
 
     /**
      * Returns a speech rate multiplier that fits {@code speechDurationMs} into {@code availableMs}.
-     * Never slows below normal speed and is capped by the user-configured max rate.
+     * Never slows below normal speed and is capped by a hard upper bound to keep speech intelligible.
+     * The user controls timing flexibility via {@code VOT_TIMING_FLEXIBILITY_MS}, which widens the
+     * segment window so this method rarely needs to push the rate high.
      */
     private static float calculateSpeechRate(long speechDurationMs, long availableMs) {
-        final float maxRate = Settings.VOT_MAX_SPEECH_RATE.get() / 10.0f;
-        if (availableMs <= 0) return maxRate;
-        return Math.max(MIN_SPEECH_RATE, Math.min(maxRate, speechDurationMs / (float) availableMs));
+        if (availableMs <= 0) return MAX_SPEECH_RATE_HARD_CAP;
+        return Math.max(MIN_SPEECH_RATE,
+                Math.min(MAX_SPEECH_RATE_HARD_CAP, speechDurationMs / (float) availableMs));
     }
 
     private static long getSpeechDurationMs(TranscriptSegment seg, int index, String voice, String lang) {

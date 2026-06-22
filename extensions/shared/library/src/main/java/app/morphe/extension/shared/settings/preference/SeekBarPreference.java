@@ -19,6 +19,8 @@ import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
+import androidx.annotation.Nullable;
+
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -35,9 +37,20 @@ import app.morphe.extension.shared.ui.Dim;
 @SuppressWarnings({"unused", "deprecation"})
 public class SeekBarPreference extends Preference {
 
-    public record SeekBarConfig(IntegerSetting setting, int min, int max, int step, String unit, int divisor) {
+    public record SeekBarConfig(IntegerSetting setting, int min, int max, int step,
+                                String unit, int divisor,
+                                @Nullable String minLabelKey,
+                                @Nullable String maxLabelKey) {
+        public SeekBarConfig(IntegerSetting setting, int min, int max, int step, String unit, int divisor) {
+            this(setting, min, max, step, unit, divisor, null, null);
+        }
         public SeekBarConfig(IntegerSetting setting, int min, int max, int step, String unit) {
-            this(setting, min, max, step, unit, 1);
+            this(setting, min, max, step, unit, 1, null, null);
+        }
+        /** Slider with text labels at the ends instead of numeric min/max. */
+        public SeekBarConfig(IntegerSetting setting, int min, int max, int step,
+                             String unit, String minLabelKey, String maxLabelKey) {
+            this(setting, min, max, step, unit, 1, minLabelKey, maxLabelKey);
         }
     }
 
@@ -133,7 +146,8 @@ public class SeekBarPreference extends Preference {
         seekRow.setGravity(Gravity.BOTTOM);
 
         TextView minLabel = new TextView(context);
-        minLabel.setText(formatValue(config.min, config));
+        minLabel.setText(config.minLabelKey != null
+                ? StringRef.str(config.minLabelKey) : formatValue(config.min, config));
         minLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         seekRow.addView(minLabel,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -146,7 +160,8 @@ public class SeekBarPreference extends Preference {
         seekRow.addView(seekCenter, centerParams);
 
         TextView maxLabel = new TextView(context);
-        maxLabel.setText(formatValue(config.max, config));
+        maxLabel.setText(config.maxLabelKey != null
+                ? StringRef.str(config.maxLabelKey) : formatValue(config.max, config));
         maxLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         seekRow.addView(maxLabel,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
