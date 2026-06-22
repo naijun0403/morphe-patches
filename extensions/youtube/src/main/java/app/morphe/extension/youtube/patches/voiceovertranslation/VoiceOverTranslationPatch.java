@@ -114,10 +114,6 @@ public class VoiceOverTranslationPatch {
     // Rough estimate of natural speech duration (~15 chars per second) used to
     // decide how much the TTS rate must be raised to fit the segment time slot.
     private static final float MIN_SPEECH_RATE = 1.0f;
-    // Max rate increase between consecutive utterances. One delayed segment then
-    // raises the pace gradually over a few sentences instead of jumping straight
-    // from normal speed to maximum. Slowing back down is applied immediately.
-    private static final float MAX_RATE_STEP_UP = 0.25f;
 
     public static final String TTS_ENGINE_SYSTEM = "system";
     private static final String VOT_ID_PREFIX = "vot_";
@@ -551,8 +547,6 @@ public class VoiceOverTranslationPatch {
             wasExplicitSeek = false;
         }
 
-//        final float rate = smoothRate(VideoInformation.getPlaybackSpeed() *
-//                calculateSpeechRate(speechDurationMs, availableMs));
         final float rate = calculateSpeechRate(speechDurationMs, availableMs);
         ttsEndVideoTimeMs = speakFromMs + (long) (speechDurationMs / rate);
 
@@ -622,18 +616,6 @@ public class VoiceOverTranslationPatch {
      */
     private static float calculateSpeechRate(String text, long availableMs) {
         return calculateSpeechRate((long) text.length() * TtsEngine.ESTIMATED_MS_PER_CHAR, availableMs);
-    }
-
-    /**
-     * Limits how much the rate may rise relative to the previous utterance, so a single
-     * stall does not produce a jarring jump to maximum speed - the pace catches up
-     * gradually instead. Decreases pass through unchanged.
-     */
-    private static float smoothRate(float targetRate) {
-        Utils.verifyOnMainThread();
-        final float rate = Math.min(targetRate, lastSpeechRate + MAX_RATE_STEP_UP);
-        lastSpeechRate = rate;
-        return rate;
     }
 
     /**
