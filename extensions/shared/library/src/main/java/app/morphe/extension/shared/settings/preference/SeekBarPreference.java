@@ -19,8 +19,6 @@ import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
-import androidx.annotation.Nullable;
-
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -145,8 +143,7 @@ public class SeekBarPreference extends Preference {
         seekRow.setGravity(Gravity.BOTTOM);
 
         TextView minLabel = new TextView(context);
-        minLabel.setText(config.minLabelKey != null
-                ? StringRef.str(config.minLabelKey) : formatValue(config.min, config));
+        minLabel.setText(formatValue(config.min, config));
         minLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         seekRow.addView(minLabel,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -159,8 +156,7 @@ public class SeekBarPreference extends Preference {
         seekRow.addView(seekCenter, centerParams);
 
         TextView maxLabel = new TextView(context);
-        maxLabel.setText(config.maxLabelKey != null
-                ? StringRef.str(config.maxLabelKey) : formatValue(config.max, config));
+        maxLabel.setText(formatValue(config.max, config));
         maxLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         seekRow.addView(maxLabel,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
