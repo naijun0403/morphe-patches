@@ -190,7 +190,7 @@ public class VoiceOverTranslationPatch {
             } else if (state == VideoState.ENDED) {
                 Logger.printDebug(() -> "Stopping TTS prefetch and abandoning ducking: " + state);
                 // Do not stop TTS to allow any currently playing TTS to finish.
-                VotOriginalVolumePatch.clearMultiplier();
+                VotOriginalVolumePatch.clearAudioMultiplier();
                 TtsPrefetcher.clear();
             }
             return kotlin.Unit.INSTANCE;
@@ -227,7 +227,7 @@ public class VoiceOverTranslationPatch {
      */
     public static void videoTimeChanged(long timeMs) {
         if (!Settings.VOT_ENABLED.get() || !sessionEnabled) {
-            VotOriginalVolumePatch.clearMultiplier();
+            VotOriginalVolumePatch.clearAudioMultiplier();
             return; // Feature or session disabled.
         }
         Utils.verifyOnMainThread();
@@ -322,9 +322,9 @@ public class VoiceOverTranslationPatch {
         // ttsEndVideoTimeMs keeps the duck alive while TTS speaks into the gap before the next
         // segment, preventing a brief volume flicker mid-utterance.
         if (ttsEngine.isSpeaking() || isTestSpeaking || timeMs < ttsEndVideoTimeMs) {
-            VotOriginalVolumePatch.setMultiplier(Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f);
+            VotOriginalVolumePatch.setAudioMultiplier(Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f);
         } else {
-            VotOriginalVolumePatch.clearMultiplier();
+            VotOriginalVolumePatch.clearAudioMultiplier();
         }
     }
 
@@ -377,7 +377,7 @@ public class VoiceOverTranslationPatch {
     public static void updateOriginalAudioMultiplier() {
         Utils.verifyOnMainThread();
         if (ttsEngine.isSpeaking() || isTestSpeaking) {
-            VotOriginalVolumePatch.setMultiplier(Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f);
+            VotOriginalVolumePatch.setAudioMultiplier(Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f);
         }
     }
 
@@ -585,7 +585,7 @@ public class VoiceOverTranslationPatch {
                 return;
             }
             updateTtsLanguage();
-            VotOriginalVolumePatch.setMultiplier(Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f);
+            VotOriginalVolumePatch.setAudioMultiplier(Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f);
             tts.setSpeechRate(rate * VideoInformation.getPlaybackSpeed());
             Bundle params = new Bundle();
             params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume);
@@ -595,7 +595,7 @@ public class VoiceOverTranslationPatch {
             return;
         }
 
-        VotOriginalVolumePatch.setMultiplier(Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f);
+        VotOriginalVolumePatch.setAudioMultiplier(Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f);
         byte[] cached = TtsCache.get(currentVideoId, index, voice, lang, seg.text);
         if (cached != null) {
             final long playbackId = ttsEngine.markBusy();
@@ -700,7 +700,7 @@ public class VoiceOverTranslationPatch {
                 return;
             }
             updateTtsLanguage();
-            VotOriginalVolumePatch.setMultiplier(Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f);
+            VotOriginalVolumePatch.setAudioMultiplier(Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f);
             Bundle params = new Bundle();
             params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume);
             tts.setSpeechRate(1.0f);
@@ -713,13 +713,13 @@ public class VoiceOverTranslationPatch {
         final String lang = resolveTargetLang();
         byte[] cached = TtsCache.get(TEST_VIDEO_ID, TEST_SEGMENT_INDEX, voiceId, lang, getTestString());
         if (cached != null) {
-            VotOriginalVolumePatch.setMultiplier(Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f);
+            VotOriginalVolumePatch.setAudioMultiplier(Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f);
             final long id = ttsEngine.markBusy();
             ttsEngine.play(cached, volume, id, () -> updateIsTestSpeaking(testId));
             return;
         }
 
-        VotOriginalVolumePatch.setMultiplier(Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f);
+        VotOriginalVolumePatch.setAudioMultiplier(Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f);
         ttsEngine.speak(getTestString(), voiceId, resolveTargetLang(), volume, () -> updateIsTestSpeaking(testId));
     }
 
@@ -785,7 +785,7 @@ public class VoiceOverTranslationPatch {
         float lastSpeechRate = MIN_SPEECH_RATE;
         lastSpokenIndex = -1;
         ttsEndVideoTimeMs = 0;
-        VotOriginalVolumePatch.clearMultiplier();
+        VotOriginalVolumePatch.clearAudioMultiplier();
     }
 
     /**

@@ -1,59 +1,77 @@
+/*
+ * Copyright 2026 Morphe.
+ * https://github.com/MorpheApp/morphe-patches
+ *
+ * See the included NOTICE file for GPLv3 §7(b) and §7(c) terms that apply to this code.
+ */
+
 @file:Suppress("SpellCheckingInspection")
 
 package app.morphe.patches.youtube.video.voiceovertranslation
 
 import app.morphe.patcher.Fingerprint
-import app.morphe.patcher.OpcodesFilter
+import app.morphe.patcher.InstructionLocation.MatchAfterWithin
+import app.morphe.patcher.anyInstruction
 import app.morphe.patcher.fieldAccess
 import app.morphe.patcher.methodCall
+import app.morphe.patcher.newInstance
+import app.morphe.patcher.opcode
+import app.morphe.patcher.string
 import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
 
-// AudioSink helper method that writes the cached volume to AudioTrack. Located in YouTube 21.21.80
-// as Lczz;->X()V. Used as a class anchor so AudioSinkSetVolumeFingerprint can target the same class.
-internal object AudioSinkApplyVolumeMethodFingerprint : Fingerprint(
+private object AudioSinkSetSpeedMethodFingerprint : Fingerprint(
     returnType = "V",
     parameters = listOf(),
     filters = listOf(
-        methodCall(
-            definingClass = "Landroid/media/AudioTrack;",
-            name = "setVolume",
-            parameters = listOf("F"),
-            returnType = "I",
+        methodCall("Landroid/media/PlaybackParams;->setSpeed(F)Landroid/media/PlaybackParams;"),
+        anyInstruction(
+            string("AudioTrackAudioOutput"),
+            string("DefaultAudioSink") // 20.21.37
         ),
-    ),
+        string("Failed to set playback params")
+    )
 )
 
-// Public AudioSink interface method setVolume(F)V. In YouTube 21.21.80 this is Lczz;->D(F)V with
-// the pattern: iget M; cmpl-float; if-eqz skip; iput M; invoke-direct X(); return-void.
 internal object AudioSinkSetVolumeFingerprint : Fingerprint(
-    classFingerprint = AudioSinkApplyVolumeMethodFingerprint,
+    classFingerprint = AudioSinkSetSpeedMethodFingerprint,
     accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.FINAL),
     returnType = "V",
     parameters = listOf("F"),
-    filters = OpcodesFilter.opcodesToFilters(
-        Opcode.IGET,
-        Opcode.CMPL_FLOAT,
-        Opcode.IF_EQZ,
-        Opcode.IPUT,
-        Opcode.INVOKE_DIRECT,
-        Opcode.RETURN_VOID,
-    ),
-)
-
-// AudioTrack wrapper constructor. In YouTube 21.21.80 this is Lczl;-><init>(Landroid/media/AudioTrack;...)V
-// which stores the AudioTrack in a final instance field via iput-object p1.
-internal object AudioTrackWrapperInitFingerprint : Fingerprint(
-    name = "<init>",
-    accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.CONSTRUCTOR),
-    returnType = "V",
     filters = listOf(
         fieldAccess(
-            opcode = Opcode.IPUT_OBJECT,
-            type = "Landroid/media/AudioTrack;",
+            definingClass = "this",
+            opcode = Opcode.IGET,
+            type = "F"
         ),
-    ),
-    custom = { methodDef, _ ->
-        methodDef.parameters.firstOrNull()?.type == "Landroid/media/AudioTrack;"
-    },
+        opcode(
+            opcode = Opcode.CMPL_FLOAT,
+            location = MatchAfterWithin(10)
+        ),
+        fieldAccess(
+            definingClass = "this",
+            opcode = Opcode.IPUT,
+            type = "F",
+            location = MatchAfterWithin(10)
+        ),
+        opcode(
+            opcode = Opcode.RETURN_VOID,
+            location = MatchAfterWithin(10)
+        )
+    )
+)
+
+internal object AudioTrackWrapperInitFingerprint : Fingerprint(
+    accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.CONSTRUCTOR),
+    returnType = "V",
+    parameters = listOf("Landroid/media/AudioTrack;"),
+    filters = listOf(
+        newInstance("Landroid/media/AudioTimestamp;"),
+        fieldAccess(
+            opcode = Opcode.IPUT_OBJECT,
+            definingClass = "this",
+            type = "Landroid/media/AudioTimestamp;",
+            location = MatchAfterWithin(5)
+        )
+    )
 )

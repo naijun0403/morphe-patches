@@ -11,10 +11,10 @@ import android.media.AudioTrack;
 
 import java.util.concurrent.atomic.AtomicReference;
 
+import app.morphe.extension.shared.Logger;
+
 /**
- * Multiplies the YouTube ExoPlayer audio sink volume by a runtime multiplier so the
- * voice-over translation can duck the original audio without relying on the system
- * AudioFocus negotiation (which is unreliable after Activity pause/resume).
+ * Multiplies the YouTube ExoPlayer audio sink volume by a specific multiplier.
  */
 @SuppressWarnings("unused")
 public final class VotOriginalVolumePatch {
@@ -28,23 +28,25 @@ public final class VotOriginalVolumePatch {
     }
 
     /**
-     * Bytecode hook injection point (Hook A).
+     * Injection point.
+     *
      * Invoked on entry of the AudioSink {@code setVolume(F)V} interface method that ExoPlayer
      * calls before writing volume to AudioTrack. Runs on the ExoPlayer audio thread.
      */
-    public static float applyMultiplier(float volume) {
+    public static float getAudioMultiplier(float volume) {
         float clamped = clamp01(volume);
         lastBaseVolume = clamped;
         return clamp01(clamped * currentMultiplier);
     }
 
     /**
-     * Bytecode hook injection point (Hook B).
+     * Injection point.
+     *
      * Invoked on construction of the AudioTrack wrapper so the active AudioTrack can be
      * volume-adjusted directly when the multiplier changes without waiting for ExoPlayer
      * to call {@code setVolume} again.
      */
-    public static void captureAudioTrack(AudioTrack track) {
+    public static void setAudioTrack(AudioTrack track) {
         if (track != null) lastAudioTrackRef.set(track);
     }
 
@@ -52,26 +54,31 @@ public final class VotOriginalVolumePatch {
      * Sets the ducking multiplier (0..1) and immediately applies it to the active AudioTrack.
      * Called from the main thread.
      */
-    public static void setMultiplier(float multiplier) {
-        float clamped = clamp01(multiplier);
+    public static void setAudioMultiplier(float multiplier) {
+        final float clamped = clamp01(multiplier);
         if (clamped == currentMultiplier) return;
         currentMultiplier = clamped;
         applyToActiveTrack();
     }
 
-    /** Resets the multiplier to 1.0 (original volume) and applies immediately. */
-    public static void clearMultiplier() {
-        setMultiplier(1.0f);
+    /**
+     * Resets the multiplier to 1.0 (original volume) and applies immediately.
+     */
+    public static void clearAudioMultiplier() {
+        setAudioMultiplier(1.0f);
     }
 
-    // Bypasses the AudioSink.setVolume skip-if-equal optimization so a multiplier change is
-    // audible without waiting for ExoPlayer to push a new volume value through D(F)V.
+    /**
+     * Bypasses the AudioSink.setVolume skip-if-equal optimization so a multiplier change is
+     * audible without waiting for ExoPlayer to push a new volume value through D(F)V.
+     */
     private static void applyToActiveTrack() {
         AudioTrack track = lastAudioTrackRef.get();
         if (track == null) return;
         try {
             track.setVolume(clamp01(lastBaseVolume * currentMultiplier));
-        } catch (Exception ignored) {
+        } catch (Exception ex) {
+            Logger.printDebug(() -> "AudioTrack setVolume failed", ex);
         }
     }
 }
