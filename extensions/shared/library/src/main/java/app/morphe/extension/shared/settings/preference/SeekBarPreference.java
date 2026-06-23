@@ -59,12 +59,6 @@ public class SeekBarPreference extends Preference {
         REGISTRY.put(config.setting.key, config);
     }
 
-    /** Returns the config registered for the given setting, or {@code null} if none. */
-    @Nullable
-    public static SeekBarConfig configFor(IntegerSetting setting) {
-        return REGISTRY.get(setting.key);
-    }
-
     public SeekBarPreference(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         super(context, attrs, defStyleAttr, defStyleRes);
         init();
@@ -203,28 +197,18 @@ public class SeekBarPreference extends Preference {
     }
 
     private static void updateLabel(TextView label, int value, SeekBarConfig config) {
-        label.setText(formatLabel(value, config));
-    }
-
-    public static String formatLabel(int value, SeekBarConfig config) {
-        if (config.valueLabelKeys != null) {
-            int progress = valueToProgress(config, value);
-            if (progress >= 0 && progress < config.valueLabelKeys.length) {
-                return StringRef.str(config.valueLabelKeys[progress]);
-            }
-        }
-        return formatValue(value, config);
+        label.setText(formatValue(value, config));
     }
 
     private static String formatValue(int value, SeekBarConfig config) {
         return String.format(Locale.ROOT, "%d%s", value, config.unit);
     }
 
-    public static int valueToProgress(SeekBarConfig config, int value) {
+    private static int valueToProgress(SeekBarConfig config, int value) {
         return (Math.max(config.min, Math.min(config.max, value)) - config.min) / config.step;
     }
 
-    public static int progressToValue(SeekBarConfig config, int progress) {
+    private static int progressToValue(SeekBarConfig config, int progress) {
         return config.min + progress * config.step;
     }
 }

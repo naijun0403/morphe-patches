@@ -52,8 +52,6 @@ import app.morphe.extension.shared.ResourceType;
 import app.morphe.extension.shared.ResourceUtils;
 import app.morphe.extension.shared.Utils;
 import app.morphe.extension.shared.settings.preference.CustomDialogListPreference;
-import app.morphe.extension.shared.settings.preference.SeekBarPreference;
-import app.morphe.extension.shared.settings.preference.SeekBarPreference.SeekBarConfig;
 import app.morphe.extension.shared.ui.CustomDialog;
 import app.morphe.extension.shared.ui.Dim;
 import app.morphe.extension.shared.ui.SheetBottomDialog;
@@ -133,8 +131,14 @@ public final class VotBottomSheet {
                     Settings.VOT_ORIGINAL_AUDIO_VOLUME.save(value);
                     VoiceOverTranslationPatch.updatePlaybackVolume();
                 }));
-        content.addView(makeTimingFlexibilityRow(context,
-                str("morphe_vot_timing_flexibility_title"), fg));
+        content.addView(makeRateSliderRow(context,
+                str("morphe_vot_timing_flexibility_title"),
+                Settings.VOT_TIMING_FLEXIBILITY_MS.get(),
+                fg,
+                value -> {
+                    Settings.VOT_TIMING_FLEXIBILITY_MS.save(value);
+                    VoiceOverTranslationPatch.recalculatePlaybackTimes();
+                }));
 
         root.addView(scroll);
         SheetBottomDialog.SlideDialog dialog =
@@ -595,19 +599,21 @@ public final class VotBottomSheet {
         return divider;
     }
 
-    private static LinearLayout makeTimingFlexibilityRow(Context context, String label, int fgColor) {
-        final SeekBarConfig config = SeekBarPreference.configFor(Settings.VOT_TIMING_FLEXIBILITY_MS);
-        if (config == null) {
-            throw new IllegalStateException(
-                    "VotBottomSheet: no SeekBarConfig registered for "
-                            + Settings.VOT_TIMING_FLEXIBILITY_MS.key);
-        }
+    // Timing flexibility slider range. Keep in sync with the matching SeekBarConfig
+    // registered in Settings so the dialog and bottom-sheet sliders cover the same range.
+    private static final int TIMING_FLEX_MIN_MS = 1000;
+    private static final int TIMING_FLEX_MAX_MS = 4000;
+    private static final int TIMING_FLEX_STEP_MS = 250;
+    private static final int TIMING_FLEX_STEPS =
+            (TIMING_FLEX_MAX_MS - TIMING_FLEX_MIN_MS) / TIMING_FLEX_STEP_MS;
 
+    private static LinearLayout makeRateSliderRow(Context context, String label, int storedValue,
+                                                   int fgColor, IntConsumer onChanged) {
         LinearLayout outer = new LinearLayout(context);
         outer.setOrientation(LinearLayout.VERTICAL);
         LinearLayout.LayoutParams outerParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        outerParams.setMargins(0, Dim.dp16, 0, 0);
+        outerParams.setMargins(0, Dim.dp8, 0, 0);
         outer.setLayoutParams(outerParams);
 
         TextView labelView = new TextView(context);
@@ -617,20 +623,19 @@ public final class VotBottomSheet {
         labelView.setTypeface(Typeface.DEFAULT_BOLD);
         outer.addView(labelView);
 
-        final int storedValue = Settings.VOT_TIMING_FLEXIBILITY_MS.get();
-
         TextView currentLabel = new TextView(context);
         currentLabel.setGravity(Gravity.CENTER);
-        currentLabel.setText(SeekBarPreference.formatLabel(storedValue, config));
+        currentLabel.setText(formatTimingFlex(storedValue));
         currentLabel.setTextColor(fgColor);
         currentLabel.setTextSize(14);
 
         SeekBar seekBar = new SeekBar(context);
-        seekBar.setMax((config.max() - config.min()) / config.step());
-        seekBar.setProgress(SeekBarPreference.valueToProgress(config, storedValue));
+        seekBar.setMax(TIMING_FLEX_STEPS);
+        seekBar.setProgress(msToProgress(storedValue));
         seekBar.getProgressDrawable().setColorFilter(new PorterDuffColorFilter(fgColor, PorterDuff.Mode.SRC_IN));
         seekBar.getThumb().setColorFilter(new PorterDuffColorFilter(fgColor, PorterDuff.Mode.SRC_IN));
 
+        // Center column: current value above, seekbar below.
         LinearLayout seekCenter = new LinearLayout(context);
         seekCenter.setOrientation(LinearLayout.VERTICAL);
         LinearLayout.LayoutParams currentParams = new LinearLayout.LayoutParams(
@@ -648,13 +653,11 @@ public final class VotBottomSheet {
         row.setMinimumHeight(Dim.dp48);
         outer.addView(row);
 
-        if (config.minLabelKey() != null) {
-            TextView minLabel = new TextView(context);
-            minLabel.setText(str(config.minLabelKey()));
-            minLabel.setTextColor(fgColor);
-            minLabel.setTextSize(14);
-            row.addView(minLabel);
-        }
+        TextView fastLabel = new TextView(context);
+        fastLabel.setText(str("morphe_vot_timing_flexibility_fast"));
+        fastLabel.setTextColor(fgColor);
+        fastLabel.setTextSize(14);
+        row.addView(fastLabel);
 
         LinearLayout.LayoutParams centerParams = new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
@@ -662,22 +665,19 @@ public final class VotBottomSheet {
         centerParams.setMarginEnd(Dim.dp8);
         row.addView(seekCenter, centerParams);
 
-        if (config.maxLabelKey() != null) {
-            TextView maxLabel = new TextView(context);
-            maxLabel.setText(str(config.maxLabelKey()));
-            maxLabel.setTextColor(fgColor);
-            maxLabel.setTextSize(14);
-            row.addView(maxLabel);
-        }
+        TextView slowLabel = new TextView(context);
+        slowLabel.setText(str("morphe_vot_timing_flexibility_slow"));
+        slowLabel.setTextColor(fgColor);
+        slowLabel.setTextSize(14);
+        row.addView(slowLabel);
 
         seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
                 if (fromUser) {
-                    final int value = SeekBarPreference.progressToValue(config, progress);
-                    currentLabel.setText(SeekBarPreference.formatLabel(value, config));
-                    Settings.VOT_TIMING_FLEXIBILITY_MS.save(value);
-                    VoiceOverTranslationPatch.recalculatePlaybackTimes();
+                    final int ms = progressToMs(progress);
+                    currentLabel.setText(formatTimingFlex(ms));
+                    onChanged.accept(ms);
                 }
             }
             @Override public void onStartTrackingTouch(SeekBar bar) { }
@@ -687,13 +687,26 @@ public final class VotBottomSheet {
         return outer;
     }
 
+    private static String formatTimingFlex(int ms) {
+        return String.format(Locale.ROOT, "%dms", ms);
+    }
+
+    private static int msToProgress(int ms) {
+        final int clamped = Math.max(TIMING_FLEX_MIN_MS, Math.min(TIMING_FLEX_MAX_MS, ms));
+        return (clamped - TIMING_FLEX_MIN_MS) / TIMING_FLEX_STEP_MS;
+    }
+
+    private static int progressToMs(int progress) {
+        return TIMING_FLEX_MIN_MS + progress * TIMING_FLEX_STEP_MS;
+    }
+
     private static LinearLayout makeSliderRow(Context context, String label, int initialValue,
                                                int fgColor, IntConsumer onChanged) {
         LinearLayout outer = new LinearLayout(context);
         outer.setOrientation(LinearLayout.VERTICAL);
         LinearLayout.LayoutParams outerParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        outerParams.setMargins(0, Dim.dp16, 0, 0);
+        outerParams.setMargins(0, Dim.dp8, 0, 0);
         outer.setLayoutParams(outerParams);
 
         TextView labelView = new TextView(context);

@@ -686,15 +686,6 @@ public class Settings extends SharedYouTubeSettings {
         SeekBarPreference.register(new SeekBarConfig(VOT_ORIGINAL_AUDIO_VOLUME,
                 0, 100, 5, "%"));
         SeekBarPreference.register(new SeekBarConfig(VOT_TIMING_FLEXIBILITY_MS,
-                1000, 4000, 750,
-                "morphe_vot_timing_flexibility_fast",
-                "morphe_vot_timing_flexibility_slow",
-                new String[]{
-                        "morphe_vot_timing_flexibility_fastest",
-                        "morphe_vot_timing_flexibility_faster",
-                        "morphe_vot_timing_flexibility_default",
-                        "morphe_vot_timing_flexibility_slower",
-                        "morphe_vot_timing_flexibility_slowest",
-                }));
+                1000, 4000, 250, "ms"));
     }
 }
