@@ -94,8 +94,6 @@ public final class TranscriptSegment {
                 ", endMs=" + endMs +
                 ", playbackStartMs=" + playbackStartMs +
                 ", playbackEndMs=" + playbackEndMs +
-                ", durationMs=" + durationMs +
-                ", playbackRate=" + (durationMs > 0 ? (durationMs / (float) (playbackEndMs - playbackStartMs)) : 0) +
                 ", text='" + text + '\'' +
                 '}';
     }
