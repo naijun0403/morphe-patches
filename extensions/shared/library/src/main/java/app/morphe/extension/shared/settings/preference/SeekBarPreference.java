@@ -38,18 +38,9 @@ import app.morphe.extension.shared.ui.Dim;
 public class SeekBarPreference extends Preference {
 
     public record SeekBarConfig(IntegerSetting setting, int min, int max, int step,
-                                String unit,
-                                @Nullable String minLabelKey,
-                                @Nullable String maxLabelKey,
-                                @Nullable String[] valueLabelKeys) {
-        /** Plain slider showing the numeric value with the given unit suffix. */
+                                String unit, int divisor) {
         public SeekBarConfig(IntegerSetting setting, int min, int max, int step, String unit) {
-            this(setting, min, max, step, unit, null, null, null);
-        }
-        /** Slider that snaps to a fixed set of positions, each with its own label. */
-        public SeekBarConfig(IntegerSetting setting, int min, int max, int step,
-                             String minLabelKey, String maxLabelKey, String[] valueLabelKeys) {
-            this(setting, min, max, step, "", minLabelKey, maxLabelKey, valueLabelKeys);
+            this(setting, min, max, step, unit, 1);
         }
     }
 
@@ -151,8 +142,7 @@ public class SeekBarPreference extends Preference {
         seekRow.setGravity(Gravity.BOTTOM);
 
         TextView minLabel = new TextView(context);
-        minLabel.setText(config.minLabelKey != null
-                ? StringRef.str(config.minLabelKey) : formatValue(config.min, config));
+        minLabel.setText(formatValue(config.min, config));
         minLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         seekRow.addView(minLabel,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -165,8 +155,7 @@ public class SeekBarPreference extends Preference {
         seekRow.addView(seekCenter, centerParams);
 
         TextView maxLabel = new TextView(context);
-        maxLabel.setText(config.maxLabelKey != null
-                ? StringRef.str(config.maxLabelKey) : formatValue(config.max, config));
+        maxLabel.setText(formatValue(config.max, config));
         maxLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         seekRow.addView(maxLabel,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -207,17 +196,14 @@ public class SeekBarPreference extends Preference {
     }
 
     public static String formatLabel(int value, SeekBarConfig config) {
-        if (config.valueLabelKeys != null) {
-            int progress = valueToProgress(config, value);
-            if (progress >= 0 && progress < config.valueLabelKeys.length) {
-                return StringRef.str(config.valueLabelKeys[progress]);
-            }
-        }
         return formatValue(value, config);
     }
 
     private static String formatValue(int value, SeekBarConfig config) {
-        return String.format(Locale.ROOT, "%d%s", value, config.unit);
+        if (config.divisor == 1) {
+            return String.format(Locale.ROOT, "%d%s", value, config.unit);
+        }
+        return String.format(Locale.ROOT, "%.1f%s", (float) value / config.divisor, config.unit);
     }
 
     public static int valueToProgress(SeekBarConfig config, int value) {
