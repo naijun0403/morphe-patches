@@ -12,14 +12,14 @@ import androidx.annotation.NonNull;
 import java.util.Objects;
 
 public final class TranscriptSegment {
-    private final String lang;
-    private final String text;
-    private final long startMs;
-    private final long endMs;
+    public final String lang;
+    public final String text;
+    public final long startMs;
+    public final long endMs;
 
-    private volatile long playbackStartMs;
-    private volatile long playbackEndMs;
-    private volatile long durationMs;
+    public volatile long playbackStartMs;
+    public volatile long playbackEndMs;
+    public volatile long durationMs;
 
     public TranscriptSegment(long startMs, long endMs, String text, String lang) {
         this.startMs = startMs;
@@ -29,46 +29,6 @@ public final class TranscriptSegment {
         this.playbackStartMs = startMs;
         this.playbackEndMs = endMs;
         this.durationMs = -1;
-    }
-
-    public long startMs() {
-        return startMs;
-    }
-
-    public long endMs() {
-        return endMs;
-    }
-
-    public String text() {
-        return text;
-    }
-
-    public String lang() {
-        return lang;
-    }
-
-    public long playbackStartMs() {
-        return playbackStartMs;
-    }
-
-    public void setPlaybackStartMs(long playbackStartMs) {
-        this.playbackStartMs = playbackStartMs;
-    }
-
-    public long playbackEndMs() {
-        return playbackEndMs;
-    }
-
-    public void setPlaybackEndMs(long playbackEndMs) {
-        this.playbackEndMs = playbackEndMs;
-    }
-
-    public long durationMs() {
-        return durationMs;
-    }
-
-    public void setDurationMs(long durationMs) {
-        this.durationMs = durationMs;
     }
 
     @Override
@@ -88,12 +48,17 @@ public final class TranscriptSegment {
     @NonNull
     @Override
     public String toString() {
+        final long duration = durationMs;
+        final long playbackEnd = playbackEndMs;
+        final long playbackStart = playbackStartMs;
         return "TranscriptSegment{" +
                 "lang=" + lang +
                 ", startMs=" + startMs +
                 ", endMs=" + endMs +
-                ", playbackStartMs=" + playbackStartMs +
-                ", playbackEndMs=" + playbackEndMs +
+                ", playbackStartMs=" + playbackStart +
+                ", playbackEndMs=" + playbackEnd +
+                ", durationMs=" + duration +
+                ", playbackRate=" + (duration > 0 ? (duration / (float) (playbackEnd - playbackStart)) : 0) +
                 ", text='" + text + '\'' +
                 '}';
     }

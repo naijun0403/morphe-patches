@@ -160,7 +160,7 @@ public final class TranscriptTranslator {
         if (originals == null) return false;
         if (segmentIndex < 0 || segmentIndex >= originals.size()) return false;
         // Text already differs from the original - translated by a completed batch or a streamed line.
-        if (!currentText.equals(originals.get(segmentIndex).text())) return false;
+        if (!currentText.equals(originals.get(segmentIndex).text)) return false;
         List<List<TranscriptSegment>> batches = liveBatches;
         final boolean[] done = liveBatchDone;
         if (batches == null || done == null) return true;
@@ -372,7 +372,7 @@ public final class TranscriptTranslator {
         if (batchSize <= 1) return index;
         int splitAt = -1;
         for (int i = 0; i < batchSize; i++) {
-            if (batch.get(i).endMs() > timeMs) {
+            if (batch.get(i).endMs > timeMs) {
                 if (i > 0) splitAt = i;
                 break;
             }
@@ -399,7 +399,7 @@ public final class TranscriptTranslator {
         int chars = 0;
         int splitAt = 0;
         for (int i = 0; i < batchSize; i++) {
-            chars += batch.get(i).text().length() + 1;
+            chars += batch.get(i).text.length() + 1;
             splitAt = i + 1;
             if (chars >= OPENROUTER_FIRST_BATCH_CHARS) break;
         }
@@ -447,7 +447,7 @@ public final class TranscriptTranslator {
         for (int j = 0; j < limit; j++) {
             TranscriptSegment orig = batch.get(j);
             target.set(offset + j, new TranscriptSegment(
-                    orig.startMs(), orig.endMs(), translated.get(j), lang));
+                    orig.startMs, orig.endMs, translated.get(j), lang));
         }
     }
 
@@ -499,7 +499,7 @@ public final class TranscriptTranslator {
         final int batchesSize = batches.size();
         for (int i = 0; i < batchesSize; i++) {
             List<TranscriptSegment> batch = batches.get(i);
-            if (batch.get(batch.size() - 1).endMs() > timeMs) {
+            if (batch.get(batch.size() - 1).endMs > timeMs) {
                 return i;
             }
         }
@@ -512,7 +512,7 @@ public final class TranscriptTranslator {
         List<TranscriptSegment> batch = new ArrayList<>(segments.size());
         int chars = 0;
         for (TranscriptSegment seg : segments) {
-            final int len = seg.text().length() + 1;
+            final int len = seg.text.length() + 1;
             if (!batch.isEmpty() && chars + len > maxChars) {
                 batches.add(batch);
                 batch = new ArrayList<>();
@@ -615,7 +615,7 @@ public final class TranscriptTranslator {
         StringBuilder joined = new StringBuilder(100 * segments.size());
         for (TranscriptSegment seg : segments) {
             if (joined.length() > 0) joined.append('\n');
-            joined.append(seg.text());
+            joined.append(seg.text);
         }
 
         HttpURLConnection conn = (HttpURLConnection) new URL(TRANSLATE_URL + targetLang).openConnection();
@@ -666,7 +666,7 @@ public final class TranscriptTranslator {
         StringBuilder joined = new StringBuilder(100 * segments.size());
         for (TranscriptSegment seg : segments) {
             if (joined.length() > 0) joined.append('\n');
-            joined.append(seg.text());
+            joined.append(seg.text);
         }
 
         String source = TranscriptFetcher.lastSourceLang;
@@ -755,7 +755,7 @@ public final class TranscriptTranslator {
         StringBuilder joined = new StringBuilder();
         for (int i = 0, size = segments.size(); i < size; i++) {
             if (i > 0) joined.append('\n');
-            joined.append(i + 1).append(": ").append(segments.get(i).text());
+            joined.append(i + 1).append(": ").append(segments.get(i).text);
         }
 
         String targetLangName = Locale.forLanguageTag(targetLang).getDisplayLanguage(Locale.ENGLISH);
@@ -797,7 +797,7 @@ public final class TranscriptTranslator {
         }
 
         List<String> result = new ArrayList<>(segments.size());
-        for (TranscriptSegment seg : segments) result.add(seg.text());
+        for (TranscriptSegment seg : segments) result.add(seg.text);
         int[] matched = {0};
         // Full raw model output, kept so a positional fallback can run if numbered parsing fails.
         final StringBuilder rawOutput = new StringBuilder();

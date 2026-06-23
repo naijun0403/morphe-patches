@@ -282,30 +282,32 @@ public class VoiceOverTranslationPatch {
 
         for (int i = 0, size = segments.size(); i < size; i++) {
             TranscriptSegment seg = segments.get(i);
-            final long segPlaybackStartMs = seg.playbackStartMs();
-            if (timeMs >= segPlaybackStartMs && timeMs < seg.playbackEndMs()) {
-                if (i != lastSpokenIndex) {
-                    if (TranscriptTranslator.isAwaitingTranslationAt(i, seg.startMs(), seg.text())) {
-                        final int segIdx = i;
-                        Logger.printDebug(() -> "Waiting for translation at segment: " + segIdx);
-                        break;
+            final long segPlaybackStartMs = seg.playbackStartMs;
+            if (timeMs >= segPlaybackStartMs) {
+                if (timeMs < seg.playbackEndMs) {
+                    if (i != lastSpokenIndex) {
+                        if (TranscriptTranslator.isAwaitingTranslationAt(i, seg.startMs, seg.text)) {
+                            final int segIdx = i;
+                            Logger.printDebug(() -> "Waiting for translation at segment: " + segIdx);
+                            break;
+                        }
+                        // isAwaitingTranslationAt returns false once a batch is marked done, even if
+                        // translation failed and the segment kept its source-language text. Check lang
+                        // so a permanently untranslated segment is never spoken.
+                        if (TranscriptFetcher.isSpokenLanguageDifferent(resolveTargetLang(), seg.lang())) {
+                            final int segIdx = i;
+                            Logger.printDebug(() -> "Skipping untranslated segment: " + segIdx);
+                            break;
+                        }
+                        if (!ttsEngine.isSpeaking() || wasExplicitSeek) {
+                            lastSpokenIndex = i;
+                            Logger.printDebug(() -> "Found segment: " + lastSpokenIndex
+                                    + " videoTime: " + timeMs);
+                            speak(seg, i);
+                        }
                     }
-                    // isAwaitingTranslationAt returns false once a batch is marked done, even if
-                    // translation failed and the segment kept its source-language text. Check lang
-                    // so a permanently untranslated segment is never spoken.
-                    if (TranscriptFetcher.isSpokenLanguageDifferent(resolveTargetLang(), seg.lang())) {
-                        final int segIdx = i;
-                        Logger.printDebug(() -> "Skipping untranslated segment: " + segIdx);
-                        break;
-                    }
-                    if (!ttsEngine.isSpeaking() || wasExplicitSeek) {
-                        lastSpokenIndex = i;
-                        Logger.printDebug(() -> "Found segment: " + lastSpokenIndex
-                                + " videoTime: " + timeMs);
-                        speak(seg, i);
-                    }
+                    break;
                 }
-                break;
             } else if (i > lastSpokenIndex && segPlaybackStartMs > timeMs
                     && segPlaybackStartMs <= timeMs + lookaheadMs) {
                 // Next segment starts between now and the next update to this method.
@@ -358,8 +360,8 @@ public class VoiceOverTranslationPatch {
     public static void resetPlaybackState() {
         Utils.verifyOnMainThread();
         for (TranscriptSegment seg : segments) {
-            seg.setPlaybackStartMs(seg.startMs());
-            seg.setPlaybackEndMs(seg.endMs());
+            seg.setPlaybackStartMs(seg.startMs);
+            seg.setPlaybackEndMs(seg.endMs);
             seg.setDurationMs(-1);
         }
         TtsPrefetcher.triggerRescan();
@@ -427,9 +429,8 @@ public class VoiceOverTranslationPatch {
                                 // re-speak it with the translated text on the next tick.
                                 if (lastSpokenIndex >= 0
                                         && lastSpokenIndex < segments.size()
-                                        && lastSpokenIndex < updated.size()
-                                        && !segments.get(lastSpokenIndex).text()
-                                        .equals(updated.get(lastSpokenIndex).text())) {
+                                        && lastSpokenIndex < updated.size() && !segments.get(lastSpokenIndex).text
+                                        .equals(updated.get(lastSpokenIndex).text)) {
                                     stopTts();
                                 }
                                 segments = updated;
@@ -549,8 +550,8 @@ public class VoiceOverTranslationPatch {
         String voice = resolveVoice(lang);
         if (voice == null) return;
 
-        final long speakFromMs = Math.max(lastVideoTimeMs, seg.playbackStartMs());
-        final long availableMs = seg.playbackEndMs() - speakFromMs;
+        final long speakFromMs = Math.max(lastVideoTimeMs, seg.playbackStartMs);
+        final long availableMs = seg.playbackEndMs - speakFromMs;
 
         // Exact if cached, otherwise estimated from char count.
         final long speechDurationMs = getSpeechDurationMs(seg, index, voice, lang);
@@ -558,7 +559,7 @@ public class VoiceOverTranslationPatch {
         // Calculate if we should seek into the audio (e.g. after a short seek within segment).
         long startTimeMs = 0;
         if (wasExplicitSeek) {
-            final long timeIntoSegment = lastVideoTimeMs - seg.playbackStartMs();
+            final long timeIntoSegment = lastVideoTimeMs - seg.playbackStartMs;
             if (timeIntoSegment > SEEK_INTO_THRESHOLD_MS) {
                 // Approximate audio position. Ideally we'd use the speech rate, but since rate is
                 // baked into SSML for Edge, we assume normal speed. The TTS clip is usually shorter
@@ -590,12 +591,12 @@ public class VoiceOverTranslationPatch {
             params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume);
             final long id = ttsEngine.markBusy();
             // System TTS doesn't support seekTo, so it will always play from the start.
-            tts.speak(seg.text(), TextToSpeech.QUEUE_FLUSH, params, VOT_ID_PREFIX + id);
+            tts.speak(seg.text, TextToSpeech.QUEUE_FLUSH, params, VOT_ID_PREFIX + id);
             return;
         }
 
         VotOriginalVolumePatch.setMultiplier(Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f);
-        byte[] cached = TtsCache.get(currentVideoId, index, voice, lang, seg.text());
+        byte[] cached = TtsCache.get(currentVideoId, index, voice, lang, seg.text);
         if (cached != null) {
             final long playbackId = ttsEngine.markBusy();
             ttsEngine.play(cached, volume, rate, startTimeMs, playbackId,
@@ -604,7 +605,7 @@ public class VoiceOverTranslationPatch {
         }
 
         // Edge synthesis doesn't support seeking during synthesis; play() will seek the result.
-        ttsEngine.speak(seg.text(), voice, lang, volume, rate, startTimeMs,
+        ttsEngine.speak(seg.text, voice, lang, volume, rate, startTimeMs,
                 VoiceOverTranslationPatch::triggerNextSegmentCheck);
     }
 
@@ -629,10 +630,10 @@ public class VoiceOverTranslationPatch {
     private static long getSpeechDurationMs(TranscriptSegment seg, int index, String voice, String lang) {
         long duration = seg.durationMs();
         if (duration <= 0) {
-            duration = TtsCache.getDuration(currentVideoId, index, voice, lang, seg.text());
+            duration = TtsCache.getDuration(currentVideoId, index, voice, lang, seg.text);
             if (duration > 0) seg.setDurationMs(duration);
         }
-        return duration > 0 ? duration : (long) seg.text().length() * TtsEngine.ESTIMATED_MS_PER_CHAR;
+        return duration > 0 ? duration : (long) seg.text.length() * TtsEngine.ESTIMATED_MS_PER_CHAR;
     }
 
     /**
@@ -658,7 +659,7 @@ public class VoiceOverTranslationPatch {
         boolean insideSameSegment = false;
         if (lastSpokenIndex >= 0 && lastSpokenIndex < segments.size()) {
             TranscriptSegment seg = segments.get(lastSpokenIndex);
-            if (lastVideoTimeMs >= seg.playbackStartMs() && lastVideoTimeMs < seg.playbackEndMs()) {
+            if (lastVideoTimeMs >= seg.playbackStartMs && lastVideoTimeMs < seg.playbackEndMs) {
                 insideSameSegment = true;
             }
         }

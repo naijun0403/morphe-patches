@@ -169,7 +169,7 @@ final class TtsPrefetcher {
             } else {
                 final int delay;
                 synchronized (lock) {
-                    final long distanceMs = Math.abs(next.seg.startMs() - timeMs);
+                    final long distanceMs = Math.abs(next.seg.startMs - timeMs);
                     if (currentBackoffMs > 0) {
                         delay = currentBackoffMs;
                     } else if (distanceMs <= DISTANCE_IMMEDIATE_MS) {
@@ -250,14 +250,14 @@ final class TtsPrefetcher {
         // Priority 1: Future segments, closest first.
         for (int i = 0; i < segmentsSize; i++) {
             TranscriptSegment seg = segments.get(i);
-            if (seg.startMs() >= timeMs) {
+            if (seg.startMs >= timeMs) {
                 if (firstFutureIndex == segmentsSize) {
                     firstFutureIndex = i;
                 }
                 // A failed translation batch leaves segments in the source language; skip them
                 // so we don't cache source-language TTS while the user expects the target language.
-                if (TranscriptFetcher.isSpokenLanguageDifferent(lang, seg.lang())) continue;
-                if (TtsCache.notCached(videoId, i, voice, lang, seg.text())) {
+                if (TranscriptFetcher.isSpokenLanguageDifferent(lang, seg.lang)) continue;
+                if (TtsCache.notCached(videoId, i, voice, lang, seg.text)) {
                     return new NextFetch(i, i - firstFutureIndex, seg);
                 }
             }
@@ -266,8 +266,8 @@ final class TtsPrefetcher {
         // Priority 2: Past segments (for loops/seeks), closest to playhead first.
         for (int i = firstFutureIndex - 1; i >= 0; i--) {
             TranscriptSegment seg = segments.get(i);
-            if (TranscriptFetcher.isSpokenLanguageDifferent(lang, seg.lang())) continue;
-            if (TtsCache.notCached(videoId, i, voice, lang, seg.text())) {
+            if (TranscriptFetcher.isSpokenLanguageDifferent(lang, seg.lang)) continue;
+            if (TtsCache.notCached(videoId, i, voice, lang, seg.text)) {
                 return new NextFetch(i, firstFutureIndex - i, seg);
             }
         }
@@ -279,11 +279,11 @@ final class TtsPrefetcher {
                                  int totalSegments, String voice, String lang) {
         try {
             final long start = System.currentTimeMillis();
-            final byte[] data = engine.prefetch(seg.text(), voice, lang);
+            final byte[] data = engine.prefetch(seg.text, voice, lang);
             if (data.length > 0) {
-                TtsCache.put(videoId, index, voice, lang, seg.text(), data);
+                TtsCache.put(videoId, index, voice, lang, seg.text, data);
                 final long durationMs = TtsEngine.mp3DurationMs(data.length);
-                seg.setDurationMs(durationMs);
+                seg.durationMs = durationMs;
                 engine.adjustPlaybackTimes(currentSegments, index,
                         VoiceOverTranslationPatch.getLastSpokenIndex(),
                         videoId, voice, lang);
@@ -291,8 +291,8 @@ final class TtsPrefetcher {
                 Logger.printDebug(() -> "prefetched TTS: " + videoId
                         + " segment: " + index + "/" + totalSegments + " fetchTime: "
                         + (System.currentTimeMillis() - start) + "ms text: "
-                        + (seg.text().length() > textSubstringLength ? seg.text()
-                        .substring(0, textSubstringLength).concat("...") : seg.text()));
+                        + (seg.text.length() > textSubstringLength ? seg.text
+                        .substring(0, textSubstringLength).concat("...") : seg.text));
                 return true;
             }
             return false;

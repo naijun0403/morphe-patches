@@ -331,11 +331,11 @@ final class TtsEngine {
 
         // Find contiguous block
         int startIdx = index;
-        while (startIdx > 0 && segments.get(startIdx).startMs() == segments.get(startIdx - 1).endMs()) {
+        while (startIdx > 0 && segments.get(startIdx).startMs == segments.get(startIdx - 1).endMs) {
             startIdx--;
         }
         int endIdx = index;
-        while (endIdx < segments.size() - 1 && segments.get(endIdx).endMs() == segments.get(endIdx + 1).startMs()) {
+        while (endIdx < segments.size() - 1 && segments.get(endIdx).endMs == segments.get(endIdx + 1).startMs) {
             endIdx++;
         }
 
@@ -347,27 +347,29 @@ final class TtsEngine {
 
         // Calculate total spoken duration
         long totalSpokenMs = 0;
-        final long originalDurationMs = segments.get(endIdx).endMs() - segments.get(startIdx).startMs();
+        final long originalDurationMs = segments.get(endIdx).endMs - segments.get(startIdx).startMs;
 
         for (int i = startIdx; i <= endIdx; i++) {
             TranscriptSegment s = segments.get(i);
             long duration = s.durationMs();
             if (duration <= 0) {
-                duration = TtsCache.getDuration(videoId, i, voice, lang, s.text());
+                duration = TtsCache.getDuration(videoId, i, voice, lang, s.text);
                 if (duration > 0) s.setDurationMs(duration);
             }
             if (duration <= 0) {
-                duration = s.text().length() * ESTIMATED_MS_PER_CHAR;
+                duration = s.text.length() * ESTIMATED_MS_PER_CHAR;
             }
             totalSpokenMs += duration;
         }
 
         // Calculate limits
-        final long originalStart = segments.get(startIdx).startMs();
-        final long originalEnd = segments.get(endIdx).endMs();
+        final long originalStart = segments.get(startIdx).startMs;
+        final long originalEnd = segments.get(endIdx).endMs;
 
-        final long gapStart = (startIdx > 0) ? segments.get(startIdx - 1).endMs() : 0;
-        final long gapEnd = (endIdx < segments.size() - 1) ? segments.get(endIdx + 1).startMs() : Long.MAX_VALUE;
+        final long gapStart;
+        gapStart = startIdx > 0 ? segments.get(startIdx - 1).endMs : 0;
+        final long gapEnd;
+        gapEnd = endIdx < segments.size() - 1 ? segments.get(endIdx + 1).startMs : Long.MAX_VALUE;
 
         // Available expansion at start is half the gap to the previous non-contiguous segment
         final long maxExpandStart = Math.min(PLAYBACK_ADJUST_LIMIT_MS, (originalStart - gapStart) / 2);
@@ -403,10 +405,10 @@ final class TtsEngine {
             TranscriptSegment s = segments.get(i);
             long spoken = s.durationMs();
             if (spoken <= 0) {
-                spoken = TtsCache.getDuration(videoId, i, voice, lang, s.text());
+                spoken = TtsCache.getDuration(videoId, i, voice, lang, s.text);
                 if (spoken > 0) s.setDurationMs(spoken);
             }
-            if (spoken <= 0) spoken = s.text().length() * ESTIMATED_MS_PER_CHAR;
+            if (spoken <= 0) spoken = s.text.length() * ESTIMATED_MS_PER_CHAR;
 
             s.setPlaybackStartMs(currentPos);
             final long segmentWindow;
@@ -415,8 +417,8 @@ final class TtsEngine {
             } else {
                 final long idealEnd = currentPos + (long) (totalWindow * (spoken / (double) totalSpokenMs));
                 // Clamp every boundary to respect the drift limit
-                long clampedEnd = Math.max(s.endMs() - PLAYBACK_ADJUST_LIMIT_MS,
-                        Math.min(s.endMs() + PLAYBACK_ADJUST_LIMIT_MS, idealEnd));
+                long clampedEnd = Math.max(s.endMs - PLAYBACK_ADJUST_LIMIT_MS,
+                        Math.min(s.endMs + PLAYBACK_ADJUST_LIMIT_MS, idealEnd));
                 // Ensure monotonicity
                 clampedEnd = Math.max(currentPos, Math.min(newEnd, clampedEnd));
                 segmentWindow = clampedEnd - currentPos;

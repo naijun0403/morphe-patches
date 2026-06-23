@@ -293,14 +293,14 @@ final class TranscriptFetcher {
             TranscriptSegment cur = lines.get(i);
             TranscriptSegment next = lines.get(i + 1);
 
-            final long curEndMs = cur.endMs();
-            final long nextStartMs = next.startMs();
+            final long curEndMs = cur.endMs;
+            final long nextStartMs = next.startMs;
             if (curEndMs > nextStartMs) {
-                lines.set(i, new TranscriptSegment(cur.startMs(), nextStartMs, cur.text(), cur.lang()));
+                lines.set(i, new TranscriptSegment(cur.startMs, nextStartMs, cur.text, cur.lang));
             } else if (nextStartMs - curEndMs <= CLOSE_GAP_THRESHOLD_MS) {
                 final long mid = (curEndMs + nextStartMs) / 2;
-                lines.set(i, new TranscriptSegment(cur.startMs(), mid, cur.text(), cur.lang()));
-                lines.set(i + 1, new TranscriptSegment(mid, next.endMs(), next.text(), next.lang()));
+                lines.set(i, new TranscriptSegment(cur.startMs, mid, cur.text, cur.lang));
+                lines.set(i + 1, new TranscriptSegment(mid, next.endMs, next.text, next.lang));
             }
         }
 
@@ -324,19 +324,19 @@ final class TranscriptFetcher {
         for (int i = 0, size = lines.size(); i < size; i++) {
             TranscriptSegment line = lines.get(i);
             if (text.length() == 0) {
-                startMs = line.startMs();
-                sentenceLang = line.lang();
+                startMs = line.startMs;
+                sentenceLang = line.lang;
             } else {
                 text.append(' ');
             }
-            text.append(line.text());
-            endMs = line.endMs();
+            text.append(line.text);
+            endMs = line.endMs;
 
             boolean flush;
             if (i == size - 1) {
                 flush = true;
             } else {
-                final long gap = lines.get(i + 1).startMs() - endMs;
+                final long gap = lines.get(i + 1).startMs - endMs;
                 if (punctuated) {
                     flush = endsSentence(text)
                             || text.length() >= MAX_SENTENCE_CHARS
@@ -344,7 +344,7 @@ final class TranscriptFetcher {
                 } else {
                     flush = gap > UNPUNCTUATED_GAP_MS
                             || (gap > UNPUNCTUATED_SOFT_GAP_MS
-                            && startsWithUpperCase(lines.get(i + 1).text()))
+                            && startsWithUpperCase(lines.get(i + 1).text))
                             || text.length() >= MAX_UNPUNCTUATED_CHARS;
                 }
 
@@ -387,7 +387,7 @@ final class TranscriptFetcher {
     private static boolean detectPunctuation(List<TranscriptSegment> lines) {
         int punctuatedLines = 0;
         for (TranscriptSegment line : lines) {
-            String t = line.text();
+            String t = line.text;
             for (int i = 0, len = t.length(); i < len; i++) {
                 final char c = t.charAt(i);
                 if (c == '.' || c == '!' || c == '?') {
