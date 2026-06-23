@@ -72,7 +72,7 @@ final class TtsEngine {
 
     public static final long ESTIMATED_MS_PER_CHAR = 65;
     // TODO: Allow changing this with a setting of low/medium/high?
-    public final long PLAYBACK_ADJUST_LIMIT_MS = 2500;
+    public final long SEGMENT_START_END_MAX_MOVEMENT_FROM_ORIGINAL_MS = 4000;
 
     // All fields below (except synthesisLock related) must be accessed ONLY on the main thread.
     private boolean stopped;
@@ -396,9 +396,9 @@ final class TtsEngine {
         gapEnd = endIdx < segments.size() - 1 ? segments.get(endIdx + 1).startMs : Long.MAX_VALUE;
 
         // Available expansion at start is half the gap to the previous non-contiguous segment
-        final long maxExpandStart = Math.min(PLAYBACK_ADJUST_LIMIT_MS, (originalStart - gapStart) / 2);
+        final long maxExpandStart = Math.min(SEGMENT_START_END_MAX_MOVEMENT_FROM_ORIGINAL_MS, (originalStart - gapStart) / 2);
         // Available expansion at end is half the gap to the next non-contiguous segment
-        final long maxExpandEnd = Math.min(PLAYBACK_ADJUST_LIMIT_MS, (gapEnd - originalEnd) / 2);
+        final long maxExpandEnd = Math.min(SEGMENT_START_END_MAX_MOVEMENT_FROM_ORIGINAL_MS, (gapEnd - originalEnd) / 2);
 
         long limitStart = originalStart - maxExpandStart;
         long limitEnd = originalEnd + maxExpandEnd;
@@ -441,8 +441,8 @@ final class TtsEngine {
             } else {
                 final long idealEnd = currentPos + (long) (totalWindow * (spoken / (double) totalSpokenMs));
                 // Clamp every boundary to respect the drift limit
-                long clampedEnd = Math.max(s.endMs - PLAYBACK_ADJUST_LIMIT_MS,
-                        Math.min(s.endMs + PLAYBACK_ADJUST_LIMIT_MS, idealEnd));
+                long clampedEnd = Math.max(s.endMs - SEGMENT_START_END_MAX_MOVEMENT_FROM_ORIGINAL_MS,
+                        Math.min(s.endMs + SEGMENT_START_END_MAX_MOVEMENT_FROM_ORIGINAL_MS, idealEnd));
                 // Ensure monotonicity
                 clampedEnd = Math.max(currentPos, Math.min(newEnd, clampedEnd));
                 segmentWindow = clampedEnd - currentPos;
