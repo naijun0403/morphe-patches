@@ -618,8 +618,8 @@ public final class VotBottomSheet {
         row.addView(labelView);
 
         SeekBar seekBar = new SeekBar(context);
-        seekBar.setMax(15);
-        seekBar.setProgress(storedValue - 10);
+        seekBar.setMax(10);
+        seekBar.setProgress(storedValue - 15);
         seekBar.getProgressDrawable().setColorFilter(new PorterDuffColorFilter(fgColor, PorterDuff.Mode.SRC_IN));
         seekBar.getThumb().setColorFilter(new PorterDuffColorFilter(fgColor, PorterDuff.Mode.SRC_IN));
         LinearLayout.LayoutParams seekParams = new LinearLayout.LayoutParams(
