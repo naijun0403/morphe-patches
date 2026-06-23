@@ -342,8 +342,10 @@ Verify the package name is correct and the app is installed"</string>
     <string name="morphe_vot_enabled_title">Voice over translation</string>
     <string name="morphe_vot_caption_language_title">Language</string>
     <string name="morphe_vot_translation_service_title">Translation provider</string>
-    <string name="morphe_vot_original_audio_volume_title">Voice volume</string>
-    <string name="morphe_vot_original_audio_volume_summary">Adjust the dubbed voice volume relative to the original audio (0 is silent, 100 is full volume)</string>
+    <string name="morphe_vot_original_audio_volume_title">Original audio volume</string>
+    <string name="morphe_vot_original_audio_volume_summary">Volume of the original YouTube audio while the translation is speaking</string>
+    <string name="morphe_vot_translation_volume_title">Translation volume</string>
+    <string name="morphe_vot_translation_volume_summary">Volume of the dubbed translation voice</string>
     <string name="morphe_vot_max_speech_rate_title">Max speech rate</string>
     <string name="morphe_vot_max_speech_rate_summary">Maximum speed multiplier when fitting speech into a subtitle slot</string>
     <string name="morphe_vot_service_google" translatable="false">Google Translate</string>

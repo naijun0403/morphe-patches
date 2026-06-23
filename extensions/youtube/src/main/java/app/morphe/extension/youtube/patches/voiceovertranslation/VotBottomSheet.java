@@ -129,6 +129,14 @@ public final class VotBottomSheet {
                 fg,
                 value -> {
                     Settings.VOT_ORIGINAL_AUDIO_VOLUME.save(value);
+                    VoiceOverTranslationPatch.updateOriginalAudioMultiplier();
+                }));
+        content.addView(makeSliderRow(context,
+                str("morphe_vot_translation_volume_title"),
+                Settings.VOT_TRANSLATION_VOLUME.get(),
+                fg,
+                value -> {
+                    Settings.VOT_TRANSLATION_VOLUME.save(value);
                     VoiceOverTranslationPatch.updatePlaybackVolume();
                 }));
         content.addView(makeRateSliderRow(context,

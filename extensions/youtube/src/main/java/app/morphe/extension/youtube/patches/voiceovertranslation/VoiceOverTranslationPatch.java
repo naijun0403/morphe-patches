@@ -14,11 +14,8 @@ import static app.morphe.extension.youtube.patches.voiceovertranslation.Transcri
 
 import android.app.Activity;
 import android.app.Dialog;
-import android.content.Context;
 import android.content.Intent;
 import android.media.AudioAttributes;
-import android.media.AudioFocusRequest;
-import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.speech.tts.TextToSpeech;
@@ -149,20 +146,6 @@ public class VoiceOverTranslationPatch {
 
     private static Runnable onStateChangeCallback;
 
-    private static AudioManager audioManager;
-    // Kept as a field so abandonAudioFocus() uses the same listener instance as requestAudioFocus().
-    private static final AudioManager.OnAudioFocusChangeListener focusChangeListener = focusChange -> {
-        if (focusChange == AudioManager.AUDIOFOCUS_LOSS
-                || focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT
-                || focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK) {
-            Logger.printDebug(() -> "Ducking focus lost: " + focusChange);
-            abandonDuck();
-        }
-    };
-    private static AudioFocusRequest focusRequest;
-    private static volatile boolean isDucking;
-    private static volatile boolean duckDesired;
-
     private static TextToSpeech tts;
     private static boolean ttsReady;
 
@@ -207,7 +190,7 @@ public class VoiceOverTranslationPatch {
             } else if (state == VideoState.ENDED) {
                 Logger.printDebug(() -> "Stopping TTS prefetch and abandoning ducking: " + state);
                 // Do not stop TTS to allow any currently playing TTS to finish.
-                abandonDuck();
+                VotOriginalVolumePatch.clearMultiplier();
                 TtsPrefetcher.clear();
             }
             return kotlin.Unit.INSTANCE;
@@ -244,7 +227,7 @@ public class VoiceOverTranslationPatch {
      */
     public static void videoTimeChanged(long timeMs) {
         if (!Settings.VOT_ENABLED.get() || !sessionEnabled) {
-            updateDucking();
+            VotOriginalVolumePatch.clearMultiplier();
             return; // Feature or session disabled.
         }
         Utils.verifyOnMainThread();
@@ -336,8 +319,11 @@ public class VoiceOverTranslationPatch {
         }
         // ttsEndVideoTimeMs keeps the duck alive while TTS speaks into the gap before the next
         // segment, preventing a brief volume flicker mid-utterance.
-        duckDesired = ttsEngine.isSpeaking() || isTestSpeaking || timeMs < ttsEndVideoTimeMs;
-        updateDucking();
+        if (ttsEngine.isSpeaking() || isTestSpeaking || timeMs < ttsEndVideoTimeMs) {
+            VotOriginalVolumePatch.setMultiplier(Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f);
+        } else {
+            VotOriginalVolumePatch.clearMultiplier();
+        }
     }
 
     public static boolean isTranslationActive() {
@@ -382,7 +368,15 @@ public class VoiceOverTranslationPatch {
     /** Applies the current voice volume setting to the active playback. */
     public static void updatePlaybackVolume() {
         Utils.verifyOnMainThread();
-        ttsEngine.setVolume(Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f);
+        ttsEngine.setVolume(Settings.VOT_TRANSLATION_VOLUME.get() / 100.0f);
+    }
+
+    /** Re-applies the ducking multiplier so a Settings change takes effect immediately. */
+    public static void updateOriginalAudioMultiplier() {
+        Utils.verifyOnMainThread();
+        if (ttsEngine.isSpeaking() || isTestSpeaking) {
+            VotOriginalVolumePatch.setMultiplier(Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f);
+        }
     }
 
     public static void reloadTranscript() {
@@ -550,7 +544,7 @@ public class VoiceOverTranslationPatch {
         Utils.verifyOnMainThread();
         Logger.printDebug(() -> "Speak: " + seg);
         String lang = resolveTargetLang();
-        final float volume = Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f;
+        final float volume = Settings.VOT_TRANSLATION_VOLUME.get() / 100.0f;
 
         String voice = resolveVoice(lang);
         if (voice == null) return;
@@ -590,8 +584,7 @@ public class VoiceOverTranslationPatch {
                 return;
             }
             updateTtsLanguage();
-            requestDuck();
-            updateDucking();
+            VotOriginalVolumePatch.setMultiplier(Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f);
             tts.setSpeechRate(rate * VideoInformation.getPlaybackSpeed());
             Bundle params = new Bundle();
             params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume);
@@ -601,8 +594,7 @@ public class VoiceOverTranslationPatch {
             return;
         }
 
-        requestDuck();
-        updateDucking();
+        VotOriginalVolumePatch.setMultiplier(Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f);
         byte[] cached = TtsCache.get(currentVideoId, index, voice, lang, seg.text());
         if (cached != null) {
             final long playbackId = ttsEngine.markBusy();
@@ -698,7 +690,7 @@ public class VoiceOverTranslationPatch {
         isTestSpeaking = true;
         lastTestVoiceId = voiceId;
 
-        final float volume = Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f;
+        final float volume = Settings.VOT_TRANSLATION_VOLUME.get() / 100.0f;
 
         if (TTS_ENGINE_SYSTEM.equals(voiceId)) {
             ensureTts();
@@ -707,8 +699,7 @@ public class VoiceOverTranslationPatch {
                 return;
             }
             updateTtsLanguage();
-            requestDuck();
-            updateDucking();
+            VotOriginalVolumePatch.setMultiplier(Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f);
             Bundle params = new Bundle();
             params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume);
             tts.setSpeechRate(1.0f);
@@ -721,15 +712,13 @@ public class VoiceOverTranslationPatch {
         final String lang = resolveTargetLang();
         byte[] cached = TtsCache.get(TEST_VIDEO_ID, TEST_SEGMENT_INDEX, voiceId, lang, getTestString());
         if (cached != null) {
-            requestDuck();
-            updateDucking();
+            VotOriginalVolumePatch.setMultiplier(Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f);
             final long id = ttsEngine.markBusy();
             ttsEngine.play(cached, volume, id, () -> updateIsTestSpeaking(testId));
             return;
         }
 
-        requestDuck();
-        updateDucking();
+        VotOriginalVolumePatch.setMultiplier(Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f);
         ttsEngine.speak(getTestString(), voiceId, resolveTargetLang(), volume, () -> updateIsTestSpeaking(testId));
     }
 
@@ -795,67 +784,7 @@ public class VoiceOverTranslationPatch {
         float lastSpeechRate = MIN_SPEECH_RATE;
         lastSpokenIndex = -1;
         ttsEndVideoTimeMs = 0;
-        abandonDuck();
-    }
-
-    /**
-     * Requests transient audio focus with ducking so ExoPlayer (YouTube) receives
-     * AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK and reduces its media volume while TTS speaks.
-     * No-op if ducking is already active.
-     */
-    private static void requestDuck() {
-        Utils.verifyOnMainThread();
-        duckDesired = true;
-    }
-
-    /**
-     * Releases the transient audio focus so ExoPlayer restores its media volume.
-     * No-op if ducking is not active.
-     */
-    private static void abandonDuck() {
-        Utils.verifyOnMainThread();
-        duckDesired = false;
-    }
-
-    private static void updateDucking() {
-        Utils.verifyOnMainThread();
-        if (duckDesired == isDucking) return;
-
-        if (duckDesired) {
-            Logger.printDebug(() -> "ducking enabled");
-            if (focusRequest == null) {
-                focusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
-                        .setAudioAttributes(new AudioAttributes.Builder()
-                                .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
-                                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                                .build())
-                        .setWillPauseWhenDucked(false)
-                        .setOnAudioFocusChangeListener(focusChangeListener)
-                        .build();
-            }
-            final int result = getAudioManager().requestAudioFocus(focusRequest);
-            isDucking = result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
-            if (!isDucking) {
-                logError(() -> "Failed to request audio focus: " + result, null);
-            }
-        } else {
-            Logger.printDebug(() -> "ducking disabled");
-            isDucking = false;
-            if (audioManager == null) return;
-            if (focusRequest != null) {
-                Logger.printDebug(() -> "abandoning focus request");
-                audioManager.abandonAudioFocusRequest(focusRequest);
-                focusRequest = null;
-            }
-        }
-    }
-
-    private static AudioManager getAudioManager() {
-        Utils.verifyOnMainThread();
-        if (audioManager == null) {
-            audioManager = (AudioManager) Utils.getContext().getSystemService(Context.AUDIO_SERVICE);
-        }
-        return audioManager;
+        VotOriginalVolumePatch.clearMultiplier();
     }
 
     /**

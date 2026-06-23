@@ -65,6 +65,7 @@ val voiceOverTranslationPatch = bytecodePatch(
         playerOverlayButtonsHookPatch,
         legacyPlayerControlsPatch,
         voiceOverTranslationResourcePatch,
+        votOriginalVolumeBytecodePatch
     )
 
     compatibleWith(COMPATIBILITY_YOUTUBE)
