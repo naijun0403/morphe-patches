@@ -31,7 +31,6 @@ import java.util.Locale;
 import java.util.TimeZone;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
@@ -723,13 +722,9 @@ final class TtsEngine {
             }
         });
 
-        // Block background thread until playback finishes or is cancelled.
-        // If play() was cancelled before reaching runOnMainThread above, latch will already be 0.
-        final long timeoutMs = mp3DurationMs(mp3.length) + 10_000;
-        final boolean awaitSuccessful = latch.await(timeoutMs, TimeUnit.MILLISECONDS);
-        if (!awaitSuccessful) {
-            VoiceOverTranslationPatch.logError(() -> "Waited for latch but was not successful", null);
-        }
+        // Block until playback finishes or is canceled. A timeout can't bound playback time
+        // because the user can pause the video indefinitely.
+        latch.await();
 
         Utils.runOnMainThread(() -> {
             if (playLatch == latch) {
