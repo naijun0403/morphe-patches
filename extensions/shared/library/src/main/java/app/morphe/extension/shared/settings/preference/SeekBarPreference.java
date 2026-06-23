@@ -19,6 +19,8 @@ import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
+import androidx.annotation.Nullable;
+
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -36,18 +38,19 @@ import app.morphe.extension.shared.ui.Dim;
 public class SeekBarPreference extends Preference {
 
     public record SeekBarConfig(IntegerSetting setting, int min, int max, int step,
-                                String unit,
+                                String unit, int divisor,
                                 @Nullable String minLabelKey,
-                                @Nullable String maxLabelKey,
-                                @Nullable String[] valueLabelKeys) {
-        /** Plain slider showing the numeric value with the given unit suffix. */
-        public SeekBarConfig(IntegerSetting setting, int min, int max, int step, String unit) {
-            this(setting, min, max, step, unit, null, null, null);
+                                @Nullable String maxLabelKey) {
+        public SeekBarConfig(IntegerSetting setting, int min, int max, int step, String unit, int divisor) {
+            this(setting, min, max, step, unit, divisor, null, null);
         }
-        /** Slider that snaps to a fixed set of positions, each with its own label. */
+        public SeekBarConfig(IntegerSetting setting, int min, int max, int step, String unit) {
+            this(setting, min, max, step, unit, 1, null, null);
+        }
+        /** Slider with text labels at the ends instead of numeric min/max. */
         public SeekBarConfig(IntegerSetting setting, int min, int max, int step,
-                             String minLabelKey, String maxLabelKey, String[] valueLabelKeys) {
-            this(setting, min, max, step, "", minLabelKey, maxLabelKey, valueLabelKeys);
+                             String unit, String minLabelKey, String maxLabelKey) {
+            this(setting, min, max, step, unit, 1, minLabelKey, maxLabelKey);
         }
     }
 
@@ -143,7 +146,8 @@ public class SeekBarPreference extends Preference {
         seekRow.setGravity(Gravity.BOTTOM);
 
         TextView minLabel = new TextView(context);
-        minLabel.setText(formatValue(config.min, config));
+        minLabel.setText(config.minLabelKey != null
+                ? StringRef.str(config.minLabelKey) : formatValue(config.min, config));
         minLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         seekRow.addView(minLabel,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -156,7 +160,8 @@ public class SeekBarPreference extends Preference {
         seekRow.addView(seekCenter, centerParams);
 
         TextView maxLabel = new TextView(context);
-        maxLabel.setText(formatValue(config.max, config));
+        maxLabel.setText(config.maxLabelKey != null
+                ? StringRef.str(config.maxLabelKey) : formatValue(config.max, config));
         maxLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         seekRow.addView(maxLabel,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -197,7 +202,10 @@ public class SeekBarPreference extends Preference {
     }
 
     private static String formatValue(int value, SeekBarConfig config) {
-        return String.format(Locale.ROOT, "%d%s", value, config.unit);
+        if (config.divisor == 1) {
+            return String.format(Locale.ROOT, "%d%s", value, config.unit);
+        }
+        return String.format(Locale.ROOT, "%.1f%s", (float) value / config.divisor, config.unit);
     }
 
     private static int valueToProgress(SeekBarConfig config, int value) {
