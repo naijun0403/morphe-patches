@@ -142,10 +142,10 @@ public final class VotBottomSheet {
                     VoiceOverTranslationPatch.updatePlaybackVolume();
                 }));
         content.addView(makeSliderRow(context,
-                str("morphe_vot_max_speech_rate_title"),
-                Settings.VOT_MAX_SPEECH_RATE,
+                str("morphe_vot_max_queue_age_title"),
+                Settings.VOT_MAX_QUEUE_AGE,
                 fg,
-                Settings.VOT_MAX_SPEECH_RATE::save));
+                Settings.VOT_MAX_QUEUE_AGE::save));
 
         root.addView(scroll);
         SheetBottomDialog.SlideDialog dialog =
@@ -623,7 +623,7 @@ public final class VotBottomSheet {
         seekRow.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout.LayoutParams seekRowParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        seekRowParams.topMargin = Dim.dp8;
+        seekRowParams.topMargin = Dim.dp12;
         seekRow.setLayoutParams(seekRowParams);
 
         SeekBar seekBar = new SeekBar(context);
