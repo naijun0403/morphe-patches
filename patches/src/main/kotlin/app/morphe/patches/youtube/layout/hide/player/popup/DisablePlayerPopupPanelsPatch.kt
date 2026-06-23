@@ -33,7 +33,7 @@ val disablePlayerPopupPanelsPatch = bytecodePatch(
 
         StartVideoInformerFingerprint.method.addInstruction(
             0,
-            "invoke-static { }, $EXTENSION_CLASS->enablePlayerPopupPanelsBypass()V"
+            "invoke-static { }, $EXTENSION_CLASS->allowPlayerPopupPanelsBypass()V"
         )
 
         EngagementPanelControllerFingerprint.method.addInstructionsWithLabels(
