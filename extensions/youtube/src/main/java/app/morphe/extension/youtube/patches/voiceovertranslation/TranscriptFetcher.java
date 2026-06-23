@@ -231,7 +231,7 @@ final class TranscriptFetcher {
     // Minimum duration for a merged segment to avoid being skipped by the playback polling.
     private static final long MIN_SEGMENT_DURATION_MS = 2_000;
 
-    private static final Pattern BRACKETS_PATTERN = Pattern.compile("\\[[^\\]]*]");
+    private static final Pattern BRACKETS_PATTERN = Pattern.compile("\\[[^]]*]");
     private static final Pattern PARENTHESES_PATTERN = Pattern.compile("\\([^)]*\\)");
 
     // Heuristics for old ASR tracks that have no punctuation at all.
@@ -424,10 +424,8 @@ final class TranscriptFetcher {
             }
             // Heuristic for initials: "A.", "B.", etc.
             final int sLength = s.length();
-            if (sLength >= 3 && s.charAt(sLength - 2) == ' '
-                    && Character.isUpperCase(s.charAt(sLength - 3))) {
-                return false;
-            }
+            return sLength < 3 || s.charAt(sLength - 2) != ' '
+                    || !Character.isUpperCase(s.charAt(sLength - 3));
         }
         return true;
     }

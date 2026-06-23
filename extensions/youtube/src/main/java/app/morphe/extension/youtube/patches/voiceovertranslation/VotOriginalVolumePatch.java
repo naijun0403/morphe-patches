@@ -29,7 +29,7 @@ public final class VotOriginalVolumePatch {
 
     /**
      * Injection point.
-     *
+     * <p>
      * Invoked on entry of the AudioSink {@code setVolume(F)V} interface method that ExoPlayer
      * calls before writing volume to AudioTrack. Runs on the ExoPlayer audio thread.
      */
@@ -41,7 +41,7 @@ public final class VotOriginalVolumePatch {
 
     /**
      * Injection point.
-     *
+     * <p>
      * Invoked on construction of the AudioTrack wrapper so the active AudioTrack can be
      * volume-adjusted directly when the multiplier changes without waiting for ExoPlayer
      * to call {@code setVolume} again.

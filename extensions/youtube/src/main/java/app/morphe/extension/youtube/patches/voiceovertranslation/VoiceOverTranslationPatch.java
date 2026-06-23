@@ -308,8 +308,7 @@ public class VoiceOverTranslationPatch {
                     }
                     break;
                 }
-            } else if (i > lastSpokenIndex && segPlaybackStartMs > timeMs
-                    && segPlaybackStartMs <= timeMs + lookaheadMs) {
+            } else if (i > lastSpokenIndex && segPlaybackStartMs <= timeMs + lookaheadMs) {
                 // Next segment starts between now and the next update to this method.
                 // Schedule a call to recheck TTS playback when the segment will start.
                 final float speed = Math.max(0.1f, VideoInformation.getPlaybackSpeed());
