@@ -294,7 +294,7 @@ public class VoiceOverTranslationPatch {
                         // isAwaitingTranslationAt returns false once a batch is marked done, even if
                         // translation failed and the segment kept its source-language text. Check lang
                         // so a permanently untranslated segment is never spoken.
-                        if (TranscriptFetcher.isSpokenLanguageDifferent(resolveTargetLang(), seg.lang())) {
+                        if (TranscriptFetcher.isSpokenLanguageDifferent(resolveTargetLang(), seg.lang)) {
                             final int segIdx = i;
                             Logger.printDebug(() -> "Skipping untranslated segment: " + segIdx);
                             break;
@@ -359,9 +359,9 @@ public class VoiceOverTranslationPatch {
     public static void resetPlaybackState() {
         Utils.verifyOnMainThread();
         for (TranscriptSegment seg : segments) {
-            seg.setPlaybackStartMs(seg.startMs);
-            seg.setPlaybackEndMs(seg.endMs);
-            seg.setDurationMs(-1);
+            seg.playbackStartMs = seg.startMs;
+            seg.playbackEndMs = seg.endMs;
+            seg.durationMs = -1;
         }
         TtsPrefetcher.triggerRescan();
     }
@@ -627,10 +627,10 @@ public class VoiceOverTranslationPatch {
     }
 
     private static long getSpeechDurationMs(TranscriptSegment seg, int index, String voice, String lang) {
-        long duration = seg.durationMs();
+        long duration = seg.durationMs;
         if (duration <= 0) {
             duration = TtsCache.getDuration(currentVideoId, index, voice, lang, seg.text);
-            if (duration > 0) seg.setDurationMs(duration);
+            if (duration > 0) seg.durationMs = duration;
         }
         return duration > 0 ? duration : (long) seg.text.length() * TtsEngine.ESTIMATED_MS_PER_CHAR;
     }

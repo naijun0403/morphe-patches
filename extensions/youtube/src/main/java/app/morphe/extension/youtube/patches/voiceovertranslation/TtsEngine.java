@@ -11,6 +11,7 @@ import android.media.AudioAttributes;
 import android.media.MediaDataSource;
 import android.media.MediaPlayer;
 import android.media.PlaybackParams;
+import android.media.audiofx.LoudnessEnhancer;
 import android.util.Base64;
 
 import androidx.annotation.GuardedBy;
@@ -77,6 +78,14 @@ final class TtsEngine {
     private boolean stopped;
     private boolean speaking;
     private MediaPlayer currentPlayer;
+    /**
+     * Boosts TTS playback gain above MediaPlayer's 1.0 ceiling so Edge MP3 (normalized to ~-16 LUFS)
+     * matches YouTube media loudness (~-14 LUFS or louder). Null when no playback is active or when
+     * the device does not support {@link LoudnessEnhancer}.
+     */
+    private LoudnessEnhancer currentEnhancer;
+    /** Gain applied to TTS playback in millibels. +6 dB approximately doubles perceived loudness. */
+    private static final int TTS_GAIN_MILLIBELS = 600;
     private CountDownLatch playLatch;
     /** Tracks the active synthesis/playback session to prevent overlapping segments. */
     private long playbackId;
@@ -161,6 +170,7 @@ final class TtsEngine {
             } catch (Exception ex) {
                 VoiceOverTranslationPatch.logError(() -> "MediaPlayer stop failed in markBusy", ex);
             }
+            releaseEnhancerInternal();
             try {
                 currentPlayer.release();
             } catch (Exception ex) {
@@ -311,6 +321,7 @@ final class TtsEngine {
             } catch (Exception ex) {
                 VoiceOverTranslationPatch.logError(() -> "MediaPlayer stop failed", ex);
             }
+            releaseEnhancerInternal();
             try {
                 currentPlayer.release();
             } catch (Exception ex) {
@@ -318,6 +329,20 @@ final class TtsEngine {
             }
             currentPlayer = null;
         }
+    }
+
+    /**
+     * Releases the active {@link LoudnessEnhancer}. Must be called before releasing the MediaPlayer
+     * it was attached to, since the effect is bound to the player's audio session.
+     */
+    private void releaseEnhancerInternal() {
+        if (currentEnhancer == null) return;
+        try {
+            currentEnhancer.release();
+        } catch (Exception ex) {
+            Logger.printDebug(() -> "LoudnessEnhancer release failed", ex);
+        }
+        currentEnhancer = null;
     }
 
     /**
@@ -350,10 +375,10 @@ final class TtsEngine {
 
         for (int i = startIdx; i <= endIdx; i++) {
             TranscriptSegment s = segments.get(i);
-            long duration = s.durationMs();
+            long duration = s.durationMs;
             if (duration <= 0) {
                 duration = TtsCache.getDuration(videoId, i, voice, lang, s.text);
-                if (duration > 0) s.setDurationMs(duration);
+                if (duration > 0) s.durationMs = duration;
             }
             if (duration <= 0) {
                 duration = s.text.length() * ESTIMATED_MS_PER_CHAR;
@@ -402,14 +427,14 @@ final class TtsEngine {
 
         for (int i = startIdx; i <= endIdx; i++) {
             TranscriptSegment s = segments.get(i);
-            long spoken = s.durationMs();
+            long spoken = s.durationMs;
             if (spoken <= 0) {
                 spoken = TtsCache.getDuration(videoId, i, voice, lang, s.text);
-                if (spoken > 0) s.setDurationMs(spoken);
+                if (spoken > 0) s.durationMs = spoken;
             }
             if (spoken <= 0) spoken = s.text.length() * ESTIMATED_MS_PER_CHAR;
 
-            s.setPlaybackStartMs(currentPos);
+            s.playbackStartMs = currentPos;
             final long segmentWindow;
             if (i == endIdx) {
                 segmentWindow = newEnd - currentPos;
@@ -423,7 +448,7 @@ final class TtsEngine {
                 segmentWindow = clampedEnd - currentPos;
             }
             currentPos += segmentWindow;
-            s.setPlaybackEndMs(currentPos);
+            s.playbackEndMs = currentPos;
         }
     }
 
@@ -679,6 +704,16 @@ final class TtsEngine {
                         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                         .build());
                 mp.setVolume(volume, volume);
+                // Attach the boost as soon as the session is available so the first frames are not
+                // played at native loudness. Failure is non-fatal: the device falls back to 1.0 gain.
+                try {
+                    LoudnessEnhancer enhancer = new LoudnessEnhancer(mp.getAudioSessionId());
+                    enhancer.setTargetGain(TTS_GAIN_MILLIBELS);
+                    enhancer.setEnabled(true);
+                    currentEnhancer = enhancer;
+                } catch (Exception ex) {
+                    Logger.printDebug(() -> "LoudnessEnhancer attach failed", ex);
+                }
                 mp.setDataSource(new MediaDataSource() {
                     @Override
                     public int readAt(long position, byte[] buffer, int offset, int size) {
@@ -737,6 +772,7 @@ final class TtsEngine {
                 } catch (Exception ex) {
                     Logger.printDebug(() -> "MediaPlayer stop failed", ex);
                 }
+                releaseEnhancerInternal();
                 try {
                     mp.release();
                 } catch (Exception ex) {
