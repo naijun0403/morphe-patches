@@ -330,33 +330,48 @@ final class TtsEngine {
     }
 
     /**
-     * Adjusts playback times for a contiguous block of segments to fit the actual spoken audio.
+     * Adjusts playback times for a neighborhood of segments around the given index.
      */
     public void adjustPlaybackTimes(List<TranscriptSegment> segments, int index,
                                     int currentlyPlayingIndex,
                                     String videoId, String voice, String lang) {
         if (index < 0 || index >= segments.size()) return;
 
-        // Find contiguous block
+        // 1. Find neighborhood. Gaps < 5s are considered related for time-borrowing.
+        final long neighborhoodGapLimitMs = 5000;
         int startIdx = index;
-        while (startIdx > 0 && segments.get(startIdx).startMs() == segments.get(startIdx - 1).endMs()) {
+        while (startIdx > 0 && segments.get(startIdx).startMs() - segments.get(startIdx - 1).endMs() < neighborhoodGapLimitMs) {
             startIdx--;
         }
         int endIdx = index;
-        while (endIdx < segments.size() - 1 && segments.get(endIdx).endMs() == segments.get(endIdx + 1).startMs()) {
+        while (endIdx < segments.size() - 1 && segments.get(endIdx + 1).startMs() - segments.get(endIdx).endMs() < neighborhoodGapLimitMs) {
             endIdx++;
         }
 
-        // Skip while a segment in this block is mid-playback; shifting its boundaries
-        // out from under the player can desync audio or end it early.
-        if (currentlyPlayingIndex >= startIdx && currentlyPlayingIndex <= endIdx) {
-            return;
+        adjustPlaybackRange(segments, startIdx, endIdx, currentlyPlayingIndex, videoId, voice, lang);
+    }
+
+    /**
+     * Core logic to fit a range of segments into the available time window.
+     * Uses a proportional redistribution algorithm that averages the playback rate across
+     * the range while respecting a maximum drift limit for each segment boundary.
+     * Guaranteed to prevent overlapping playback windows.
+     */
+    public void adjustPlaybackRange(List<TranscriptSegment> segments, int startIdx, int endIdx,
+                                     int currentlyPlayingIndex,
+                                     String videoId, String voice, String lang) {
+        if (segments.isEmpty() || startIdx > endIdx) return;
+
+        // Avoid adjusting anything currently playing or already finished.
+        if (startIdx <= currentlyPlayingIndex) {
+            startIdx = currentlyPlayingIndex + 1;
         }
+        if (startIdx > endIdx) return;
 
-        // Calculate total spoken duration.
+        final long adjustLimitMs = playbackAdjustLimitMs();
+
+        // 1. Calculate total work (spoken duration + internal gaps) and original duration.
         long totalSpokenMs = 0;
-        final long originalDurationMs = segments.get(endIdx).endMs() - segments.get(startIdx).startMs();
-
         for (int i = startIdx; i <= endIdx; i++) {
             TranscriptSegment s = segments.get(i);
             long duration = s.durationMs();
@@ -364,74 +379,83 @@ final class TtsEngine {
                 duration = TtsCache.getDuration(videoId, i, voice, lang, s.text());
                 if (duration > 0) s.setDurationMs(duration);
             }
-            if (duration <= 0) {
-                duration = s.text().length() * ESTIMATED_MS_PER_CHAR;
-            }
+            if (duration <= 0) duration = s.text().length() * ESTIMATED_MS_PER_CHAR;
             totalSpokenMs += duration;
         }
 
-        // Calculate limits.
+        long totalInternalGapsMs = 0;
+        for (int i = startIdx; i < endIdx; i++) {
+            totalInternalGapsMs += Math.max(0, segments.get(i + 1).startMs() - segments.get(i).endMs());
+        }
+
+        final long totalWorkMs = totalSpokenMs + totalInternalGapsMs;
         final long originalStart = segments.get(startIdx).startMs();
         final long originalEnd = segments.get(endIdx).endMs();
+        final long originalDurationMs = originalEnd - originalStart;
 
-        final long gapStart = (startIdx > 0) ? segments.get(startIdx - 1).endMs() : 0;
-        final long gapEnd = (endIdx < segments.size() - 1) ? segments.get(endIdx + 1).startMs() : Long.MAX_VALUE;
+        // 2. Determine the available expansion window.
+        // We can move the start of the block earlier and the end of the block later.
+        final long boundaryGapMs = 10000;
+        final long gapBefore = (startIdx > 0) ? (segments.get(startIdx).startMs() - segments.get(startIdx - 1).endMs()) : boundaryGapMs;
+        final long gapAfter = (endIdx < segments.size() - 1) ? (segments.get(endIdx + 1).startMs() - segments.get(endIdx).endMs()) : boundaryGapMs;
 
-        final long adjustLimitMs = playbackAdjustLimitMs();
-        // Available expansion at start is half the gap to the previous non-contiguous segment.
-        final long maxExpandStart = Math.min(adjustLimitMs, (originalStart - gapStart) / 2);
-        // Available expansion at end is half the gap to the next non-contiguous segment.
-        final long maxExpandEnd = Math.min(adjustLimitMs, (gapEnd - originalEnd) / 2);
+        // Expansion is limited by the user setting AND the physical gap to neighbors.
+        final long maxExpandStart = Math.min(adjustLimitMs, Math.max(0, gapBefore));
+        final long maxExpandEnd = Math.min(adjustLimitMs, Math.max(0, gapAfter));
 
-        long limitStart = originalStart - maxExpandStart;
-        long limitEnd = originalEnd + maxExpandEnd;
-
-        // Expand block if needed.
         long newStart = originalStart;
         long newEnd = originalEnd;
 
-        if (totalSpokenMs > originalDurationMs) {
-            long needed = totalSpokenMs - originalDurationMs;
-
+        if (totalWorkMs > originalDurationMs) {
+            long needed = totalWorkMs - originalDurationMs;
             // Prefer end expansion.
-            final long expandEnd = Math.min(needed, limitEnd - originalEnd);
+            final long expandEnd = Math.min(needed, maxExpandEnd);
             newEnd += expandEnd;
             needed -= expandEnd;
-
             if (needed > 0) {
-                final long expandStart = Math.min(needed, originalStart - limitStart);
+                final long expandStart = Math.min(needed, maxExpandStart);
                 newStart -= expandStart;
             }
         }
 
-        // Redistribute internal boundaries.
-        long currentPos = newStart;
         final long totalWindow = newEnd - newStart;
+        // The effective rate multiplier for this block. 1.0 = natural speed.
+        // We divide the available window by the total natural work (speech + gaps).
+        final double rateMultiplier = (double) totalWindow / totalWorkMs;
+
+        // 3. Global Redistribution.
+        // We calculate each segment's position based on its natural offset from the block start,
+        // scaled by the neighborhood's average rate multiplier.
+        long naturalOffset = 0;
+        long minAllowedPos = (startIdx > 0) ? segments.get(startIdx - 1).playbackEndMs() : 0;
 
         for (int i = startIdx; i <= endIdx; i++) {
             TranscriptSegment s = segments.get(i);
             long spoken = s.durationMs();
-            if (spoken <= 0) {
-                spoken = TtsCache.getDuration(videoId, i, voice, lang, s.text());
-                if (spoken > 0) s.setDurationMs(spoken);
-            }
             if (spoken <= 0) spoken = s.text().length() * ESTIMATED_MS_PER_CHAR;
 
-            s.setPlaybackStartMs(currentPos);
-            final long segmentWindow;
-            if (i == endIdx) {
-                segmentWindow = newEnd - currentPos;
-            } else {
-                final long idealEnd = currentPos + (long) (totalWindow * (spoken / (double) totalSpokenMs));
-                // Clamp every boundary to respect the drift limit.
-                long clampedEnd = Math.max(s.endMs() - adjustLimitMs,
-                        Math.min(s.endMs() + adjustLimitMs, idealEnd));
-                // Ensure monotonicity.
-                clampedEnd = Math.max(currentPos, Math.min(newEnd, clampedEnd));
-                segmentWindow = clampedEnd - currentPos;
+            // Target boundaries based on perfectly averaged rate.
+            long targetStart = newStart + (long) (naturalOffset * rateMultiplier);
+            long targetEnd   = newStart + (long) ((naturalOffset + spoken) * rateMultiplier);
+
+            // Respect drift limits and previous segment end.
+            long clampedStart = Math.max(s.startMs() - adjustLimitMs,
+                    Math.min(s.startMs() + adjustLimitMs, targetStart));
+            clampedStart = Math.max(minAllowedPos, clampedStart);
+            s.setPlaybackStartMs(clampedStart);
+
+            long clampedEnd = Math.max(s.endMs() - adjustLimitMs,
+                    Math.min(s.endMs() + adjustLimitMs, targetEnd));
+            clampedEnd = Math.max(clampedStart, clampedEnd);
+            s.setPlaybackEndMs(clampedEnd);
+
+            minAllowedPos = clampedEnd;
+
+            // Advance natural timeline.
+            naturalOffset += spoken;
+            if (i < endIdx) {
+                naturalOffset += Math.max(0, segments.get(i + 1).startMs() - segments.get(i).endMs());
             }
-            currentPos += segmentWindow;
-            s.setPlaybackEndMs(currentPos);
         }
     }
 
