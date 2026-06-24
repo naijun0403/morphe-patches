@@ -131,6 +131,11 @@ public class VoiceOverTranslationPatch {
     private static long ttsEndVideoTimeMs;
     // Deduplicates lookahead wake-ups so a tight tick loop does not flood the main looper.
     private static long scheduledCheckForSegmentStartMs = -1;
+    // Tracks slot-fit rate and the playback speed in effect when the active utterance
+    // started, so a mid-utterance video speed change can be re-applied to MediaPlayer.
+    // lastAppliedPlaybackSpeed = -1 means nothing is playing.
+    private static float currentTtsBaseRate = 1.0f;
+    private static float lastAppliedPlaybackSpeed = -1f;
 
     private static List<TranscriptSegment> segments = new ArrayList<>();
     // Volatile so background threads can read the active segment without
@@ -244,6 +249,8 @@ public class VoiceOverTranslationPatch {
             return; // Feature or session disabled.
         }
         Utils.verifyOnMainThread();
+
+        propagatePlaybackSpeedIfChanged();
 
         PlayerType currentPlayerType = PlayerType.getCurrent();
         if (!currentPlayerType.isMaximizedOrFullscreen()
@@ -595,6 +602,8 @@ public class VoiceOverTranslationPatch {
         final long remainingSpeechMs = Math.max(0, speechDurationMs - startTimeMs);
         final float rate = calculateSpeechRate(remainingSpeechMs, availableMs);
         ttsEndVideoTimeMs = speakFromMs + (long) (remainingSpeechMs / rate);
+        currentTtsBaseRate = rate;
+        lastAppliedPlaybackSpeed = VideoInformation.getPlaybackSpeed();
 
         if (TTS_ENGINE_SYSTEM.equals(voice)) {
             ensureTts();
@@ -661,6 +670,19 @@ public class VoiceOverTranslationPatch {
                 videoTimeChanged(VideoInformation.getVideoTime());
             }
         });
+    }
+
+    /**
+     * Pushes a new MediaPlayer rate when video speed changes mid-utterance so the listener
+     * doesn't wait for the current one to finish. No-op for System TTS (Android TextToSpeech
+     * cannot change rate in-flight; the next utterance picks up the new value).
+     */
+    private static void propagatePlaybackSpeedIfChanged() {
+        if (lastAppliedPlaybackSpeed < 0) return;
+        final float current = VideoInformation.getPlaybackSpeed();
+        if (current == lastAppliedPlaybackSpeed) return;
+        lastAppliedPlaybackSpeed = current;
+        ttsEngine.setPlaybackRate(currentTtsBaseRate * current);
     }
 
     /**
@@ -834,6 +856,8 @@ public class VoiceOverTranslationPatch {
         lastSpokenIndex = -1;
         ttsEndVideoTimeMs = 0;
         scheduledCheckForSegmentStartMs = -1;
+        currentTtsBaseRate = 1.0f;
+        lastAppliedPlaybackSpeed = -1f;
         VotOriginalVolumePatch.clearAudioMultiplier();
     }
 

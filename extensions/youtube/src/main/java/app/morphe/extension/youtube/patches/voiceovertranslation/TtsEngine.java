@@ -292,6 +292,17 @@ final class TtsEngine {
         }
     }
 
+    /** Updates the active MediaPlayer's rate in place. No-op if there is no active player. */
+    void setPlaybackRate(float rate) {
+        Utils.verifyOnMainThread();
+        if (currentPlayer == null) return;
+        try {
+            currentPlayer.setPlaybackParams(new PlaybackParams().setSpeed(rate));
+        } catch (Exception ex) {
+            VoiceOverTranslationPatch.logError(() -> "MediaPlayer setPlaybackRate failed", ex);
+        }
+    }
+
     /** Stops any in-progress synthesis or playback immediately. */
     void stop() {
         Utils.verifyOnMainThread();
