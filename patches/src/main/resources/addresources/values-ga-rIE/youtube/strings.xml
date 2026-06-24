@@ -234,6 +234,7 @@ I measc na n-athruithe tá:
   <string name="morphe_hide_keyword_content_home_title">Folaigh físeáin Baile de réir eochairfhocail</string>
   <string name="morphe_hide_keyword_content_search_title">Folaigh torthaí cuardaigh de réir eochairfhocail</string>
   <string name="morphe_hide_keyword_content_subscriptions_title">Folaigh físeáin Síntiúis de réir eochairfhocail</string>
+  <string name="morphe_hide_keyword_content_comments_title">Folaigh tuairimí de réir eochairfhocail</string>
   <string name="morphe_hide_keyword_content_phrases_title">Eochairfhocail le cur i bhfolach</string>
   <!-- For localization, it is preferred, but not required, if 'LeBlanc' is replaced with a localized name or a familiar word that has upper case letters in the middle of the word.
          This is because keywords can be in any language, and showing an example in the localized script helps convey this. -->
@@ -243,12 +244,12 @@ Is féidir le heochairfhocail a bheith in aon téacs a thaispeántar i dteidil f
 
 Ní mór focail a bhfuil litreacha móra sa lár acu a bheith ag teacht go díreach (m.sh.: iPhone, TikTok, LeBlanc)"</string>
   <string name="morphe_hide_keyword_content_about_title">Maidir le scagadh eochairfhocal</string>
-  <string name="morphe_hide_keyword_content_about_summary">"Baile / Síntiúis / Déantar torthaí cuardaigh a scagadh chun ábhar a mheaitseálann frásaí eochairfhocail a cheilt
+  <string name="morphe_hide_keyword_content_about_summary">"Baile / Síntiúis / Cuardaigh / Déantar tráchtanna a scagadh chun ábhar a mheaitseálann frásaí eochairfhocail a cheilt
 
 Teorainneacha:
-• Ní féidir Shorts a chur i bhfolach de réir ainm cainéil
-• Ní fhéadfar cuid de chomhpháirteanna UI a chur i bhfolach
-• D'fhéadfadh gan aon torthaí a thaispeáint má chuirtear cuardach ar fhocal eochair"</string>
+• Ní féidir gearrscannáin a cheilt de réir ainm an chainéil
+• Seans nach mbeidh roinnt comhpháirteanna den Chomhéadan Úsáideora i bhfolach
+• Seans nach dtaispeánfar aon torthaí nuair a chuardaítear eochairfhocal"</string>
   <string name="morphe_hide_keyword_content_about_whole_words_title">Meaitseáil focail iomlána</string>
   <!-- Translations must use a localized example. For languages that do not use spaces between words (Chinese, Japanese, etc.) the English AI example should be used since no localized examples exist. Or if using machine translations, or if nobody wants to think of a localized example, then the English 'ai' example should be left as-is. -->
   <string name="morphe_hide_keyword_content_about_whole_words_summary">Má bhaineann tú eochairfhocal/frása le comharthaí athfhriotail dhúbailte, cuirfear cosc ​​ar mheaitseáil pháirteach de theidil físeáin agus ainmneacha cainéal&lt;br&gt;&lt;br&gt;Mar shampla,&lt;br&gt;&lt;b&gt;\"ai\"&lt;/b&gt; ceilteoidh sé an físeán: &lt;b&gt;Conas a oibríonn AI?&lt;/b&gt;&lt;br&gt;ach ní cheiltfidh sé: &lt;b&gt;Cad is brí le hainm féinig?&lt;/b&gt;</string>
@@ -470,6 +471,8 @@ Nóta: Mura bhfuil 'Sruthanna físe bréige' cumasaithe, d'fhéadfadh sé seo io
   <string name="morphe_hide_stop_ads_button_title">Folaigh an cnaipe \'Stop fógraí\'</string>
   <!-- Button does not have any text and is only shown as an icon, and only when the video information area is collapsed to a compact state. -->
   <string name="morphe_hide_comments_button_title">Cnaipe Folaigh Tráchtanna</string>
+  <!-- 'Connect' should be translated using the same localized wording YouTube displays for the button. -->
+  <string name="morphe_hide_connect_button_title">Folaigh an cnaipe Connect</string>
   <!-- 'Report' should be translated using the same localized wording YouTube displays for the button.
           This button usually appears on live streamed videos. -->
   <string name="morphe_hide_report_button_title">Cnaipe Folaigh Tuairisc</string>
@@ -494,6 +497,7 @@ Nóta: Mura bhfuil 'Sruthanna físe bréige' cumasaithe, d'fhéadfadh sé seo io
   <string name="morphe_hide_shop_button_title">Folaigh cnaipe Siopa</string>
   <!-- 'Save' should be translated using the same localized wording YouTube displays for the button. -->
   <string name="morphe_hide_save_button_title">Folaigh an cnaipe Sábháil</string>
+  <string name="morphe_hide_more_button_title">Folaigh cnaipe More</string>
   <string name="morphe_fullscreen_buttons">Cnaipí lánscáileáin</string>
   <string name="morphe_hide_quick_actions_title">Folaigh barra gníomhaíochta</string>
   <string name="morphe_hide_quick_actions_ask_button_title">Folaigh an cnaipe Iarr</string>
@@ -579,6 +583,7 @@ Chun rochtain a fháil ar Socruithe, cumasaigh an cnaipe Socruithe trí Ghinear�
   <string name="morphe_toolbar_screen_title">Barra Uirlisí</string>
   <string name="morphe_toolbar_screen_summary">Roghnaigh cé na comhpháirteanna a thaispeántar sa bharra uirlisí</string>
   <string name="morphe_hide_toolbar_cast_button_title">Folaigh an cnaipe Cast</string>
+  <string name="morphe_hide_toolbar_chat_button_title">Folaigh cnaipe Comhrá</string>
   <string name="morphe_hide_toolbar_create_button_title">Folaigh an cnaipe Cruthaigh</string>
   <string name="morphe_hide_toolbar_microphone_button_title">Folaigh an cnaipe Micreafón</string>
   <string name="morphe_hide_toolbar_notification_button_title">Folaigh an cnaipe Fógraí</string>
@@ -734,13 +739,16 @@ Socruithe → Athsheinm (nó Uathsheinm) → Uathsheinm an chéad fhíseán eile
   <string name="morphe_exit_fullscreen_entry_3">Tírdhreach amháin</string>
   <string name="morphe_exit_fullscreen_entry_4">Portráid agus tírdhreach</string>
   <!-- layout.player.fullscreen.disableFullscreenGesturesPatch -->
-  <string name="morphe_disable_fullscreen_gestures_title">gesteanna lánscáileáin</string>
-  <string name="morphe_disable_fullscreen_gestures_summary">gothaí an peataigh chun dul isteach nó imeacht as mód lánscáileáin</string>
-  <string name="morphe_disable_fullscreen_pulled_up_gesture_title">Díchumasaigh gotha ​​svaidhpeáil ardaithe portráide</string>
-  <string name="morphe_disable_fullscreen_sliding_down_gesture_title">Díchumasaigh gotha ​​svaidhpeáil síos portráid</string>
-  <string name="morphe_disable_fullscreen_dragged_down_gesture_title">Díchumasaigh gotha ​​tarraingt síos tírdhreach</string>
-  <!-- layout.player.fullscreen.openVideosFullscreen -->
-  <string name="morphe_open_videos_fullscreen_portrait_title">Oscail físeáin i bportráid lánscáileáin</string>
+  <string name="morphe_disable_fullscreen_gestures_title">Gothaí lánscáileáin</string>
+  <string name="morphe_disable_fullscreen_gestures_summary">Gothaí imreora chun dul isteach nó imeacht as mód lánscáileáin</string>
+  <string name="morphe_disable_fullscreen_pulled_up_gesture_title">Díchumasaigh gotha ​​svaidhpeála suas portráide</string>
+  <string name="morphe_disable_fullscreen_sliding_down_gesture_title">Díchumasaigh gotha ​​svaidhpeála síos portráide</string>
+  <string name="morphe_disable_fullscreen_dragged_down_gesture_title">Díchumasaigh gotha ​​svaidhpeála tírdhreacha</string>
+  <!-- layout.player.fullscreen.openVideosFullscreenPatch -->
+  <string name="morphe_open_videos_fullscreen_title">Oscail físeáin i mód lánscáileáin</string>
+  <string name="morphe_open_videos_fullscreen_entry_1">Díchumasaithe</string>
+  <string name="morphe_open_videos_fullscreen_entry_2">Portráid</string>
+  <string name="morphe_open_videos_fullscreen_entry_3">Tírdhreach</string>
   <!-- layout.player.overlay.customPlayerOverlayOpacityPatch -->
   <string name="morphe_player_overlay_opacity_title">Teimhneacht fhorleagan imreora</string>
   <string name="morphe_player_overlay_opacity_summary">Coigeartaigh an leibhéal trédhearcachta (is é 0 trédhearcach, is é 100 teimhneach)</string>
@@ -1016,22 +1024,25 @@ Mura bhfuil buaicphointe á chur isteach agat, tapáil Cealaigh agus marcáil an
   <string name="morphe_change_form_factor_entry_2">Guthán</string>
   <string name="morphe_change_form_factor_entry_3">Táibléad</string>
   <string name="morphe_change_form_factor_entry_4">Gluaisteán</string>
-  <string name="morphe_change_form_factor_user_dialog_message">"Áirítear leis na hathruithe:
+  <string name="morphe_change_form_factor_user_dialog_message">"I measc na n-athruithe tá:
 
-Leagan amach táibléid
+Leagan amach táibléad
 • Tá poist phobail i bhfolach
-• Níl an socrú athsheinm i bhfothaí ar fáil
-• Níl an cnaipe athmheasctha ná an cnaipe fuaime ar fáil i Shorts
-• Níl an barra gníomhaíochta físe fillte
+• Níl fáil ar athsheinm i socrú fothaí
+• Níl an cnaipe Remix agus an cnaipe Fuaim ar fáil i Shorts
+• Taispeántar seanbharra gníomhaíochta físeáin nár thit
 
 Leagan amach na ngluaisteán
-• Tá an fotha eagraithe de réir topaicí agus bealaí
-• Níl an socrú athsheinm i bhfothaí ar fáil
-• Níl an cnaipe athmheasctha ná an cnaipe fuaime ar fáil i Shorts
-• Oscail Shorts sa ghnáthimreoir
-• Níl an barra gníomhaíochta físe fillte"</string>
+• Eagraítear beathú de réir topaicí agus cainéil
+• Níl fáil ar athsheinm i socrú fothaí
+• Níl an cnaipe Remix agus an cnaipe Fuaim ar fáil i Shorts
+• Osclaítear shorts san imreoir rialta
+• Taispeántar seanbharra gníomhaíochta físeáin nár thit"</string>
   <string name="morphe_tablet_layout_in_player_title">Cumasaigh leagan amach táibléid sa seinnteoir</string>
-  <string name="morphe_tablet_layout_in_player_summary">Athchóiríonn sé leagan amach an imreoir sean</string>
+  <!-- "Restore old video action bar" must be translated the same as morphe_restore_old_video_action_bar_title -->
+  <string name="morphe_tablet_layout_in_player_summary">"Athchóiríonn sé leagan amach sean-imreoir
+
+Teorainneacha: Má tá ‘Athchóirigh seanbharra gníomhaíochta na bhfíseán’ múchta, seans nach mbeidh forleagan ‘Tuilleadh físeáin’ ar fáil"</string>
   <!-- layout.spoofappversion.spoofAppVersionPatch -->
   <string name="morphe_spoof_app_version_title">Leagan aip bréige</string>
   <string name="morphe_spoof_app_version_summary">Meallann sé an freastalaí le go gceapfá go bhfuil tú ag úsáid seanleagan den aip chun gnéithe oidhreachta den chomhéadan úsáideora a athbhunú.</string>
@@ -1289,4 +1300,9 @@ D’fhéadfadh sé go mbeadh stad nó go gcaillfí frámaí ag athsheinm físe l
   <string name="morphe_spoof_video_streams_about_no_force_original_audio">• Níl an fuaim bhunaidh iallach ar fáil</string>
   <string name="morphe_spoof_video_streams_player_js_variant_title">Leagan JavaScript an imreora</string>
   <string name="morphe_spoof_video_streams_stats_for_nerds_title">Taispeáin spoofáil i Staitisticí do nerds</string>
+  <!-- misc.fix.videoactionbar.restoreOldVideoActionBarPatch -->
+  <string name="morphe_restore_old_video_action_bar_title">Athchóirigh an seanbharra gníomhaíochta físeáin</string>
+  <string name="morphe_restore_old_video_action_bar_summary">"Ní thaitnítear le ceartúcháin agus ní féidir cnaipí gnímh físeáin a chur i bhfolach
+
+Teorainneacha: Filltear ar fhorleagan sean-stíl 'Tuilleadh físeáin'"</string>
 </resources>
