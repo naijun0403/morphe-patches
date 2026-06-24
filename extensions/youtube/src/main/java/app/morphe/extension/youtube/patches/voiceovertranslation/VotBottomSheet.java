@@ -60,6 +60,11 @@ import app.morphe.extension.shared.ui.SheetBottomDialog;
 import app.morphe.extension.youtube.settings.Settings;
 import app.morphe.extension.youtube.shared.PipDismissHelper;
 
+/**
+ * Builds the VoT bottom-sheet UI shown from the player overlay button: caption language,
+ * translation service, TTS engine/voice, plus sliders for volumes and speech rate cap.
+ * Sub-pickers (language, voice, service) slide up over this sheet as separate dialogs.
+ */
 public final class VotBottomSheet {
 
     private static final int DRAWABLE_CHEVRON_RIGHT = ResourceUtils.getIdentifier(

@@ -29,6 +29,12 @@ import app.morphe.extension.shared.innertube.utils.AuthUtils;
 import app.morphe.extension.shared.requests.Requester;
 import app.morphe.extension.youtube.patches.CaptionCookiesPatch;
 
+/**
+ * Pulls the video's caption track (Innertube preferred, direct timedtext as fallback),
+ * parses the JSON3 payload into line-level segments, merges those into sentence-sized
+ * chunks suitable for TTS, and delegates translation to {@link TranscriptTranslator}
+ * when the source language differs from the user's target.
+ */
 final class TranscriptFetcher {
 
     private static final int CONNECT_TIMEOUT_MS = 10_000;
@@ -60,14 +66,14 @@ final class TranscriptFetcher {
         return segments;
     }
 
+    /**
+     * @return true if {@code source} needs translation to reach {@code target}. Portuguese
+     * is region-sensitive (pt-BR != pt-PT); other languages match on the base subtag.
+     */
     public static boolean isSpokenLanguageDifferent(String target, String source) {
         if (target == null || source == null) return true;
-        if (target.equalsIgnoreCase(source)) return false; // Direct match (handles pt-BR == pt-BR)
-
-        // If Portuguese but didn't match directly above, the regions are different (e.g., pt-BR != pt-PT)
+        if (target.equalsIgnoreCase(source)) return false;
         if (target.startsWith("pt-")) return true;
-
-        // For everything else, strip the region and compare base languages (e.g., en-US == en-GB)
         return !VoiceCatalog.getIso639(target).equalsIgnoreCase(VoiceCatalog.getIso639(source));
     }
 

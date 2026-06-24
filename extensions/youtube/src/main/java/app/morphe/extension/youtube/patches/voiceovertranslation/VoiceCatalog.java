@@ -18,8 +18,11 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Maps language codes (same values as {@code morphe_vot_caption_language_entry_values})
- * to voice display names shown in the settings UI.
+ * Static catalog of all Edge TTS voices known to this patch. Used both to populate the
+ * voice picker UI and to resolve a voice id for a given language at TTS dispatch time.
+ *
+ * <p>Multilingual voices are also added to languages other than their native one, so a
+ * user with an exotic caption language still has fallback options.
  */
 final class VoiceCatalog {
 

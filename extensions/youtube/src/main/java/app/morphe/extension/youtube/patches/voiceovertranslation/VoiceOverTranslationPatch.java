@@ -41,9 +41,19 @@ import app.morphe.extension.youtube.shared.PlayerType;
 import app.morphe.extension.youtube.shared.VideoState;
 
 /**
- * Patch that provides voice-over translation for YouTube videos.
+ * Orchestrator for the voice-over translation feature: reacts to video time/state changes,
+ * fetches and translates captions, prefetches TTS audio, and dispatches each segment to
+ * either the Edge or System TTS engine.
  *
- * <p>State management is performed on the main thread to avoid complex synchronization.
+ * <p>Collaborators:
+ * <ul>
+ *   <li>{@link TranscriptFetcher} / {@link TranscriptTranslator} - caption pipeline</li>
+ *   <li>{@link TtsPrefetcher} - background synthesis into {@link TtsCache}</li>
+ *   <li>{@link TtsEngine} - Edge TTS WebSocket + MediaPlayer playback</li>
+ *   <li>{@link VotOriginalVolumePatch} - ducks the original audio while TTS speaks</li>
+ * </ul>
+ *
+ * <p>State is touched only on the main thread; the few cross-thread reads use volatile fields.
  */
 @SuppressWarnings({"unused", "deprecation", "RedundantSuppression"})
 public class VoiceOverTranslationPatch {
@@ -102,14 +112,14 @@ public class VoiceOverTranslationPatch {
         }
     }
 
+    // Tick-over-tick time jump above this triggers seek handling.
     private static final long SEEK_JUMP_THRESHOLD_MS = 2_900;
 
     // Minimum time into a segment to justify seeking within the audio instead of
     // playing from the start. Prevents tiny pops on small adjustments.
     private static final long SEEK_INTO_THRESHOLD_MS = 1_000;
 
-    // Rough estimate of natural speech duration (~15 chars per second) used to
-    // decide how much the TTS rate must be raised to fit the segment time slot.
+    // Floor on the calculated speech rate; never slow speech below natural speed.
     private static final float MIN_SPEECH_RATE = 1.0f;
 
     public static final String TTS_ENGINE_SYSTEM = "system";
@@ -142,6 +152,7 @@ public class VoiceOverTranslationPatch {
     // taking a lock. Writes still happen only on the main thread.
     private static volatile int lastSpokenIndex = -1;
 
+    /** @return Index of the segment whose audio is mid-playback, or -1. Safe off-main-thread. */
     static int getLastSpokenIndex() {
         return lastSpokenIndex;
     }
@@ -353,15 +364,18 @@ public class VoiceOverTranslationPatch {
         }
     }
 
+    /** @return true when VoT is enabled, the session is on, and a transcript is loaded. */
     public static boolean isTranslationActive() {
         Utils.verifyOnMainThread();
         return Settings.VOT_ENABLED.get() && sessionEnabled && !segments.isEmpty();
     }
 
+    /** @return Per-session enabled flag (toggleable via the player button) - not the global setting. */
     public static boolean isSessionEnabled() {
         return sessionEnabled;
     }
 
+    /** Flips the session enabled flag and either stops TTS or kicks off transcript loading. */
     public static void toggleTranslation() {
         Utils.verifyOnMainThread();
         sessionEnabled = !sessionEnabled;
@@ -377,11 +391,16 @@ public class VoiceOverTranslationPatch {
         notifyStateChanged();
     }
 
+    /** Stops any in-progress TTS without changing session state. */
     public static void interruptSpeech() {
         Utils.verifyOnMainThread();
         stopTts();
     }
 
+    /**
+     * Resets every segment's playback window to its original caption timing and asks the
+     * prefetcher to re-evaluate. Used by the bottom-sheet "reset" action.
+     */
     public static void resetPlaybackState() {
         Utils.verifyOnMainThread();
         for (TranscriptSegment seg : segments) {
@@ -406,6 +425,7 @@ public class VoiceOverTranslationPatch {
         }
     }
 
+    /** Discards the current transcript and TTS state and re-fetches for the current video. */
     public static void reloadTranscript() {
         Utils.verifyOnMainThread();
         if (currentVideoId.isEmpty()) return;
@@ -420,6 +440,7 @@ public class VoiceOverTranslationPatch {
         }
     }
 
+    /** Registers a callback fired whenever toggle/load state changes (used by the player button UI). */
     public static void setOnTranslationStateChangeCallback(Runnable callback) {
         Utils.verifyOnMainThread();
         onStateChangeCallback = callback;
@@ -497,6 +518,7 @@ public class VoiceOverTranslationPatch {
         });
     }
 
+    /** Lazily creates the System TTS instance and wires its completion listener. Idempotent. */
     public static void ensureTts() {
         Utils.verifyOnMainThread();
         if (tts != null) return;
@@ -743,6 +765,7 @@ public class VoiceOverTranslationPatch {
         }
     }
 
+    /** @return Short sample sentence in the current target language; used by voice preview. */
     public static String getTestString() {
         Locale locale = Locale.forLanguageTag(resolveTargetLang());
         return ResourceUtils.getStringByLocale("morphe_vot_tts_sample", locale);

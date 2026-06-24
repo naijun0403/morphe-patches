@@ -19,14 +19,9 @@ import app.morphe.extension.shared.Utils;
 import app.morphe.extension.youtube.settings.Settings;
 
 /**
- * <pre>
- * Background prefetcher for Edge TTS audio segments.
- *
- * Uses an adaptive throttling strategy:
- * - Segments near the current time are fetched quickly.
- * - Segments further out are fetched moderately.
- * - Remaining segments are fetched slowly until the video is fully cached.
- * </pre>
+ * Background prefetcher that synthesizes upcoming TTS audio into {@link TtsCache} ahead of
+ * playback. Throttles by distance from the play head: aggressive for the next 30s, moderate
+ * out to 60s, slow for everything further, with exponential backoff on server errors.
  */
 final class TtsPrefetcher {
 

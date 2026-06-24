@@ -11,14 +11,27 @@ import androidx.annotation.NonNull;
 
 import java.util.Objects;
 
+/**
+ * One caption line, post-translation. Holds the original video timing plus the (possibly
+ * adjusted) window during which the TTS audio is allowed to play.
+ */
 public final class TranscriptSegment {
+    /** BCP-47 language tag of {@link #text} (e.g. {@code uk-UA}). */
     public final String lang;
+    /** Translated caption text to be spoken. */
     public final String text;
+    /** Original caption start/end times (video ms). Immutable - matches the source captions. */
     public final long startMs;
     public final long endMs;
 
+    /**
+     * Playback window for the TTS audio. Initially equal to {@link #startMs}/{@link #endMs}
+     * but may be shifted by {@link TtsEngine#adjustPlaybackTimes} once the actual audio
+     * length is known, so longer-than-slot speech can borrow time from neighboring gaps.
+     */
     public volatile long playbackStartMs;
     public volatile long playbackEndMs;
+    /** Actual TTS audio duration in ms; -1 until the audio has been synthesized. */
     public volatile long durationMs;
 
     public TranscriptSegment(long startMs, long endMs, String text, String lang) {

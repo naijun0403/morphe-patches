@@ -70,7 +70,9 @@ final class TtsEngine {
     // "Connection reset" when the server drops an idle WebSocket connection.
     private static final long SOCKET_MAX_IDLE_MS = 20_000;
 
+    /** Rough natural speech rate (~15 chars/sec) used to estimate audio duration from text length. */
     public static final long ESTIMATED_MS_PER_CHAR = 65;
+    /** Maximum drift (in either direction) that {@link #adjustPlaybackTimes} may apply to a slot. */
     public final long SEGMENT_START_END_MAX_MOVEMENT_FROM_ORIGINAL_MS = 4000;
 
     // All fields below (except synthesisLock related) must be accessed ONLY on the main thread.
@@ -350,7 +352,19 @@ final class TtsEngine {
     }
 
     /**
-     * Adjusts playback times for a contiguous block of segments to fit the actual spoken audio.
+     * Reshapes playback windows for the block of contiguous segments containing {@code index}
+     * so longer-than-slot speech can borrow time from the gap on either side. Two phases:
+     *
+     * <ol>
+     *   <li>Expand the block boundaries outward (up to {@link #SEGMENT_START_END_MAX_MOVEMENT_FROM_ORIGINAL_MS}
+     *       and at most half of the gap to the neighboring block) if total spoken duration
+     *       exceeds the original window;</li>
+     *   <li>Redistribute internal segment boundaries proportionally to spoken duration so each
+     *       segment gets the share of the window it needs.</li>
+     * </ol>
+     *
+     * Skips entirely while a segment in this block is mid-playback - shifting boundaries
+     * under the player would desync or end audio prematurely.
      */
     public void adjustPlaybackTimes(List<TranscriptSegment> segments, int index,
                                     int currentlyPlayingIndex,

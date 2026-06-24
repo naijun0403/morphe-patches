@@ -117,6 +117,7 @@ public final class TranscriptTranslator {
     private static volatile long pendingSeekTimeMs;
     private static final Runnable seekCutter = TranscriptTranslator::applySeekCut;
 
+    /** Aborts any running translation and disconnects the in-flight HTTP request if any. */
     static void requestAbort() {
         abortTranslation = true;
         HttpURLConnection conn = activeConnection;
