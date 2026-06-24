@@ -45,8 +45,8 @@ import app.morphe.extension.youtube.patches.VideoInformation;
  * through Android's MediaPlayer on the NAVIGATION_GUIDANCE audio channel (independent
  * volume from YouTube's media stream).
  *
- * <p>One instance is shared for the lifetime of the patch; ordering is enforced by the
- * caller (typically {@link TtsQueue}) - this class plays a single utterance at a time.
+ * <p>One instance is shared for the lifetime of the patch; only one synthesis + playback
+ * runs at a time (callers gate on {@link #isSpeaking()}).
  *
  * <p>The underlying WebSocket connection is kept alive across calls and only torn down
  * on an explicit error or when the server closes it.
@@ -71,10 +71,12 @@ final class TtsEngine {
     private static final long SOCKET_MAX_IDLE_MS = 20_000;
 
     public static final long ESTIMATED_MS_PER_CHAR = 65;
+    // TODO: Allow changing this with a setting of low/medium/high?
     public final long SEGMENT_START_END_MAX_MOVEMENT_FROM_ORIGINAL_MS = 4000;
 
     // All fields below (except synthesisLock related) must be accessed ONLY on the main thread.
     private boolean stopped;
+    private boolean speaking;
     private MediaPlayer currentPlayer;
     /**
      * Boosts TTS playback gain above MediaPlayer's 1.0 ceiling so Edge MP3 (normalized to ~-16 LUFS)
@@ -103,6 +105,11 @@ final class TtsEngine {
 
     private TtsEngine() {}
 
+    boolean isSpeaking() {
+        Utils.verifyOnMainThread();
+        return speaking;
+    }
+
     /**
      * High-level entry point for Edge TTS speech at natural speed (rate=1.0).
      * Handles background synthesis and playback for the given voice.
@@ -127,14 +134,18 @@ final class TtsEngine {
                         // is baked into synthesized data.
                         final float playbackRate = VideoInformation.getPlaybackSpeed();
                         play(data, volume, playbackRate, startTimeMs, id, onDone);
-                    } else if (id == playbackId && onDone != null) {
-                        onDone.run();
+                    } else if (id == playbackId) {
+                        speaking = false;
+                        if (onDone != null) onDone.run();
                     }
                 });
             } catch (Exception ex) {
                 VoiceOverTranslationPatch.logError(() -> "Edge TTS speak failed", ex);
                 Utils.runOnMainThread(() -> {
-                    if (id == playbackId && onDone != null) onDone.run();
+                    if (id == playbackId) {
+                        speaking = false;
+                        if (onDone != null) onDone.run();
+                    }
                 });
             }
         });
@@ -169,7 +180,17 @@ final class TtsEngine {
         }
         stopped = false;
         playbackId++;
+        speaking = true;
         return playbackId;
+    }
+
+    /** Clears the busy flag for a specific playback ID if it's still current. */
+    void clearBusy(long id) {
+        Utils.verifyOnMainThread();
+        if (id == playbackId) {
+            Logger.printDebug((() -> "clearing busy flag"));
+            speaking = false;
+        }
     }
 
     /** Returns the current active playback session ID. */
@@ -213,7 +234,10 @@ final class TtsEngine {
 
         // Reject audio that completed synthesis after stop() was called (e.g. post-seek).
         if (stopped || id != playbackId) {
-            if (id == playbackId && onDone != null) onDone.run();
+            if (id == playbackId) {
+                speaking = false;
+                if (onDone != null) onDone.run();
+            }
             return;
         }
 
@@ -229,7 +253,10 @@ final class TtsEngine {
                 });
             } finally {
                 Utils.runOnMainThread(() -> {
-                    if (id == playbackId && onDone != null) onDone.run();
+                    if (id == playbackId) {
+                        speaking = false;
+                        if (onDone != null) onDone.run();
+                    }
                 });
             }
         });
@@ -279,6 +306,7 @@ final class TtsEngine {
             Logger.printDebug(() -> "Stopping TTS");
         }
         stopped = true;
+        speaking = false;
 
         // Unblock latch.await() in playMp3() so the thread exits quickly.
         if (playLatch != null) {
@@ -423,7 +451,6 @@ final class TtsEngine {
             s.playbackEndMs = currentPos;
         }
     }
-
 
     private byte[] synthesizeEdge(String text, String voice, String lang, float rate) throws Exception {
         Utils.verifyOffMainThread();

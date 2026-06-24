@@ -535,7 +535,7 @@ public class Settings extends SharedYouTubeSettings {
     public static final StringSetting VOT_TTS_VOICE_TYPE = new StringSetting("morphe_vot_tts_voice_type", "auto", parent(VOT_ENABLED));
     public static final IntegerSetting VOT_ORIGINAL_AUDIO_VOLUME = new IntegerSetting("morphe_vot_original_audio_volume", 50, parent(VOT_ENABLED));
     public static final IntegerSetting VOT_TRANSLATION_VOLUME = new IntegerSetting("morphe_vot_translation_volume", 100, parent(VOT_ENABLED));
-    public static final IntegerSetting VOT_MAX_QUEUE_AGE = new IntegerSetting("morphe_vot_max_queue_age", 4, parent(VOT_ENABLED));
+    public static final IntegerSetting VOT_MAX_SPEECH_RATE = new IntegerSetting("morphe_vot_max_speech_rate", 15, parent(VOT_ENABLED));
     public static final StringSetting VOT_TRANSLATION_SERVICE = new StringSetting("morphe_vot_translation_service", "google", parent(VOT_ENABLED));
     public static final StringSetting VOT_OPENROUTER_API_KEY = new StringSetting("morphe_vot_openrouter_api_key", "", new OpenRouterServiceAvailability());
     public static final StringSetting VOT_OPENROUTER_MODEL = new StringSetting("morphe_vot_openrouter_model", "mistralai/mistral-nemo", new OpenRouterServiceAvailability());
@@ -659,9 +659,11 @@ public class Settings extends SharedYouTubeSettings {
 
         Setting.addImportExportCallback(SponsorBlockSettings.SB_IMPORT_EXPORT_CALLBACK);
         Setting.addImportExportCallback(VoiceOverTranslationPatch.VOT_IMPORT_EXPORT_CALLBACK);
+    }
 
     // Register SeekBar UI configs so the single shared SeekBarPreference class knows the
     // range, step, unit, integer setting that uses it.
+    static {
         SeekBarPreference.register(new SeekBarConfig(SWIPE_ZONE_WIDTH,
                 5, 50, 1, "%"));
         SeekBarPreference.register(new SeekBarConfig(SWIPE_OVERLAY_OPACITY,
@@ -686,7 +688,7 @@ public class Settings extends SharedYouTubeSettings {
                 0, 100, 10, "%"));
         SeekBarPreference.register(new SeekBarConfig(VOT_TRANSLATION_VOLUME,
                 0, 100, 10, "%"));
-        SeekBarPreference.register(new SeekBarConfig(VOT_MAX_QUEUE_AGE,
-                2, 7, 1, "s"));
+        SeekBarPreference.register(new SeekBarConfig(VOT_MAX_SPEECH_RATE,
+                10, 25, 1, "x", 10));
     }
 }
