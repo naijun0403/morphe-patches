@@ -305,6 +305,7 @@ public final class VotBottomSheet {
         pickerRoot.addView(listLayout);
         mainDialog.dismiss();
         pickerDialog.setOnCancelListener(d -> VotBottomSheet.show(context));
+        PipDismissHelper.dismissOnPip(pickerDialog);
         pickerDialog.show();
     }
 
@@ -399,6 +400,7 @@ public final class VotBottomSheet {
         pickerRoot.addView(scroll);
         mainDialog.dismiss();
         pickerDialog.setOnCancelListener(d -> VotBottomSheet.show(context));
+        PipDismissHelper.dismissOnPip(pickerDialog);
         pickerDialog.show();
     }
 
@@ -563,6 +565,7 @@ public final class VotBottomSheet {
         pickerRoot.addView(listView);
         mainDialog.dismiss();
         pickerDialog.setOnCancelListener(d -> VotBottomSheet.show(context));
+        PipDismissHelper.dismissOnPip(pickerDialog);
         pickerDialog.show();
     }
 
@@ -623,7 +626,7 @@ public final class VotBottomSheet {
         seekRow.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout.LayoutParams seekRowParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        seekRowParams.topMargin = Dim.dp8;
+        seekRowParams.topMargin = Dim.dp16;
         seekRow.setLayoutParams(seekRowParams);
 
         SeekBar seekBar = new SeekBar(context);
