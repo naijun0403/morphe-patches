@@ -26,6 +26,7 @@ import android.widget.LinearLayout;
 import androidx.annotation.Nullable;
 
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
@@ -954,6 +955,67 @@ public class VoiceOverTranslationPatch {
             pair.first.show();
         } catch (Exception ex) {
             logError(() -> "showOpenRouterCreditsDialog failure", ex);
+        }
+    }
+
+    static void notifyMyMemoryError(int responseStatus, @Nullable String details) {
+        if (httpErrorDialogShownThisVideo) return;
+        httpErrorDialogShownThisVideo = true;
+        if (TranscriptTranslator.isMyMemoryQuotaError(responseStatus, details)) {
+            final String nextAvailableAt = formatNextAvailableClockTime(
+                    TranscriptTranslator.parseMyMemoryNextAvailableMinutes(details));
+            Utils.runOnMainThread(() -> {
+                Activity activity = Utils.getActivity();
+                if (activity == null || activity.isFinishing() || activity.isDestroyed()) return;
+                showMyMemoryQuotaDialog(activity, nextAvailableAt);
+            });
+        } else {
+            Utils.showToastLong(str("morphe_vot_mymemory_error", responseStatus));
+        }
+    }
+
+    /**
+     * Converts a wait duration to the wall-clock time the quota will reset, formatted as
+     * {@code HH:mm} in the device locale. Returns null when the duration is unknown so the
+     * dialog can omit the "next available at" line.
+     */
+    @Nullable
+    private static String formatNextAvailableClockTime(@Nullable Long waitMinutes) {
+        if (waitMinutes == null) return null;
+        Calendar c = Calendar.getInstance();
+        c.add(Calendar.MINUTE, waitMinutes.intValue());
+        return String.format(Locale.getDefault(), "%02d:%02d",
+                c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE));
+    }
+
+    private static void showMyMemoryQuotaDialog(Activity activity, @Nullable String nextAvailableAt) {
+        Utils.verifyOnMainThread();
+        try {
+            // Show a different body depending on whether the user already gets the 10x
+            // limit via an email - otherwise we'd suggest adding what's already there.
+            final boolean emailSet = !Settings.VOT_MYMEMORY_EMAIL.get().trim().isEmpty();
+            String message = emailSet
+                    ? str("morphe_vot_mymemory_quota_message_with_email")
+                    : str("morphe_vot_mymemory_quota_message_no_email");
+            if (nextAvailableAt != null) {
+                message = str("morphe_vot_mymemory_quota_next_available", nextAvailableAt)
+                        + "\n\n" + message;
+            }
+            Pair<Dialog, LinearLayout> pair = CustomDialog.create(
+                    activity,
+                    str("morphe_vot_mymemory_quota_title"),
+                    message,
+                    null,
+                    null,
+                    () -> {},
+                    null,
+                    null,
+                    null,
+                    true
+            );
+            pair.first.show();
+        } catch (Exception ex) {
+            logError(() -> "showMyMemoryQuotaDialog failure", ex);
         }
     }
 

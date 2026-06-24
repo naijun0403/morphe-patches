@@ -391,6 +391,11 @@ Your API key should never be shared. Anyone with access to it can use your OpenR
     <string name="morphe_vot_openrouter_credits_message">Your OpenRouter credit limit has been reached. Top up your balance or increase your key spending limit at OpenRouter.ai</string>
     <string name="morphe_vot_openrouter_open_website">Open OpenRouter.ai</string>
     <string name="morphe_vot_openrouter_error">OpenRouter translation failed (HTTP %s)</string>
+    <string name="morphe_vot_mymemory_quota_title">MyMemory daily limit reached</string>
+    <string name="morphe_vot_mymemory_quota_next_available">Next available at %s.</string>
+    <string name="morphe_vot_mymemory_quota_message_no_email">You\'ve used today\'s free MyMemory translation quota (5,000 characters). Add a MyMemory email in settings to raise the daily limit to 50,000 characters, or switch to a different translation service</string>
+    <string name="morphe_vot_mymemory_quota_message_with_email">You\'ve used today\'s MyMemory translation quota (50,000 characters). Switch to a different translation service or try again tomorrow</string>
+    <string name="morphe_vot_mymemory_error">MyMemory translation failed (status %s)</string>
 
     <!-- interaction.loop.loopVideoPatch -->
     <string name="morphe_loop_video_title">Enable loop video</string>

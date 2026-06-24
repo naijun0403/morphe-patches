@@ -35,6 +35,8 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.Utils;
@@ -46,11 +48,11 @@ import app.morphe.extension.youtube.settings.Settings;
  */
 public final class TranscriptTranslator {
 
-    private static final String TRANSLATE_URL =
-            "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&dt=t&tl=";
-
     private static final int CONNECT_TIMEOUT_MS = 10_000;
     private static final int READ_TIMEOUT_MS = 15_000;
+
+    private static final String GOOGLE_TRANSLATE_URL =
+            "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&dt=t&tl=";
 
     // Batches are built by character budget rather than segment count, so request
     // sizes stay uniform regardless of how long the merged sentences are.
@@ -619,7 +621,7 @@ public final class TranscriptTranslator {
             joined.append(seg.text);
         }
 
-        HttpURLConnection conn = (HttpURLConnection) new URL(TRANSLATE_URL + targetLang).openConnection();
+        HttpURLConnection conn = (HttpURLConnection) new URL(GOOGLE_TRANSLATE_URL + targetLang).openConnection();
         conn.setRequestMethod("POST");
         conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
         conn.setReadTimeout(READ_TIMEOUT_MS);
@@ -686,16 +688,23 @@ public final class TranscriptTranslator {
 
         final int httpCode = conn.getResponseCode();
         if (httpCode != 200) {
-            VoiceOverTranslationPatch.notifyHttpError(httpCode);
+            // Must use the error stream for non-200; getInputStream() throws FileNotFoundException
+            // on Android's HttpURLConnection for 4xx/5xx responses.
+            final String body = readErrorBody(conn);
+            VoiceOverTranslationPatch.notifyMyMemoryError(httpCode, body);
             throw new Exception("MyMemory HTTP status: " + httpCode + " language: " + targetLang
-                    + " response: " + Requester.parseString(conn));
+                    + " response: " + body);
         }
 
         // Response: {"responseStatus": 200, "responseData": {"translatedText": "..."}}
+        // On error responseStatus is the string form of an HTTP-like code (e.g. "403" for quota).
         JSONObject json = new JSONObject(Requester.parseString(conn));
         final int responseStatus = json.optInt("responseStatus", 200);
-        if (responseStatus != 200) throw new Exception("MyMemory error " + responseStatus
-                + ": " + json.optString("responseDetails", "unknown error"));
+        if (responseStatus != 200) {
+            final String details = json.optString("responseDetails", "unknown error");
+            VoiceOverTranslationPatch.notifyMyMemoryError(responseStatus, details);
+            throw new Exception("MyMemory error " + responseStatus + ": " + details);
+        }
 
         String translation = json.getJSONObject("responseData").getString("translatedText");
         List<String> result = Arrays.asList(translation.split("\n", -1));
@@ -737,6 +746,38 @@ public final class TranscriptTranslator {
         // OpenRouter returns 403 for both moderation blocks and spending limits;
         // distinguish by checking the message text.
         return body.contains("credit") || body.contains("limit exceeded");
+    }
+
+    /**
+     * @return true when a MyMemory response indicates the daily character quota has been
+     * exhausted. Matches the documented quota status codes (403 / 429) and the marker
+     * string MyMemory puts in {@code responseDetails} for quota responses.
+     */
+    static boolean isMyMemoryQuotaError(int responseStatus, @Nullable String details) {
+        if (responseStatus == 403 || responseStatus == 429) return true;
+        if (details == null) return false;
+        return details.toUpperCase(Locale.ROOT).contains("YOU USED ALL AVAILABLE");
+    }
+
+    private static final Pattern MYMEMORY_NEXT_AVAILABLE_PATTERN = Pattern.compile(
+            "NEXT AVAILABLE IN\\s+(\\d+)\\s*HOURS?(?:\\s+(\\d+)\\s*MINUTES?)?",
+            Pattern.CASE_INSENSITIVE);
+
+    /**
+     * Extracts the wait time from a MyMemory quota response and returns it in minutes.
+     * Returns null if the response does not include a parseable "NEXT AVAILABLE IN" stanza,
+     * which lets the caller fall back to a message that does not mention a specific time.
+     */
+    @Nullable
+    static Long parseMyMemoryNextAvailableMinutes(@Nullable String details) {
+        if (details == null) return null;
+        Matcher m = MYMEMORY_NEXT_AVAILABLE_PATTERN.matcher(details);
+        if (!m.find()) return null;
+        final String hoursStr = m.group(1);
+        final String minutesStr = m.group(2);
+        if (hoursStr == null) return null;
+        return Integer.parseInt(hoursStr) * 60L
+                + (minutesStr != null ? Integer.parseInt(minutesStr) : 0);
     }
 
     private static List<String> translateBatchOpenRouter(
