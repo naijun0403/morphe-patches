@@ -129,6 +129,8 @@ public class VoiceOverTranslationPatch {
     // Duck is held until this time so TTS that extends into the gap before the
     // next segment does not prematurely restore the original audio volume.
     private static long ttsEndVideoTimeMs;
+    // Deduplicates lookahead wake-ups so a tight tick loop does not flood the main looper.
+    private static long scheduledCheckForSegmentStartMs = -1;
 
     private static List<TranscriptSegment> segments = new ArrayList<>();
     // Volatile so background threads can read the active segment without
@@ -311,10 +313,16 @@ public class VoiceOverTranslationPatch {
             } else if (i > lastSpokenIndex && segPlaybackStartMs <= timeMs + lookaheadMs) {
                 // Next segment starts between now and the next update to this method.
                 // Schedule a call to recheck TTS playback when the segment will start.
-                final float speed = Math.max(0.1f, VideoInformation.getPlaybackSpeed());
-                final long delayMs = (long) ((segPlaybackStartMs - timeMs + schedulingDelayMs) / speed);
-                Logger.printDebug(() -> "Scheduling next segment check in " + delayMs + "ms");
-                Utils.runOnMainThreadDelayed(() -> videoTimeChanged(VideoInformation.getVideoTime()), delayMs);
+                if (segPlaybackStartMs != scheduledCheckForSegmentStartMs) {
+                    final float speed = Math.max(0.1f, VideoInformation.getPlaybackSpeed());
+                    final long delayMs = (long) ((segPlaybackStartMs - timeMs + schedulingDelayMs) / speed);
+                    Logger.printDebug(() -> "Scheduling next segment check in " + delayMs + "ms");
+                    scheduledCheckForSegmentStartMs = segPlaybackStartMs;
+                    Utils.runOnMainThreadDelayed(() -> {
+                        scheduledCheckForSegmentStartMs = -1;
+                        videoTimeChanged(VideoInformation.getVideoTime());
+                    }, delayMs);
+                }
                 break;
             }
         }
@@ -560,9 +568,9 @@ public class VoiceOverTranslationPatch {
         if (wasExplicitSeek) {
             final long timeIntoSegment = lastVideoTimeMs - seg.playbackStartMs;
             if (timeIntoSegment > SEEK_INTO_THRESHOLD_MS) {
-                // Approximate audio position. Ideally we'd use the speech rate, but since rate is
-                // baked into SSML for Edge, we assume normal speed. The TTS clip is usually shorter
-                // than the video segment, so clamp to its length to avoid seeking past the end.
+                // Approximate audio position assuming natural speed. The TTS clip is usually
+                // shorter than the video segment, so clamp to its length to avoid seeking past
+                // the end.
                 startTimeMs = Math.min(timeIntoSegment, speechDurationMs);
             }
             final long startTimeMsFinal = startTimeMs;
@@ -603,9 +611,33 @@ public class VoiceOverTranslationPatch {
             return;
         }
 
-        // Edge synthesis doesn't support seeking during synthesis; play() will seek the result.
-        ttsEngine.speak(seg.text, voice, lang, volume, rate, startTimeMs,
-                VoiceOverTranslationPatch::triggerNextSegmentCheck);
+        // Synthesize at natural speed so the result can be cached and reused at any rate;
+        // playback rate is applied by MediaPlayer instead.
+        final long playbackId = ttsEngine.markBusy();
+        final String videoIdSnapshot = currentVideoId;
+        final long startTimeMsSnapshot = startTimeMs;
+        Utils.runOnBackgroundThread(() -> {
+            byte[] data;
+            try {
+                data = ttsEngine.prefetch(seg.text, voice, lang);
+            } catch (Exception ex) {
+                logError(() -> "On-demand synthesis failed for segment " + index, ex);
+                Utils.runOnMainThread(VoiceOverTranslationPatch::triggerNextSegmentCheck);
+                return;
+            }
+            if (data.length > 0) {
+                TtsCache.put(videoIdSnapshot, index, voice, lang, seg.text, data);
+            }
+            final byte[] finalData = data;
+            Utils.runOnMainThread(() -> {
+                if (finalData.length > 0 && playbackId == ttsEngine.getPlaybackId()) {
+                    ttsEngine.play(finalData, volume, rate, startTimeMsSnapshot, playbackId,
+                            VoiceOverTranslationPatch::triggerNextSegmentCheck);
+                } else {
+                    triggerNextSegmentCheck();
+                }
+            });
+        });
     }
 
     private static void triggerNextSegmentCheck() {
@@ -779,11 +811,9 @@ public class VoiceOverTranslationPatch {
         isTestSpeaking = false;
         ttsEngine.stop();
         if (tts != null) tts.stop();
-        // Speech was interrupted (new video, seek, pause) - no backlog left to catch
-        // up on, so the next utterance starts from normal speed again.
-        float lastSpeechRate = MIN_SPEECH_RATE;
         lastSpokenIndex = -1;
         ttsEndVideoTimeMs = 0;
+        scheduledCheckForSegmentStartMs = -1;
         VotOriginalVolumePatch.clearAudioMultiplier();
     }
 
