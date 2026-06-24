@@ -71,7 +71,6 @@ final class TtsEngine {
     private static final long SOCKET_MAX_IDLE_MS = 20_000;
 
     public static final long ESTIMATED_MS_PER_CHAR = 65;
-    // TODO: Allow changing this with a setting of low/medium/high?
     public final long SEGMENT_START_END_MAX_MOVEMENT_FROM_ORIGINAL_MS = 4000;
 
     // All fields below (except synthesisLock related) must be accessed ONLY on the main thread.
@@ -111,29 +110,19 @@ final class TtsEngine {
     }
 
     /**
-     * High-level entry point for Edge TTS speech at natural speed (rate=1.0).
-     * Handles background synthesis and playback for the given voice.
+     * High-level entry point for Edge TTS speech at natural speed. Synthesizes in the
+     * background and plays through MediaPlayer at the current video playback speed.
      */
     void speak(String text, String voiceId, String lang, float volume, Runnable onDone) {
-        speak(text, voiceId, lang, volume, 1.0f, 0, onDone);
-    }
-
-    /**
-     * High-level entry point for Edge TTS speech starting at {@code startTimeMs}.
-     */
-    void speak(String text, String voiceId, String lang, float volume, float rate, long startTimeMs, Runnable onDone) {
         Utils.verifyOnMainThread();
         final long id = markBusy();
 
         Utils.runOnBackgroundThread(() -> {
             try {
-                byte[] data = synthesize(text, voiceId, lang, rate);
+                byte[] data = prefetch(text, voiceId, lang);
                 Utils.runOnMainThread(() -> {
                     if (data.length > 0 && !stopped && id == playbackId) {
-                        // Must play based on playback rate. Underlying voice speaking rate
-                        // is baked into synthesized data.
-                        final float playbackRate = VideoInformation.getPlaybackSpeed();
-                        play(data, volume, playbackRate, startTimeMs, id, onDone);
+                        play(data, volume, VideoInformation.getPlaybackSpeed(), 0, id, onDone);
                     } else if (id == playbackId) {
                         speaking = false;
                         if (onDone != null) onDone.run();
@@ -199,16 +188,20 @@ final class TtsEngine {
         return playbackId;
     }
 
-    /**
-     * Synthesizes {@code text} with the given Edge TTS {@code voice} on a background thread.
-     */
-    byte[] synthesize(String text, String voice, String lang, float rate) throws Exception {
-        return synthesizeEdge(text, voice, lang, rate);
+    /** Synthesizes {@code text} via Edge TTS at natural speed. Must be called off the main thread. */
+    byte[] prefetch(String text, String voice, String lang) throws Exception {
+        return synthesizeEdge(text, voice, lang);
     }
 
-    /** Overload for background synthesis (prefetching). */
-    byte[] prefetch(String text, String voice, String lang) throws Exception {
-        return synthesizeEdge(text, voice, lang, 1.0f);
+    /**
+     * Pre-establishes the WebSocket so the first real synthesis does not pay TLS handshake
+     * and HTTP upgrade cost on top of the synthesis itself. Must be called off the main thread.
+     */
+    void warmConnection() throws Exception {
+        Utils.verifyOffMainThread();
+        synchronized (synthesisLock) {
+            ensureConnected();
+        }
     }
 
     /**
@@ -452,7 +445,7 @@ final class TtsEngine {
         }
     }
 
-    private byte[] synthesizeEdge(String text, String voice, String lang, float rate) throws Exception {
+    private byte[] synthesizeEdge(String text, String voice, String lang) throws Exception {
         Utils.verifyOffMainThread();
         synchronized (synthesisLock) {
             IOException lastEx = null;
@@ -460,7 +453,7 @@ final class TtsEngine {
                 try {
                     String timestamp = edgeTimestamp();
                     String requestId = uuidHex();
-                    String ssml = buildSsml(text, voice, lang, rate);
+                    String ssml = buildSsml(text, voice, lang);
 
                     // Ensure we have a valid connection.
                     ensureConnected();
@@ -500,17 +493,11 @@ final class TtsEngine {
         }
     }
 
-    private String buildSsml(String text, String voice, String lang, float rate) {
-        String inner = escapeXml(text);
-        final int ratePercent = Math.round((rate - 1.0f) * 100);
-        if (ratePercent != 0) {
-            inner = "<prosody rate='" + (ratePercent > 0 ? "+" : "") + ratePercent + "%'>"
-                    + inner + "</prosody>";
-        }
+    private String buildSsml(String text, String voice, String lang) {
         String speakLang = lang != null && !lang.isEmpty() ? lang : localePart(voice);
         return "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis'"
                 + " xml:lang='" + speakLang + "'>"
-                + "<voice name='" + voice + "'>" + inner + "</voice></speak>";
+                + "<voice name='" + voice + "'>" + escapeXml(text) + "</voice></speak>";
     }
 
     /**

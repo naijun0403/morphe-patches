@@ -222,6 +222,17 @@ public class VoiceOverTranslationPatch {
         if (PlayerType.getCurrent() == PlayerType.INLINE_MINIMAL) return;
         TtsPrefetcher.updateVideo(videoId, segments);
         loadTranscript(videoId);
+
+        // Open the Edge socket in parallel so the first synthesis doesn't pay handshake cost.
+        if (!Settings.VOT_USE_NATIVE_TTS.get()) {
+            Utils.runOnBackgroundThread(() -> {
+                try {
+                    ttsEngine.warmConnection();
+                } catch (Exception ex) {
+                    Logger.printDebug(() -> "Edge warm-up failed: " + ex);
+                }
+            });
+        }
     }
 
     /**
@@ -603,10 +614,12 @@ public class VoiceOverTranslationPatch {
         }
 
         VotOriginalVolumePatch.setAudioMultiplier(Settings.VOT_ORIGINAL_AUDIO_VOLUME.get() / 100.0f);
+        // Multiply by playback speed so TTS keeps pace with non-1.0x video.
+        final float playbackRate = rate * VideoInformation.getPlaybackSpeed();
         byte[] cached = TtsCache.get(currentVideoId, index, voice, lang, seg.text);
         if (cached != null) {
             final long playbackId = ttsEngine.markBusy();
-            ttsEngine.play(cached, volume, rate, startTimeMs, playbackId,
+            ttsEngine.play(cached, volume, playbackRate, startTimeMs, playbackId,
                     VoiceOverTranslationPatch::triggerNextSegmentCheck);
             return;
         }
@@ -631,7 +644,9 @@ public class VoiceOverTranslationPatch {
             final byte[] finalData = data;
             Utils.runOnMainThread(() -> {
                 if (finalData.length > 0 && playbackId == ttsEngine.getPlaybackId()) {
-                    ttsEngine.play(finalData, volume, rate, startTimeMsSnapshot, playbackId,
+                    // Re-read playback speed in case it changed during synthesis.
+                    final float playbackRateNow = rate * VideoInformation.getPlaybackSpeed();
+                    ttsEngine.play(finalData, volume, playbackRateNow, startTimeMsSnapshot, playbackId,
                             VoiceOverTranslationPatch::triggerNextSegmentCheck);
                 } else {
                     triggerNextSegmentCheck();
@@ -685,10 +700,15 @@ public class VoiceOverTranslationPatch {
         Utils.verifyOnMainThread();
         wasExplicitSeek = true;
 
+        // If no segment is mid-playback there is nothing to stop or preserve. This also
+        // skips the redundant work when videoTimeChanged's jump detection just handled
+        // this same seek (it resets lastSpokenIndex to -1).
+        if (lastSpokenIndex < 0) return;
+
         // Check if the seek was within the current segment. If so, let videoTimeChanged
         // handle the restart/seek-into logic to avoid a jarring stop and restart.
         boolean insideSameSegment = false;
-        if (lastSpokenIndex >= 0 && lastSpokenIndex < segments.size()) {
+        if (lastSpokenIndex < segments.size()) {
             TranscriptSegment seg = segments.get(lastSpokenIndex);
             if (lastVideoTimeMs >= seg.playbackStartMs && lastVideoTimeMs < seg.playbackEndMs) {
                 insideSameSegment = true;
