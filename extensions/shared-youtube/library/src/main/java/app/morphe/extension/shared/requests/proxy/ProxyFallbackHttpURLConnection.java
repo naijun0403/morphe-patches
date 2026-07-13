@@ -5,7 +5,7 @@
  * See the included NOTICE file for GPLv3 Section 7 terms that apply to this code.
  */
 
-package app.morphe.extension.shared.patches;
+package app.morphe.extension.shared.requests.proxy;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -17,10 +17,10 @@ import java.util.function.Consumer;
  * Request configuration is mirrored before either connection starts, but proxy credentials remain
  * exclusive to the proxy connection.
  */
-final class ProxyFallbackHttpURLConnection extends FallbackHttpURLConnection {
+public final class ProxyFallbackHttpURLConnection extends FallbackHttpURLConnection {
     private boolean connectionSelected;
 
-    ProxyFallbackHttpURLConnection(
+    public ProxyFallbackHttpURLConnection(
             HttpURLConnection proxyConnection,
             HttpURLConnection directConnection,
             Consumer<IOException> fallbackCallback

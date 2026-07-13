@@ -5,7 +5,7 @@
  * See the included NOTICE file for GPLv3 Section 7 terms that apply to this code.
  */
 
-package app.morphe.extension.shared.patches;
+package app.morphe.extension.shared.requests.proxy;
 
 import java.io.FilterInputStream;
 import java.io.IOException;
@@ -23,7 +23,7 @@ import java.util.function.Consumer;
  * Cronet connection that applies the configured timeouts to asynchronous connection setup,
  * request I/O, response headers, and response body reads.
  */
-final class CronetHttpURLConnection extends DelegatingHttpURLConnection {
+public final class CronetHttpURLConnection extends DelegatingHttpURLConnection {
     private static final int TIMEOUT_STATE_ACTIVE = 0;
     private static final int TIMEOUT_STATE_COMPLETED = 1;
     private static final int TIMEOUT_STATE_EXPIRED = 2;
@@ -39,7 +39,7 @@ final class CronetHttpURLConnection extends DelegatingHttpURLConnection {
     private volatile boolean responseHeadersReceived;
     private int responseCode;
 
-    CronetHttpURLConnection(
+    public CronetHttpURLConnection(
             HttpURLConnection delegate,
             Consumer<IllegalStateException> engineUnavailableCallback
     ) {

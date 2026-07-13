@@ -37,6 +37,9 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.requests.Requester;
+import app.morphe.extension.shared.requests.proxy.CronetFallbackHttpURLConnection;
+import app.morphe.extension.shared.requests.proxy.CronetHttpURLConnection;
+import app.morphe.extension.shared.requests.proxy.ProxyFallbackHttpURLConnection;
 
 @SuppressWarnings("unused")
 public final class NetworkProxyPatch {

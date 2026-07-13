@@ -5,7 +5,7 @@
  * See the included NOTICE file for GPLv3 Section 7 terms that apply to this code.
  */
 
-package app.morphe.extension.shared.patches;
+package app.morphe.extension.shared.requests.proxy;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -16,8 +16,8 @@ import java.util.function.Consumer;
  * Cronet connection that switches to direct if its engine becomes unavailable before request I/O
  * starts. A successful operation commits to its selected connection so requests are never replayed.
  */
-final class CronetFallbackHttpURLConnection extends FallbackHttpURLConnection {
-    CronetFallbackHttpURLConnection(
+public final class CronetFallbackHttpURLConnection extends FallbackHttpURLConnection {
+    public CronetFallbackHttpURLConnection(
             HttpURLConnection cronetConnection,
             HttpURLConnection directConnection,
             Consumer<IllegalStateException> fallbackCallback
